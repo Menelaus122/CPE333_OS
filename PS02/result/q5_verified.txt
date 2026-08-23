@@ -1,0 +1,144 @@
+# ผลการรันจริง - CPE333 PS02 ข้อ 5 (กรณีพิเศษของ Pipe)
+# Environment: Ubuntu 24.04.1 LTS (WSL2), kernel 6.6.87.2-microsoft-standard-WSL2, gcc 13.3.0
+#
+# Compile: gcc -Wall -Wextra -o q5_1_sender_reads_own q5_1_sender_reads_own.c   -> ผ่าน ไม่มี warning
+#          gcc -Wall -Wextra -o q5_2_read_before_send q5_2_read_before_send.c   -> ผ่าน ไม่มี warning
+#          gcc -Wall -Wextra -o q5_3_many_messages    q5_3_many_messages.c      -> ผ่าน ไม่มี warning
+
+
+################################################################
+# 5.1  ผู้ส่งพยายามอ่านข้อความของตัวเองกลับ
+################################################################
+
+--- วิธีทดลอง ---
+ดัดแปลงจากข้อ 4 โดย "จงใจไม่ปิด" descriptor ฝั่งใดเลย ทำให้ child ถือทั้ง
+ปลายอ่านและปลายเขียน จากนั้นให้ child เขียนข้อความลง pipe แล้วรีบ read()
+กลับทันที ส่วน parent (ผู้รับตัวจริง) หน่วงด้วย sleep(1) แล้วค่อยอ่าน
+ตั้ง alarm(3) ไว้เป็นตาข่ายกันโปรแกรมค้างถาวร
+
+$ ./q5_1_sender_reads_own
+[child ] writing: "Hello from child PID: 29443"
+[child ] now reading from fd[0] (its OWN pipe) ...
+[child ] read back 28 bytes: "Hello from child PID: 29443"   <-- its own message!
+[parent] now trying to read the message ...
+[parent] read FAILED: Interrupted system call
+[parent] -> the pipe was empty: the sender had already consumed its own message.
+
+--- ผลการทดสอบซ้ำ 3 ครั้ง ---
+ได้ผลเหมือนกันทุกครั้ง: child อ่านข้อความของตัวเองกลับได้ 28 ไบต์
+และ parent อ่านไม่ได้ ต้องถูก SIGALRM ขัดจังหวะทุกครั้ง (EINTR)
+
+--- สิ่งที่สังเกตได้ ---
+1. child อ่านข้อความของตัวเองกลับมาได้ครบ 28 ไบต์ ไม่มีอะไรห้าม
+2. parent ซึ่งเป็นผู้รับตัวจริง "ไม่ได้อะไรเลย" ข้อมูลหายไปจากระบบ
+3. parent ไม่ได้รับ EOF แต่ค้างอยู่ใน read() จนกระทั่ง alarm(3) ยิง SIGALRM
+   ทำให้ read() คืน -1 พร้อม errno = EINTR (Interrupted system call)
+
+
+################################################################
+# 5.2  ผู้รับอ่านก่อนที่ผู้ส่งจะส่ง
+################################################################
+
+--- วิธีทดลอง ---
+ให้ parent เรียก read() ทันทีตั้งแต่ pipe ยังว่าง ส่วน child หน่วง
+sleep(3) ก่อนจึงเขียน วัดเวลาที่ read() ใช้ไปด้วย clock_gettime()
+เพื่อพิสูจน์ว่า parent หลับอยู่ในเคอร์เนลจริง
+จากนั้นเฟส 2 ให้ parent อ่านซ้ำอีกครั้งหลัง child ปิดปลายเขียนและจบไปแล้ว
+
+$ ./q5_2_read_before_send
+[parent] calling read() immediately, pipe is still empty ...
+[child ] sleeping 3 s before sending ...
+[child ] sending now: "Hello from child PID: 29447"
+[child ] write end closed, exiting.
+[parent] read() returned after 3.00 s with 28 bytes: "Hello from child PID: 29447"
+[parent] -> read() BLOCKED, it did not fail and did not return 0.
+[parent] reading again, now that every write end is closed ...
+[parent] read() returned 0 after 0.00 s  -> EOF (no writer left, so no blocking)
+
+--- ผลการทดสอบซ้ำ 3 ครั้ง ---
+    รอบที่ 1 : เฟส 1 คืนค่าหลัง 3.00 s / เฟส 2 คืน 0 หลัง 0.00 s
+    รอบที่ 2 : เฟส 1 คืนค่าหลัง 3.00 s / เฟส 2 คืน 0 หลัง 0.00 s
+    รอบที่ 3 : เฟส 1 คืนค่าหลัง 3.00 s / เฟส 2 คืน 0 หลัง 0.00 s
+เวลาตรงกับ sleep(3) ของ child เป๊ะทุกครั้ง
+
+--- สิ่งที่สังเกตได้ ---
+1. read() บน pipe ที่ว่าง "ไม่ผิดพลาด และไม่คืน 0" แต่ block รอ
+2. เวลาที่วัดได้คือ 3.00 วินาที ตรงกับ sleep() ของฝั่งผู้ส่งพอดี
+   พิสูจน์ว่า parent ถูกพักไว้ในสถานะ blocked จริง ไม่ได้วนรอแบบ busy waiting
+3. เฟส 2 เมื่อปลายเขียนถูกปิดหมดทุกตัวแล้ว read() คืน 0 (EOF) ทันทีใน 0.00 s
+   ไม่ block อีกต่อไป
+   => เงื่อนไขต่างกันชัดเจน  "ว่าง + ยังมีผู้เขียน" -> block
+                             "ว่าง + ไม่มีผู้เขียน" -> EOF
+
+
+################################################################
+# 5.3  ผู้ส่งส่งหลายข้อความก่อนที่ผู้รับจะอ่าน
+################################################################
+
+--- วิธีทดลอง ---
+เฟส 1 : ให้ child เขียน 3 ข้อความรวดเดียวขณะที่ parent ยัง sleep(1) อยู่
+        แล้วให้ parent เรียก read() เพียงครั้งเดียวด้วย buffer ขนาดใหญ่
+เฟส 2 : ให้ child เขียนอีก 3 ข้อความ แล้วให้ parent อ่านทีละ 8 ไบต์
+ใช้ '|' เป็นตัวคั่นข้อความเพื่อให้มองเห็นขอบเขตได้ด้วยตา
+
+$ ./q5_3_many_messages
+[parent] sleeping 1 s so the child can queue 3 messages ...
+[child ] write #1: "MSG1 from child PID: 29450|"
+[child ] write #2: "MSG2 from child PID: 29450|"
+[child ] write #3: "MSG3 from child PID: 29450|"
+[parent] PHASE 1: one big read()
+[parent] got 81 bytes: [MSG1 from child PID: 29450|MSG2 from child PID: 29450|MSG3 from child PID: 29450|]
+[parent] -> 3 separate write() calls arrived in ONE read(). Message boundaries are gone.
+[child ] write #4: "MSG4|"
+[child ] write #5: "MSG5|"
+[child ] write #6: "MSG6|"
+[parent] PHASE 2: reading 8 bytes at a time
+[parent]   chunk 8 bytes: [MSG4|MSG]
+[parent]   chunk 7 bytes: [5|MSG6|]
+[parent] read() returned 0 -> EOF, sender is gone.
+[parent] -> a single message got split across several read() calls. The pipe is a byte stream.
+
+--- ผลการทดสอบซ้ำ 5 ครั้ง ---
+ได้ผลเหมือนกันทุกครั้ง คือ 81 ไบต์ในเฟส 1 และแบ่งเป็น 8 + 7 ไบต์ในเฟส 2
+
+--- สิ่งที่สังเกตได้ ---
+1. เฟส 1 : write() 3 ครั้ง ถูกอ่านกลับมาได้ด้วย read() ครั้งเดียว 81 ไบต์
+   (27 x 3 = 81) ข้อความทั้งสามถูกต่อกันเป็นสายเดียว ไม่มีร่องรอยว่า
+   แต่ละ write() เริ่มและจบตรงไหน
+2. เฟส 2 : เมื่ออ่านทีละ 8 ไบต์ ข้อความ "MSG5|" ถูก "ผ่าครึ่ง"
+       chunk ที่ 1 = [MSG4|MSG]     <- ได้ MSG4 เต็ม + MSG5 ครึ่งแรก
+       chunk ที่ 2 = [5|MSG6|]      <- MSG5 ครึ่งหลัง + MSG6 เต็ม
+   พิสูจน์ว่าขอบเขตข้อความไม่เคยมีอยู่จริงตั้งแต่แรก
+3. ลำดับข้อมูลยังคงถูกต้องแบบ FIFO เสมอ (MSG1..MSG6 เรียงตามลำดับ)
+   pipe รับประกันลำดับ แต่ไม่รับประกันขอบเขต
+
+
+################################################################
+# ตารางสรุปพฤติกรรมของ pipe
+################################################################
+
+  สถานการณ์                      ผลที่สังเกตได้              คำอธิบาย
+  ---------------------------   ------------------------   -------------------------
+  5.1 ผู้ส่งอ่านข้อความตัวเอง      ผู้ส่งได้ข้อความคืน 28 ไบต์   pipe เป็นคิว FIFO ที่ข้อมูล
+                                 ผู้รับตัวจริงไม่ได้อะไร       ถูกอ่านแล้วหมดไป ไม่ใช่
+                                 ค้างจน EINTR               broadcast ใครอ่านก่อนได้ก่อน
+
+  5.2 ผู้รับอ่านก่อนผู้ส่งส่ง       read() block นาน 3.00 s     ว่าง + ยังมีผู้เขียน -> block
+                                 เฟส 2 คืน 0 ใน 0.00 s      ว่าง + ไม่มีผู้เขียน -> EOF
+
+  5.3 ส่งหลายข้อความก่อนอ่าน      3 write() -> 1 read()       pipe เป็น byte stream
+                                 81 ไบต์ต่อกันเป็นสายเดียว    ไม่เก็บขอบเขตข้อความ
+                                 อ่านทีละ 8 ไบต์ทำให้         การแบ่งข้อความ (framing)
+                                 MSG5 ถูกผ่าครึ่ง             เป็นหน้าที่ของแอปพลิเคชัน
+
+
+################################################################
+# ผลการตรวจสอบความถูกต้อง
+################################################################
+
+[ผ่าน] คอมไพล์ทั้ง 3 ไฟล์ด้วย gcc -Wall -Wextra ไม่มี warning
+[ผ่าน] 5.1 ให้ผลเหมือนกันทุกครั้ง ทดสอบซ้ำ 3 ครั้ง
+[ผ่าน] 5.2 เวลาที่ block ตรงกับ sleep() เป๊ะ 3.00 s ทดสอบซ้ำ 3 ครั้ง
+[ผ่าน] 5.3 ได้ 81 ไบต์และแบ่ง 8+7 เหมือนกันทุกครั้ง ทดสอบซ้ำ 5 ครั้ง
+[ผ่าน] ไม่มี process ตกค้างหรือ zombie หลังจบการทดลอง (0 ตัว)
+[ผ่าน] ทั้ง 3 โปรแกรมมีกลไกกันค้างถาวร (alarm ใน 5.1, ปิด write end ใน 5.2/5.3)

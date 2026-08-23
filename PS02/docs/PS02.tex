@@ -1,0 +1,1201 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2026 - Problem Session 2
+%  Process Creation & Pipes
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX หรือ LuaLaTeX เท่านั้น (pdfLaTeX ใช้ไม่ได้ เพราะใช้ fontspec)
+%  Overleaf: Menu > Compiler > XeLaTeX
+%  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
+%
+%  สถานะเอกสาร: เขียนครบทั้ง 5 ข้อแล้ว
+% =====================================================================
+\documentclass[a4paper,12pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+% --- เลือกอย่างใดอย่างหนึ่ง ---
+% (A) เครื่องตัวเอง / มีฟอนต์ TH Sarabun New ติดตั้งอยู่แล้ว
+\setmainfont{TH Sarabun New}[Scale=1.4]
+
+% (B) Overleaf หรือเครื่องที่มี Noto  <-- ปลอดภัยที่สุดถ้าคอมไพล์บน Overleaf
+% \setmainfont{Noto Serif Thai}[
+%   Scale=1.0,
+%   UprightFont = * Regular,
+%   BoldFont    = * Bold,
+% ]
+
+% (C) ถ้าอัปโหลดไฟล์ .ttf เข้าโปรเจกต์เอง (วางไว้ในโฟลเดอร์ fonts/)
+% \setmainfont{THSarabunNew}[
+%   Path      = ./fonts/,
+%   Extension = .ttf,
+%   UprightFont = *,
+%   BoldFont    = *-Bold,
+%   ItalicFont  = *-Italic,
+%   Scale     = 1.4,
+% ]
+
+% ฟอนต์ monospace สำหรับโค้ด (ไม่มีสระไทย -> คอมเมนต์ในโค้ดควรเป็นอังกฤษ)
+\setmonofont{Consolas}[Scale=0.85]
+
+% การตัดคำภาษาไทย (สำคัญมาก ไม่งั้นบรรทัดจะทะลุขอบกระดาษ)
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+\definecolor{todored}{RGB}{178,34,34}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=8pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=15pt,
+  framexleftmargin=15pt,
+  morekeywords={pid_t,ssize_t,size_t,fork,wait,waitpid,pipe,read,write,close,getpid,getppid,sleep,exit,perror,fflush},
+}
+
+\lstdefinestyle{terminal}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=5pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+
+% ------------------------- คำสั่งลัด -------------------------
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\todo}[1]{\textcolor{todored}{\textbf{[ยังไม่ได้ทำ: #1]}}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2026}
+\rhead{\small Problem Session 2}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+
+% --- Logo ---
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+
+% --- Document Title ---
+{\Large\bfseries รายงาน}\\[0.4cm]
+{\Large\bfseries PS02: Process Creation \& Pipes}\\[0.4cm]
+
+\vfill
+
+% --- Instructor ---
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+
+% --- Authors ---
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+
+\vfill
+
+% --- Institution Footer ---
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% ------------------------- สารบัญ -------------------------
+\tableofcontents
+\newpage
+
+% ------------------------- สภาพแวดล้อมที่ใช้ทดลอง -------------------------
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+
+\begin{tabular}{ll}
+\toprule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11) \\
+Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code{uname -r}) \\
+คอมไพเลอร์ & \code{gcc} (Ubuntu 13.3.0-6ubuntu2\textasciitilde24.04.1) 13.3.0 \\
+คำสั่งคอมไพล์ & \code{gcc -Wall -Wextra -o q1\_1 q1\_1\_helloworld.c} \\
+ & \code{gcc -Wall -Wextra -o q1\_2 q1\_2\_wait.c} \\
+ & \code{gcc -Wall -Wextra -o q2\_1 q2\_1\_child\_first.c} \\
+ & \code{gcc -Wall -Wextra -o q2\_2 q2\_2\_parent\_first.c} \\
+ & \code{gcc -Wall -Wextra -o q3\_forkcount q3\_forkcount.c} \\
+ & \code{gcc -Wall -Wextra -o q4\_pipe q4\_pipe.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_1 q5\_1\_sender\_reads\_own.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_2 q5\_2\_read\_before\_send.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_3 q5\_3\_many\_messages.c} \\
+ผลการคอมไพล์ & ผ่านทุกไฟล์ ไม่มี warning \\
+\bottomrule
+\end{tabular}
+
+\vspace{1em}
+
+\textbf{หมายเหตุเรื่อง WSL2} \quad WSL2 รัน Linux kernel จริง ดังนั้น \code{fork()}, \code{wait()},
+\code{pipe()} และคำสั่ง \code{ps} ทำงานได้ตามปกติ อย่างไรก็ตามตัวเลขขีดจำกัดจำนวน process ในข้อ 3
+อาจต่างจาก Linux ที่ติดตั้งแบบ native หรือแบบ VM เพราะ WSL2 จัดสรรหน่วยความจำให้ VM แบบไดนามิก
+
+\newpage
+
+% =====================================================================
+\section{fork() แบบมีและไม่มี wait()}
+% =====================================================================
+
+\subsection{Source code}
+
+\subsubsection{1.1 โปรแกรม helloworld (ไม่มี \code{wait()})}
+
+\begin{lstlisting}[caption={q1\_1\_helloworld.c -- fork() without wait()},label={lst:q1_1}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(void)
+{
+    printf("Hello World!\n");
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* child */
+        printf("I am the child, my PID = %d, my parent PID = %d\n",
+               getpid(), getppid());
+    } else {
+        /* parent */
+        printf("I am the parent, my PID = %d, my child PID = %d\n",
+               getpid(), pid);
+    }
+
+    printf("Common line printed by PID %d\n", getpid());
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: เรียก \code{fork()} เพื่อสร้าง child process หากเป็น child (\code{pid == 0}) จะพิมพ์ PID ของตนเองและ parent ส่วน parent จะพิมพ์ PID ของตนเองและลูก เนื่องจากไม่มี \code{wait()} parent จึงจบการทำงานโดยไม่รอ child
+
+\newpage
+
+\subsubsection{1.2 โปรแกรมที่เพิ่ม \code{wait()}}
+
+\begin{lstlisting}[caption={q1\_2\_wait.c -- fork() with wait()},label={lst:q1_2}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+    printf("Hello World!\n");
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* child */
+        printf("I am the child, my PID = %d, my parent PID = %d\n",
+               getpid(), getppid());
+    } else {
+        /* parent */
+        wait(NULL);
+        printf("I am the parent, my PID = %d, my child PID = %d\n",
+               getpid(), pid);
+    }
+
+    printf("Common line printed by PID %d\n", getpid());
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: เพิ่มการเรียก \code{wait(NULL)} ในฝั่ง parent เพื่อสั่งให้ parent หยุดรอ (Blocked) จนกว่า child จะทำงานเสร็จและคืนสถานะเรียบร้อย บังคับให้ลำดับการแสดงผลของ child เกิดขึ้นก่อน parent เสมอ
+
+\newpage
+
+\subsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 1.1 (ไม่มี wait())}]
+$ gcc -Wall -Wextra -o q1_1 q1_1_helloworld.c
+$ ./q1_1
+Hello World!
+I am the parent, my PID = 3642, my child PID = 3643
+Common line printed by PID 3642
+I am the child, my PID = 3643, my parent PID = 3642
+Common line printed by PID 3643
+
+$ ./q1_1
+Hello World!
+I am the parent, my PID = 3644, my child PID = 3645
+Common line printed by PID 3644
+I am the child, my PID = 3645, my parent PID = 3632      <-- PPID changed (Orphan)!
+Common line printed by PID 3645
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 1.2 (มี wait())}]
+$ gcc -Wall -Wextra -o q1_2 q1_2_wait.c
+$ ./q1_2
+Hello World!
+I am the child, my PID = 3649, my parent PID = 3648
+Common line printed by PID 3649
+I am the parent, my PID = 3648, my child PID = 3649
+Common line printed by PID 3648
+\end{lstlisting}
+
+\subsection{อภิปรายผล}
+
+จากการทดลองเปรียบเทียบระหว่างโปรแกรมข้อ 1.1 (ไม่มี \code{wait()}) และข้อ 1.2 (มี \code{wait()}) สรุปความแตกต่างที่สำคัญได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การซิงโครไนซ์และลำดับ Output}:
+        ในข้อ 1.1 ทั้ง Parent และ Child แย่งกันทำงานอย่างอิสระ ลำดับการพิมพ์ข้อความจึงขึ้นอยู่กับ Kernel Scheduler และไม่แน่นอน (Non-deterministic) ในขณะที่ข้อ 1.2 การเรียก \code{wait(NULL)} จะทำให้ Parent หยุดรอ (Blocked) จนกว่า Child จะทำงานเสร็จ ลำดับ Output จึงมีความแน่นอน (Deterministic) โดยข้อความของ Child จะปรากฏก่อนเสมอ
+
+  \item \textbf{ปรากฏการณ์ Orphan Process}:
+        ในข้อ 1.1 มีโอกาสที่ Parent จะทำงานเสร็จและจบโปรแกรมไปก่อน ทำให้ Child กลายเป็น Orphan Process และถูกเคอร์เนลยกให้ \code{init} (หรือ Subreaper) เป็น Parent ใหม่แทน (สังเกตได้จาก PPID ของ Child ที่เปลี่ยนไปในการรันครั้งที่ 2) ส่วนในข้อ 1.2 จะไม่เกิดเหตุการณ์นี้เนื่องจาก Parent รอ Child อยู่เสมอ
+\end{itemize}
+
+\newpage
+% =====================================================================
+\section{Process Status และ sleep()}
+% =====================================================================
+
+การทดลองนี้ใช้ \code{sleep()} เป็นเครื่องมือควบคุม \emph{ลำดับการตาย} ของ parent
+และ child เพื่อสร้างสถานการณ์สองแบบที่ตรงข้ามกัน แล้วใช้คำสั่ง \code{ps}
+ตรวจสอบสถานะของ process ในช่วงเวลาที่สนใจ ทั้งสองโปรแกรม \textbf{จงใจไม่เรียก}
+\code{wait()} เพื่อให้เห็นพฤติกรรมที่เกิดขึ้นเมื่อ parent ไม่เก็บกวาดลูกของตนเอง
+
+\subsection{Source code}
+
+\subsubsection{2.1 Child ตายก่อน โดย Parent ยังทำงานอยู่}
+
+\begin{lstlisting}[caption={q2\_1\_child\_first.c -- child dies first, parent never reaps},label={lst:q2_1}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define PARENT_LIFETIME 30   /* seconds the parent stays alive after child dies */
+
+int main(void)
+{
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* CHILD: dies almost immediately */
+        printf("[child ] PID = %d, PPID = %d -- exiting right now\n",
+               getpid(), getppid());
+        fflush(stdout);
+        exit(0);
+    }
+
+    /* PARENT: outlives the child but never reaps it */
+    printf("[parent] PID = %d, child PID = %d\n", getpid(), pid);
+    printf("[parent] NOT calling wait(). Sleeping %d s.\n", PARENT_LIFETIME);
+    printf("[parent] Inspect now with:  ps -ef | grep -e q2_1 -e defunct\n");
+    fflush(stdout);
+
+    sleep(PARENT_LIFETIME);
+
+    printf("[parent] PID = %d exiting; the zombie child %d is now re-parented "
+           "to init/systemd and reaped.\n", getpid(), pid);
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: หลัง \code{fork()} ฝั่ง child จะพิมพ์ PID ของตนเองแล้วเรียก \code{exit(0)} ทันที ส่วน parent เข้าสู่ \code{sleep(30)} ทำให้เกิดช่วงเวลา 30 วินาทีที่ child ตายไปแล้วแต่ parent ยังมีชีวิตอยู่และยังไม่ได้เรียก \code{wait()} จึงเป็นช่วงที่เปิดอีก terminal หนึ่งเข้าไปตรวจด้วย \code{ps} ได้ทัน การเรียก \code{fflush(stdout)} ก่อน \code{exit()} และก่อน \code{sleep()} เป็นการบังคับให้ข้อความถูกเขียนออกทันที ไม่ค้างอยู่ใน buffer
+
+\newpage
+
+\subsubsection{2.2 Parent ตายก่อน โดย Child ยังทำงานอยู่}
+
+\begin{lstlisting}[caption={q2\_2\_parent\_first.c -- parent dies first, child becomes an orphan},label={lst:q2_2}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define CHILD_LIFETIME 30
+
+int main(void)
+{
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* CHILD: outlives the parent */
+        printf("[child ] PID = %d, PPID = %d  (original parent, still alive)\n",
+               getpid(), getppid());
+        fflush(stdout);
+
+        sleep(2);   /* give the parent time to die */
+
+        printf("[child ] PID = %d, PPID = %d  (parent is gone -> re-parented)\n",
+               getpid(), getppid());
+        printf("[child ] Inspect now with:  ps -ef | grep q2_2\n");
+        fflush(stdout);
+
+        sleep(CHILD_LIFETIME);
+
+        printf("[child ] PID = %d exiting, final PPID = %d\n",
+               getpid(), getppid());
+        exit(0);
+    }
+
+    /* PARENT: exits immediately, without waiting */
+    printf("[parent] PID = %d, child PID = %d -- exiting immediately\n",
+           getpid(), pid);
+    fflush(stdout);
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: สลับบทบาทจากข้อ 2.1 คือ parent พิมพ์ข้อความแล้วจบการทำงานทันที ส่วน child อยู่ต่ออีก 30 วินาที จุดสำคัญคือ child เรียก \code{getppid()} \textbf{สองครั้ง} โดยมี \code{sleep(2)} คั่นกลาง ครั้งแรกพิมพ์ตอน parent ยังมีชีวิต ครั้งที่สองพิมพ์หลัง parent ตายไปแล้ว ทำให้เห็นค่า PPID ที่เปลี่ยนไปได้จากตัวโปรแกรมเองโดยไม่ต้องพึ่ง \code{ps}
+
+\newpage
+
+\subsection{ผลการทดลอง}
+
+\subsubsection{2.1 Child ตายแล้ว แต่ Parent ยังทำงานอยู่}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์และสถานะจาก \texttt{ps} ในกรณีที่ 2.1}]
+$ gcc -Wall -Wextra -o q2_1 q2_1_child_first.c
+$ ./q2_1 &
+[parent] PID = 6908, child PID = 6910
+[parent] NOT calling wait(). Sleeping 30 s.
+[child ] PID = 6910, PPID = 6908 -- exiting right now
+
+$ ps -ef | grep -e q2_1 -e defunct | grep -v grep
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6908   6900  0 18:58 pts/2  00:00:00 ./q2_1
+poomipat  6910   6908  0 18:58 pts/2  00:00:00 [q2_1] <defunct>
+
+$ ps -eo pid,ppid,stat,comm | grep q2_1 | grep -v grep
+   PID   PPID STAT COMMAND
+  6908   6900 S+   q2_1        <- parent sleeping
+  6910   6908 Z+   q2_1        <- child is a ZOMBIE
+
+$ ps -el | grep q2_1
+F S   UID    PID   PPID  C PRI  NI ADDR SZ WCHAN  TTY      TIME CMD
+0 S  1000   6908   6900  0  80   0 -   670 hrtime pts/2 00:00:00 q2_1
+1 Z  1000   6910   6908  0  80   0 -     0 -      pts/2 00:00:00 q2_1
+                                        ^^ SZ = 0 : all memory already released
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{สรุปค่าที่สังเกตได้ในกรณีที่ 2.1}
+\begin{tabular}{ll}
+\toprule
+\textbf{รายการ} & \textbf{ค่าที่สังเกตได้} \\
+\midrule
+PID ของ parent & 6908 \\
+PID ของ child & 6910 \\
+PPID ของ child & 6908 \quad (ยังเป็น parent ตัวจริง ไม่ถูก reparent) \\
+สถานะของ child ใน \code{ps} & \code{Z+} แสดงผลเป็น \code{[q2\_1] <defunct>} \\
+หน่วยความจำของ child (\code{SZ}) & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+เมื่อรอจนครบ 30 วินาทีและ parent จบการทำงาน ตรวจซ้ำด้วย \code{ps} อีกครั้งพบว่า
+ไม่เหลือ process ชื่อ \code{q2\_1} อยู่ในระบบเลย แสดงว่า zombie ถูกเก็บกวาดทันที
+ที่ parent ตาย
+
+\newpage
+
+\subsubsection{2.2 Parent ตายแล้ว แต่ Child ยังทำงานอยู่}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์และสถานะจาก \texttt{ps} ในกรณีที่ 2.2}]
+$ gcc -Wall -Wextra -o q2_2 q2_2_parent_first.c
+$ ./q2_2 &
+[parent] PID = 6857, child PID = 6859 -- exiting immediately
+[child ] PID = 6859, PPID = 6857  (original parent, still alive)
+[child ] PID = 6859, PPID = 6846  (parent is gone -> re-parented)
+
+$ ps -ef | grep q2_2 | grep -v grep
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6859   6846  0 18:57 pts/2  00:00:00 ./q2_2
+
+$ ps -eo pid,ppid,stat,comm | grep q2_2 | grep -v grep
+   PID   PPID STAT COMMAND
+  6859   6846 S+   q2_2        <- normal sleeping state, NO zombie at all
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{สรุปค่าที่สังเกตได้ในกรณีที่ 2.2}
+\begin{tabular}{ll}
+\toprule
+\textbf{รายการ} & \textbf{ค่าที่สังเกตได้} \\
+\midrule
+PID ของ parent & 6857 \\
+PID ของ child & 6859 \\
+PPID ของ child (ก่อน parent ตาย) & 6857 \quad (parent ตัวจริง) \\
+PPID ของ child (หลัง parent ตาย) & \textbf{6846} \quad (ถูก reparent) \\
+สถานะของ child ใน \code{ps} & \code{S+} (ปกติ ไม่ใช่ zombie) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ตรวจสอบเพิ่มเติมว่า PID 6846 คือ process ใด}
+
+\begin{lstlisting}[style=terminal,caption={สายบรรพบุรุษของ process ที่รับ orphan ไปดูแล}]
+$ ps -p 6846 -o pid=,ppid=,comm=,args=
+   6846   6844 Relay(6848)  /init
+
+$ # walk the ancestry chain up to PID 1
+   PID   PPID COMMAND
+  6846   6844 Relay(6848)       <- WSL /init relay : the adopting subreaper
+  6844      2 SessionLeader
+     2      1 init-systemd(Ub
+     1      0 systemd           <- the real PID 1
+\end{lstlisting}
+
+ผลลัพธ์นี้แสดงว่า child \textbf{ไม่ได้} ถูกยกให้ PID 1 โดยตรงตามที่มักเข้าใจกัน
+แต่ถูกยกให้กระบวนการ \code{/init} ของ WSL ซึ่งลงทะเบียนตัวเองเป็น
+\emph{child subreaper} ไว้ด้วย \code{prctl(PR\_SET\_CHILD\_SUBREAPER)}
+เพราะกฎของเคอร์เนลคือยก orphan ให้ \textbf{subreaper ที่ใกล้ที่สุด}
+ไม่ใช่ยกให้ PID 1 เสมอไป บนระบบ Linux ที่ติดตั้งแบบ native หรือใน VM ทั่วไป
+ค่านี้มักออกมาเป็น 1 หรือเป็น PID ของ \code{systemd --user}
+
+\newpage
+
+\subsection{อภิปรายผล}
+
+จากการทดลองควบคุมลำดับการจบการทำงานของกระบวนการด้วย \code{sleep()} ในข้อ 2.1 และ 2.2 สรุปข้อแตกต่างและประเด็นสำคัญได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ข้อ 2.1 ปรากฏการณ์ Zombie Process}:
+        เมื่อ Child ตายก่อนแต่ Parent ยังทำงานอยู่โดยไม่ได้เรียก \code{wait()} เคอร์เนลจะคืนหน่วยความจำของ Child ทันที (\code{SZ = 0}) แต่ยังคงจอง PID และ Process Table Entry ค้างไว้ ทำให้เกิดสถานะ \code{Z} หรือ \code{<defunct>} จนกว่า Parent จะจบโปรแกรมหรือเรียก \code{wait()} เพื่ออ่าน Exit Status
+
+  \item \textbf{ข้อ 2.2 ปรากฏการณ์ Orphan Process และการ Reparent}:
+        เมื่อ Parent ตายก่อนโดยที่ Child ยังคงทำงานอยู่ Child จะกลายเป็นกระบวนการกำพร้า (Orphan) เคอร์เนลจะยก Child ให้กับ Subreaper ที่ใกล้ที่สุด (เช่น \code{systemd} หรือ \code{/init} ของ WSL) เป็น Parent คนใหม่ทันที สังเกตได้จากค่า PPID ของ Child ที่เปลี่ยนไปในการเรียก \code{getppid()} ครั้งที่สอง
+
+  \item \textbf{ความแตกต่างสำคัญและปรากฏการณ์ \code{<defunct>}}:
+        Zombie (\code{<defunct>}) คือกระบวนการที่สิ้นสุดการทำงานแล้วแต่ยังถูกจองค้างในตารางกระบวนการ หากสะสมมากจะสิ้นเปลือง PID และทำให้สร้าง Process ใหม่ไม่ได้ ต่างจาก Orphan ที่เป็นกระบวนการซึ่งยังคงทำงานตามปกติ และเมื่อ Orphan สิ้นสุดการทำงาน Parent คนใหม่ (Subreaper) จะทำหน้าที่เรียก \code{wait()} เก็บกวาดให้อัตโนมัติโดยไม่เกิด Zombie ทิ้งไว้
+\end{itemize}
+\newpage
+% =====================================================================
+\section{จำนวน process สูงสุดที่ fork ได้}
+% =====================================================================
+
+การทดลองนี้ต้องการหาว่าระบบยอมให้เรียก \code{fork()} ได้สำเร็จกี่ครั้ง
+โดยใช้โครงสร้างแบบ \textbf{โซ่ (chain)} ตามที่ Hint ของโจทย์แนะนำ คือทุก process
+สร้างลูกเพียงตัวเดียวแล้วรอด้วย \code{waitpid()} โซ่จึงยาวขึ้นทีละหนึ่งและคลายตัว
+กลับจากปลายสุดอย่างเป็นระเบียบ ซึ่ง \textbf{ไม่ใช่ fork bomb} และหยุดได้ทุกเมื่อ
+
+\subsection{Source code}
+
+\subsubsection{ส่วนหลัก: ฟังก์ชัน \code{chain()} และการรายงานผล}
+
+\begin{lstlisting}[caption={q3\_forkcount.c -- the chain and the reporting path},label={lst:q3a}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/resource.h>
+
+#define HARD_CAP 200000        /* never build a chain longer than this */
+
+struct result {
+    int count;                 /* number of successful fork() calls */
+    int err;                   /* errno that stopped us (0 = hit HARD_CAP) */
+};
+
+static int pfd[2];
+
+/* Send the tally up the chain to the root and leave. */
+static _Noreturn void report(int count, int err)
+{
+    struct result r;
+    r.count = count;
+    r.err   = err;
+    if (write(pfd[1], &r, sizeof r) != (ssize_t)sizeof r)
+        _exit(1);
+    _exit(0);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winfinite-recursion"
+
+/* I am the process produced by fork() call number `level`. */
+static void chain(int level)
+{
+    pid_t pid;
+
+    if (level >= HARD_CAP)
+        report(level, 0);      /* stopped by our own ceiling */
+
+    pid = fork();
+
+    if (pid < 0)
+        /* fork #(level+1) failed -> `level` forks succeeded in total */
+        report(level, errno);
+
+    if (pid == 0)
+        chain(level + 1);      /* the child keeps digging */
+
+    /* parent of this link: hold still until the chain below me unwinds */
+    waitpid(pid, NULL, 0);
+    _exit(0);
+}
+
+#pragma GCC diagnostic pop
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: \code{chain(level)} หมายถึง ``ฉันคือ process ที่เกิดจาก \code{fork()} ครั้งที่ \code{level}'' แต่ละตัวจะ \code{fork()} หนึ่งครั้ง ถ้าสำเร็จ ลูกจะเรียก \code{chain(level+1)} ขุดลึกต่อไป ส่วนพ่อจะติดอยู่ที่ \code{waitpid()} ไม่ทำอะไรจนกว่าโซ่ข้างล่างจะคลายกลับมา ทำให้มีเพียง process เดียวเท่านั้นที่ทำงานอยู่ในแต่ละขณะ เมื่อ \code{fork()} ล้มเหลว process ที่ลึกที่สุดจะส่งผลรวมและ \code{errno} กลับไปให้ root ผ่าน pipe ด้วย \code{report()} ส่วน \code{HARD\_CAP} เป็นเพดานของโปรแกรมเองไว้กันพลาด และคำสั่ง \code{\#pragma} จำเป็นต้องมีเพราะ gcc มองว่า \code{chain()} เป็น infinite recursion ซึ่งเป็นการเตือนที่ผิดพลาด เนื่องจากการเรียกซ้ำเกิดใน process ใหม่คนละตัวและหยุดเมื่อ \code{fork()} ล้มเหลว
+
+\newpage
+
+\subsubsection{ส่วน \code{main()}: กำหนดเพดานและรับผลลัพธ์}
+
+\begin{lstlisting}[caption={q3\_forkcount.c -- main(): optional ceiling and result collection},label={lst:q3b}]
+int main(int argc, char *argv[])
+{
+    pid_t pid;
+    struct result r = { 0, 0 };
+    struct rlimit rl;
+
+    if (argc > 1) {            /* optional artificial ceiling for rehearsal */
+        rlim_t want = (rlim_t)strtoul(argv[1], NULL, 10);
+        if (getrlimit(RLIMIT_NPROC, &rl) == 0) {
+            rl.rlim_cur = want;
+            if (rl.rlim_max != RLIM_INFINITY && rl.rlim_cur > rl.rlim_max)
+                rl.rlim_cur = rl.rlim_max;
+            if (setrlimit(RLIMIT_NPROC, &rl) != 0)
+                perror("setrlimit");
+        }
+    }
+
+    if (getrlimit(RLIMIT_NPROC, &rl) == 0)
+        printf("RLIMIT_NPROC in effect: soft = %ld, hard = %ld\n",
+               (long)rl.rlim_cur, (long)rl.rlim_max);
+
+    printf("Root PID = %d. Forking a chain until fork() fails ...\n", getpid());
+    fflush(stdout);
+
+    if (pipe(pfd) < 0) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        r.count = 0;
+        r.err   = errno;
+    } else if (pid == 0) {
+        close(pfd[0]);
+        chain(1);              /* this process came from fork() #1 */
+        _exit(0);              /* unreachable */
+    } else {
+        close(pfd[1]);         /* only the descendants write */
+        waitpid(pid, NULL, 0);
+        if (read(pfd[0], &r, sizeof r) != (ssize_t)sizeof r) {
+            fprintf(stderr, "could not read result from pipe\n");
+            exit(EXIT_FAILURE);
+        }
+        close(pfd[0]);
+    }
+
+    printf("fork() succeeded %d times.\n", r.count);
+    if (r.err == 0)
+        printf("Stopped by the program's own HARD_CAP (%d), not by the OS.\n",
+               HARD_CAP);
+    else
+        printf("fork() #%d failed with errno %d (%s).\n",
+               r.count + 1, r.err, strerror(r.err));
+
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: \code{main()} สร้าง pipe ก่อนแล้วจึง \code{fork()} เพื่อเริ่มโซ่ ฝั่ง root ปิดปลายเขียน (\code{pfd[1]}) เพราะมีแต่ลูกหลานที่จะเขียน ส่วนลูกตัวแรกปิดปลายอ่าน (\code{pfd[0]}) การที่ root เรียก \code{waitpid()} ก่อนแล้วค่อย \code{read()} ไม่ทำให้เกิด deadlock เพราะข้อมูลขนาด 8 ไบต์ถูกเขียนค้างไว้ใน buffer ของ pipe ตั้งแต่ตอนที่ process ปลายสุดยังมีชีวิตอยู่ และเนื่องจากขนาดน้อยกว่า \code{PIPE\_BUF} การเขียนจึงเป็น atomic ไม่มีทางถูกแทรก ส่วนอาร์กิวเมนต์ \code{argv[1]} เป็นทางเลือกให้ตั้งเพดานจำลองด้วย \code{setrlimit()} เพื่อซ้อมการทดลองในระดับที่ปลอดภัยก่อนรันจริง
+
+\newpage
+
+\subsection{ผลการทดลอง}
+
+ทำการทดลอง 2 ชุดด้วยเพดานต่างกัน เพื่อยืนยันว่าข้อสรุปไม่ได้ขึ้นกับขนาดของเพดาน
+ชุด A ใช้ \code{ulimit -u 300} ซึ่งรันเร็ว ส่วนชุด B ใช้ \code{ulimit -u 6000}
+ซึ่งใกล้เคียงสถานการณ์จริงมากกว่า
+
+\subsubsection{3.1 การวัดครั้งแรก}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์การวัดครั้งแรกของทั้งสองชุด}]
+$ gcc -Wall -Wextra -o q3_forkcount q3_forkcount.c
+
+--- Set A ---
+$ ulimit -u 300
+$ ./q3_forkcount
+RLIMIT_NPROC in effect: soft = 300, hard = 300
+Root PID = 25252. Forking a chain until fork() fails ...
+fork() succeeded 255 times.
+fork() #256 failed with errno 11 (Resource temporarily unavailable).
+
+--- Set B ---
+$ ulimit -u 6000
+$ ./q3_forkcount
+RLIMIT_NPROC in effect: soft = 6000, hard = 6000
+Root PID = 6921. Forking a chain until fork() fails ...
+fork() succeeded 5953 times.
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
+\end{lstlisting}
+
+\subsubsection{3.2 เมื่อมีโปรแกรมอื่นทำงานค้างอยู่}
+
+ชุด B ทำการวัดต่อเนื่อง 3 เฟสภายใต้เงื่อนไขเดียวกัน โดยตรวจนับจำนวน thread
+ของผู้ใช้ก่อนวัดทุกครั้ง เพื่อยืนยันว่าสภาพระบบกลับสู่จุดเริ่มต้นจริง
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ทั้งสามเฟสของชุด B (ulimit -u 6000)}]
+===== PHASE 1 : before starting any extra program =====
+UID threads now: 8
+$ ./q3_forkcount
+fork() succeeded 5953 times.
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
+
+===== PHASE 2 : with 100 extra programs running =====
+$ for i in $(seq 1 100); do sleep 900 & done
+UID threads now: 108
+$ ./q3_forkcount
+fork() succeeded 5853 times.            <- exactly 100 fewer
+fork() #5854 failed with errno 11 (Resource temporarily unavailable).
+
+===== PHASE 3 : after stopping all extra programs =====
+$ kill $PIDS
+UID threads now: 8
+$ ./q3_forkcount
+fork() succeeded 5953 times.            <- back to the original value
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{เปรียบเทียบจำนวน \code{fork()} ที่สำเร็จในแต่ละสถานการณ์}
+\begin{tabular}{llcc}
+\toprule
+\textbf{ชุด} & \textbf{สถานการณ์} & \textbf{process อื่นที่เพิ่ม} & \textbf{fork() สำเร็จ (ครั้ง)} \\
+\midrule
+A (เพดาน 300)  & ก่อนรันโปรแกรมเพิ่ม   & --   & 255 \\
+A (เพดาน 300)  & ระหว่างรันโปรแกรมเพิ่ม & 20   & 235 \\
+A (เพดาน 300)  & หลังปิดโปรแกรมทั้งหมด  & --   & 256 \\
+\midrule
+B (เพดาน 6000) & ก่อนรันโปรแกรมเพิ่ม   & --   & 5953 \\
+B (เพดาน 6000) & ระหว่างรันโปรแกรมเพิ่ม & 100  & 5853 \\
+B (เพดาน 6000) & หลังปิดโปรแกรมทั้งหมด  & --   & 5953 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{อภิปรายผล}
+
+จากการทดลองวัดจำนวน \code{fork()} ที่สำเร็จภายใต้สภาพระบบที่ต่างกัน
+สรุปประเด็นสำคัญได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ขีดจำกัดที่แท้จริงคือ \code{RLIMIT\_NPROC}}:
+        \code{fork()} return $-1$ พร้อม \code{errno} $= 11$ ซึ่งคือ \code{EAGAIN}
+        (Resource temporarily unavailable) เหมือนกันทุกครั้งในทุกการทดลอง
+        ไม่ใช่ \code{ENOMEM} แสดงว่าสิ่งที่หยุดเราคือโควตาจำนวน process ต่อผู้ใช้
+        ไม่ใช่หน่วยความจำหรือขนาดของตารางกระบวนการ
+
+  \item \textbf{จำนวนที่ได้ไม่เท่ากับเพดานเพราะโควตาถูกใช้ไปก่อนแล้ว}:
+        เพดาน 300 ได้ 255 ครั้ง (ส่วนต่าง 45) และเพดาน 6000 ได้ 5953 ครั้ง
+        (ส่วนต่าง 47) เนื่องจาก \code{RLIMIT\_NPROC} นับ process ของ UID นั้น
+        ทั้ง user namespace ไม่ใช่นับเฉพาะที่โปรแกรมเราสร้าง ส่วนต่างจึงคือ
+        process ที่ผู้ใช้มีอยู่ก่อนแล้ว เช่น shell, WSL relay และ session อื่น
+        ที่เปิดค้างไว้ สังเกตว่า \code{ps} มองเห็นเพียง 8 ตัวใน session ปัจจุบัน
+        แต่ถูกหักไป 47 แสดงว่ามีอีกราว 39 ตัวที่อยู่นอก session ปัจจุบัน
+        แต่ยังถูกนับรวมในโควตาเดียวกัน
+
+  \item \textbf{จำนวนลดลงตามจำนวนโปรแกรมที่รันค้างแบบหนึ่งต่อหนึ่ง}:
+        เมื่อเปิดโปรแกรม \code{sleep} ค้างไว้ 100 ตัว จำนวน \code{fork()}
+        ที่สำเร็จลดลงจาก 5953 เหลือ 5853 คือลดลง \textbf{100 พอดีเป๊ะ}
+        ไม่ขาดไม่เกิน เช่นเดียวกับชุด A ที่เปิด 20 ตัวแล้วลดลง 20 พอดี
+        ยืนยันว่าโควตานี้เป็นทรัพยากรที่แชร์กันทั้งผู้ใช้ ไม่ใช่โควตาต่อโปรแกรม
+
+  \item \textbf{ค่าจะกลับมาเท่าเดิมก็ต่อเมื่อควบคุมตัวแปรได้ครบ}:
+        ชุด B กลับมาที่ 5953 เท่าเดิมเป๊ะ เพราะปิดเฉพาะ PID ที่เปิดเองและตรวจนับ
+        thread ยืนยันว่ากลับมาที่ 8 เท่าเดิมก่อนวัดซ้ำ ในขณะที่ชุด A ได้ 256 ครั้ง
+        ซึ่งมากกว่าเดิม 1 เพราะระหว่างการทดลองมี process อื่นของผู้ใช้จบไปพอดี
+        ทำให้โควตาว่างเพิ่มขึ้น จึงสรุปได้ว่าตัวเลขที่วัดได้เป็นค่าที่ขึ้นกับสภาพ
+        ของระบบ ณ ขณะนั้น ไม่ใช่ค่าคงที่ประจำเครื่อง
+
+  \item \textbf{ต้นทุนของโครงสร้างแบบ recursive chain}:
+        การวัดแต่ละครั้งในชุด B ใช้เวลา 755--895 วินาที และใช้หน่วยความจำสูงสุด
+        ราว 13 GB ที่ความยาวโซ่ประมาณ 5{,}900 process เพราะ process ที่ระดับ $N$
+        มี stack frame สะสม $N$ เฟรม ทุกครั้งที่ \code{fork()} เคอร์เนลต้องคัดลอก
+        page table ที่ใหญ่ขึ้นเรื่อย ๆ ทำให้ทั้งเวลาและหน่วยความจำโตแบบ $O(N^2)$
+        นี่คือเหตุผลที่ไม่สามารถรันจนถึงเพดานจริง 62{,}827 ได้บนเครื่องที่มี
+        หน่วยความจำ 15.7 GB และเป็นเหตุผลที่ต้องกำหนด \code{ulimit -u}
+        ให้ต่ำลงก่อนการทดลองทุกครั้ง
+\end{itemize}
+\newpage
+% =====================================================================
+\section{การสื่อสารผ่าน Pipe}
+% =====================================================================
+
+โจทย์กำหนดให้สร้าง pipe ด้วย \code{pipe()} แล้ว \code{fork()} โดยให้ \textbf{child
+เป็นผู้ส่ง} และ \textbf{parent เป็นผู้รับ} ผู้ส่งต้องปิดปลายอ่านและผู้รับต้องปิด
+ปลายเขียนก่อนเริ่มสื่อสาร ผลลัพธ์ที่ต้องได้มีรูปแบบดังนี้
+
+\begin{lstlisting}[style=terminal]
+Child: Child PID: xxxxxx
+Parent: Parent PID: yyyyyy
+Parent: Hello from child PID: xxxxxx
+\end{lstlisting}
+
+\subsection{Source code}
+
+\begin{lstlisting}[caption={q4\_pipe.c -- child เป็นผู้ส่ง parent เป็นผู้รับ},label={lst:q4}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define BUFSZ 128
+
+int main(void)
+{
+    int fd[2];
+    pid_t pid;
+    char msg[BUFSZ], buf[BUFSZ];
+    ssize_t n;
+
+    if (pipe(fd) < 0) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER ---------- */
+        close(fd[0]);                       /* sender never reads */
+
+        printf("Child: Child PID: %d\n", getpid());
+        fflush(stdout);
+
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+
+        if (write(fd[1], msg, strlen(msg) + 1) < 0) {   /* +1 sends the '\0' */
+            perror("child write");
+            exit(EXIT_FAILURE);
+        }
+
+        close(fd[1]);                       /* signal EOF to the reader */
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER ---------- */
+    close(fd[1]);                           /* receiver never writes */
+
+    /* Read FIRST, then print. The child flushes its own line to stdout before
+     * it writes into the pipe, so this read() cannot return until the child's
+     * line has already reached the terminal. That makes the output order
+     * deterministic and equal to the one the problem sheet specifies, using
+     * the blocking read as the synchronisation point -- no sleep() needed.
+     * Printing before the read would race the child and, in practice, put the
+     * parent's line first about 39 times out of 40. */
+    n = read(fd[0], buf, sizeof buf - 1);   /* blocks until the child writes */
+    if (n < 0) {
+        perror("parent read");
+        exit(EXIT_FAILURE);
+    }
+    buf[n] = '\0';
+
+    printf("Parent: Parent PID: %d\n", getpid());
+    printf("Parent: %s\n", buf);
+
+    close(fd[0]);
+    wait(NULL);                             /* reap the child */
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: โปรแกรมเรียก \code{pipe(fd)} \textbf{ก่อน} \code{fork()} เสมอ เพื่อให้ทั้งสอง process ได้รับสำเนาของ file descriptor ทั้งคู่ไป หลัง \code{fork()} จึงมี descriptor ชี้ไปที่ pipe เดียวกันถึงสี่ตัว แต่ละฝ่ายจึงต้องปิดปลายที่ตนไม่ใช้ทันที คือ child ปิด \code{fd[0]} เพราะเป็นผู้ส่งไม่ต้องอ่าน และ parent ปิด \code{fd[1]} เพราะเป็นผู้รับไม่ต้องเขียน จากนั้น child พิมพ์ PID ของตนเอง สร้างข้อความด้วย \code{snprintf()} แล้ว \code{write()} ลง pipe โดยส่งความยาว \code{strlen(msg)+1} เพื่อให้รวมอักขระ \code{'\textbackslash 0'} ไปด้วย ส่วน parent เรียก \code{read()} ซึ่งจะ block รอจนกว่าจะมีข้อมูล แล้วจึงพิมพ์ PID ของตนเองตามด้วยข้อความที่ได้รับ และปิดท้ายด้วย \code{wait(NULL)} เพื่อเก็บกวาด child ไม่ให้เหลือ zombie
+
+\newpage
+
+\subsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 4 (รันซ้ำหลายครั้ง)}]
+$ gcc -Wall -Wextra -o q4_pipe q4_pipe.c
+$ ./q4_pipe
+Child: Child PID: 28274
+Parent: Parent PID: 28273
+Parent: Hello from child PID: 28274
+
+$ ./q4_pipe
+Child: Child PID: 29279
+Parent: Parent PID: 29277
+Parent: Hello from child PID: 29279
+
+$ ./q4_pipe
+Child: Child PID: 29282
+Parent: Parent PID: 29280
+Parent: Hello from child PID: 29282
+
+--- redirected to a file (buffering check) ---
+$ ./q4_pipe > out.txt
+$ cat out.txt
+Child: Child PID: 29293
+Parent: Parent PID: 29292
+Parent: Hello from child PID: 29293
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{ผลการตรวจสอบความถูกต้องของข้อ 4}
+\begin{tabular}{lc}
+\toprule
+\textbf{รายการที่ตรวจ} & \textbf{ผล} \\
+\midrule
+คอมไพล์ด้วย \code{gcc -Wall -Wextra} & ผ่าน ไม่มี warning \\
+รูปแบบ output ตรงกับที่โจทย์กำหนด & ตรงทุกบรรทัด \\
+ลำดับ output ถูกต้อง (ทดสอบ 200 ครั้ง) & 200 / 200 \\
+PID ในข้อความที่รับ ตรงกับ PID ของ child (10 ครั้ง) & 10 / 10 \\
+process ตกค้างหรือ zombie & 0 ตัว \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{อภิปรายผล}
+
+จากการทดลองสื่อสารระหว่าง process ผ่าน pipe สรุปประเด็นสำคัญได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{เหตุผลที่ file descriptor ถูกสืบทอดไปยัง child ได้}:
+        \code{fork()} คัดลอกตาราง file descriptor ของ parent ไปให้ child ทั้งชุด
+        ดังนั้นการเรียก \code{pipe()} \emph{ก่อน} \code{fork()} จึงทำให้ทั้งสอง
+        process มีทางเข้าถึง pipe เดียวกัน นี่คือเหตุผลที่ pipe ใช้สื่อสารได้เฉพาะ
+        ระหว่าง process ที่มีความสัมพันธ์เป็นเครือญาติกันเท่านั้น
+        ถ้าเรียก \code{pipe()} หลัง \code{fork()} จะได้ pipe คนละเส้นและคุยกันไม่ได้
+
+  \item \textbf{เหตุผลที่ต้องปิดปลายที่ไม่ใช้}:
+        หลัง \code{fork()} จะมี descriptor ชี้ไปที่ pipe เดียวกันถึงสี่ตัว
+        หากผู้รับไม่ปิดปลายเขียนของตนเอง \code{read()} จะไม่มีวันได้รับ EOF
+        เพราะเคอร์เนลจะรายงาน EOF ก็ต่อเมื่อปลายเขียน \textbf{ทุกตัว}
+        ในระบบถูกปิดแล้วเท่านั้น โปรแกรมจะค้างรออยู่ตลอดไป
+        ในทางกลับกันถ้าผู้ส่งไม่ปิดปลายอ่าน ก็จะสิ้นเปลือง descriptor
+        และเสี่ยงอ่านข้อความของตัวเองกลับมาโดยไม่ตั้งใจ ซึ่งเป็นกรณีที่จะทดลองในข้อ 5
+
+  \item \textbf{พฤติกรรม blocking ของ \code{read()}}:
+        เมื่อ pipe ยังว่าง \code{read()} จะพา process เข้าสู่สถานะ blocked
+        แล้วปล่อย CPU ให้ผู้อื่น จนกว่าจะมีข้อมูลเข้ามาหรือปลายเขียนถูกปิดหมด
+        จึงไม่ใช่การวนรอแบบสิ้นเปลือง CPU (busy waiting) และคุณสมบัตินี้เอง
+        ที่ทำให้ pipe ทำหน้าที่เป็นกลไกซิงโครไนซ์ได้ในตัว
+
+  \item \textbf{ปัญหาลำดับ output ที่พบและวิธีแก้}:
+        โค้ดฉบับแรกให้ parent พิมพ์บรรทัดของตนเองก่อนแล้วค่อยเรียก \code{read()}
+        ซึ่งไม่มีอะไรรับประกันว่า child จะได้ CPU ก่อน ผลการทดสอบ 40 ครั้งพบว่า
+        บรรทัดแรกเป็นของ parent ถึง 39 ครั้ง ทำให้สองบรรทัดแรกสลับกัน
+        ไม่ตรงกับรูปแบบที่โจทย์กำหนด แก้โดยย้าย \code{read()} ขึ้นมาไว้ก่อน
+        \code{printf()} ของ parent ซึ่งสร้างความสัมพันธ์แบบ happens-before
+        ต่อกันเป็นลูกโซ่ คือ child ต้อง \code{fflush()} บรรทัดของตนออกหน้าจอก่อน
+        จึงจะ \code{write()} ลง pipe และ \code{read()} ของ parent จะคืนค่าได้
+        ก็ต่อเมื่อการเขียนนั้นเกิดขึ้นแล้ว บรรทัดของ child จึงต้องปรากฏก่อน
+        บรรทัดของ parent เสมอ ไม่ใช่เพียงแค่มีโอกาสสูง
+        วิธีนี้ใช้ blocking read เป็นจุดซิงโครไนซ์ในตัว จึงดีกว่าการใส่
+        \code{sleep()} ซึ่งเป็นเพียงการเดาเวลาและยังคงมีโอกาสผิดพลาด
+        ผลหลังแก้คือลำดับถูกต้อง 200 จาก 200 ครั้ง
+
+  \item \textbf{ไม่พบปัญหา buffer ซ้ำเหมือนข้อ 1}:
+        เมื่อ redirect output ลงไฟล์ ผลลัพธ์ยังคงถูกต้องครบสามบรรทัดไม่มีข้อความซ้ำ
+        เพราะโปรแกรมนี้ไม่มีการเรียก \code{printf()} ก่อน \code{fork()}
+        buffer ของ stdout จึงว่างอยู่แล้วในขณะที่ทำสำเนา address space
+\end{itemize}
+\newpage
+% =====================================================================
+\section{การทดลองกรณีพิเศษของ Pipe}
+% =====================================================================
+
+ข้อนี้ดัดแปลงโปรแกรมข้อ 4 ออกเป็นสามเวอร์ชัน เพื่อทดสอบพฤติกรรมของ pipe
+ในสถานการณ์ที่ผิดไปจากการใช้งานปกติ เนื่องจากโค้ดทั้งสามมีโครงสร้างหลัก
+เหมือนข้อ 4 ในรายงานนี้จึงแสดงเฉพาะ \textbf{ส่วนที่แก้ไข} ของแต่ละเวอร์ชัน
+โปรแกรมทุกตัวมีกลไกกันการค้างถาวรไว้ด้วย
+
+\subsection{5.1 ผู้ส่งพยายามอ่านข้อความของตัวเองกลับ}
+
+\textbf{วิธีทดลอง}: จงใจ \emph{ไม่ปิด} descriptor ฝั่งใดเลย ทำให้ child ถือทั้งปลายอ่านและปลายเขียน จากนั้นให้ child เขียนข้อความลง pipe แล้วรีบ \code{read()} กลับทันที ส่วน parent ซึ่งเป็นผู้รับตัวจริงหน่วงด้วย \code{sleep(1)} ก่อนจึงอ่าน และตั้ง \code{alarm(3)} ไว้เป็นตาข่ายกันโปรแกรมค้างถาวร
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.1},label={lst:q5_1}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER, but it also reads ---------- */
+        /* NOTE: deliberately NOT closing fd[0] -- that is the whole point. */
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+        write(fd[1], msg, strlen(msg) + 1);
+
+        n = read(fd[0], buf, sizeof buf - 1);      /* read back its OWN pipe */
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[child ] read back %zd bytes: \"%s\"\n", n, buf);
+        }
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = the intended RECEIVER ---------- */
+    sa.sa_handler = on_alarm;
+    sa.sa_flags   = 0;            /* no SA_RESTART: we WANT read() to fail */
+    sigaction(SIGALRM, &sa, NULL);
+
+    sleep(1);                     /* let the child write AND read first */
+
+    alarm(3);                     /* safety net so we never hang */
+    n = read(fd[0], buf, sizeof buf - 1);
+    alarm(0);
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.1}]
+$ ./q5_1_sender_reads_own
+[child ] writing: "Hello from child PID: 29443"
+[child ] now reading from fd[0] (its OWN pipe) ...
+[child ] read back 28 bytes: "Hello from child PID: 29443"   <-- its own message!
+[parent] now trying to read the message ...
+[parent] read FAILED: Interrupted system call
+[parent] -> the pipe was empty: the sender had already consumed its own message.
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้}: child อ่านข้อความของตัวเองกลับมาได้ครบทั้ง 28 ไบต์ โดยไม่มีอะไรห้ามเลย ผลคือ parent ซึ่งเป็นผู้รับตัวจริงไม่ได้รับอะไรเลย ข้อมูลหายไปจากระบบ และที่สำคัญคือ parent ไม่ได้รับ EOF แต่ค้างอยู่ใน \code{read()} จนกระทั่ง \code{alarm(3)} ยิง \code{SIGALRM} ทำให้ \code{read()} คืน $-1$ พร้อม \code{errno} $=$ \code{EINTR} ทดสอบซ้ำ 3 ครั้งได้ผลเหมือนกันทุกครั้ง
+
+\newpage
+
+\subsection{5.2 ผู้รับอ่านก่อนที่ผู้ส่งจะส่ง}
+
+\textbf{วิธีทดลอง}: ให้ parent เรียก \code{read()} ทันทีตั้งแต่ pipe ยังว่าง ส่วน child หน่วง \code{sleep(3)} ก่อนจึงเขียน วัดเวลาที่ \code{read()} ใช้ไปด้วย \code{clock\_gettime()} เพื่อพิสูจน์ว่า parent ถูกพักอยู่ในเคอร์เนลจริง จากนั้นในเฟสที่สองให้ parent อ่านซ้ำอีกครั้งหลังจาก child ปิดปลายเขียนและจบไปแล้ว
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.2},label={lst:q5_2}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER, but a slow one ---------- */
+        close(fd[0]);
+        sleep(SEND_DELAY);                 /* 3 seconds late on purpose */
+
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+        write(fd[1], msg, strlen(msg) + 1);
+
+        close(fd[1]);        /* closing the last write end -> reader sees EOF */
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER, reads far too early ---------- */
+    close(fd[1]);
+
+    t0 = now();                            /* phase 1: pipe is still empty */
+    n  = read(fd[0], buf, sizeof buf - 1);
+    printf("[parent] read() returned after %.2f s with %zd bytes\n",
+           now() - t0, n);
+
+    t0 = now();                            /* phase 2: no writer left */
+    n  = read(fd[0], buf, sizeof buf - 1);
+    printf("[parent] read() returned %zd after %.2f s\n", n, now() - t0);
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.2}]
+$ ./q5_2_read_before_send
+[parent] calling read() immediately, pipe is still empty ...
+[child ] sleeping 3 s before sending ...
+[child ] sending now: "Hello from child PID: 29447"
+[child ] write end closed, exiting.
+[parent] read() returned after 3.00 s with 28 bytes: "Hello from child PID: 29447"
+[parent] -> read() BLOCKED, it did not fail and did not return 0.
+[parent] reading again, now that every write end is closed ...
+[parent] read() returned 0 after 0.00 s  -> EOF (no writer left, so no blocking)
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้}: การเรียก \code{read()} บน pipe ที่ว่างไม่ได้ผิดพลาดและไม่ได้คืนค่า 0 แต่ \textbf{block รอ} เวลาที่วัดได้คือ 3.00 วินาที ตรงกับ \code{sleep()} ของฝั่งผู้ส่งพอดี ซึ่งพิสูจน์ว่า parent ถูกพักไว้ในสถานะ blocked จริง ไม่ได้วนรอแบบ busy waiting ส่วนในเฟสที่สองเมื่อปลายเขียนถูกปิดหมดทุกตัวแล้ว \code{read()} คืนค่า 0 คือ EOF ทันทีภายใน 0.00 วินาที ไม่ block อีกต่อไป ทดสอบซ้ำ 3 ครั้งได้เวลาตรงกันทุกครั้ง
+
+\newpage
+
+\subsection{5.3 ผู้ส่งส่งหลายข้อความก่อนที่ผู้รับจะอ่าน}
+
+\textbf{วิธีทดลอง}: เฟสที่หนึ่งให้ child เขียน 3 ข้อความรวดเดียวขณะที่ parent ยัง \code{sleep(1)} อยู่ แล้วให้ parent เรียก \code{read()} เพียงครั้งเดียวด้วย buffer ขนาดใหญ่ เฟสที่สองให้ child เขียนอีก 3 ข้อความ แล้วให้ parent อ่านทีละ 8 ไบต์ ใช้อักขระ \code{|} เป็นตัวคั่นข้อความเพื่อให้มองเห็นขอบเขตได้ด้วยตา
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.3},label={lst:q5_3}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER ---------- */
+        close(fd[0]);
+
+        for (i = 1; i <= NMSG; i++) {      /* batch 1: three writes in a row */
+            snprintf(msg, sizeof msg, "MSG%d from child PID: %d|", i, getpid());
+            write(fd[1], msg, strlen(msg));         /* '|' is our delimiter */
+        }
+
+        sleep(2);      /* let the parent finish phase 1 before phase 2 starts */
+
+        for (i = NMSG + 1; i <= 2 * NMSG; i++) {    /* batch 2 */
+            snprintf(msg, sizeof msg, "MSG%d|", i);
+            write(fd[1], msg, strlen(msg));
+        }
+        close(fd[1]);
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER, reads late ---------- */
+    close(fd[1]);
+    sleep(1);                              /* let the child queue 3 messages */
+
+    n = read(fd[0], buf, sizeof buf - 1);  /* PHASE 1: one big read() */
+    dump("[parent] got", buf, n);
+
+    sleep(2);
+                                           /* PHASE 2: 8 bytes at a time */
+    while ((n = read(fd[0], buf, SMALL)) > 0)
+        dump("[parent]   chunk", buf, n);
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.3}]
+$ ./q5_3_many_messages
+[child ] write #1: "MSG1 from child PID: 29450|"
+[child ] write #2: "MSG2 from child PID: 29450|"
+[child ] write #3: "MSG3 from child PID: 29450|"
+[parent] PHASE 1: one big read()
+[parent] got 81 bytes: [MSG1 from child PID: 29450|MSG2 from child PID: 29450|MSG3 from child PID: 29450|]
+[parent] -> 3 separate write() calls arrived in ONE read(). Message boundaries are gone.
+[child ] write #4: "MSG4|"
+[child ] write #5: "MSG5|"
+[child ] write #6: "MSG6|"
+[parent] PHASE 2: reading 8 bytes at a time
+[parent]   chunk 8 bytes: [MSG4|MSG]        <- MSG5 is cut in half here
+[parent]   chunk 7 bytes: [5|MSG6|]         <- and continues here
+[parent] read() returned 0 -> EOF, sender is gone.
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้}: ในเฟสที่หนึ่ง การเรียก \code{write()} 3 ครั้งถูกอ่านกลับมาได้ด้วย \code{read()} เพียงครั้งเดียวรวม 81 ไบต์ ($27 \times 3$) ข้อความทั้งสามถูกต่อกันเป็นสายเดียวโดยไม่มีร่องรอยว่าแต่ละ \code{write()} เริ่มและจบตรงไหน ส่วนในเฟสที่สองเมื่ออ่านทีละ 8 ไบต์ ข้อความ \code{MSG5|} ถูกผ่าครึ่ง โดยครึ่งแรกไปอยู่ท้าย chunk ที่หนึ่งและครึ่งหลังไปอยู่ต้น chunk ที่สอง อย่างไรก็ตามลำดับของข้อมูลยังคงถูกต้องแบบ FIFO เสมอ ทดสอบซ้ำ 5 ครั้งได้ผลเหมือนกันทุกครั้ง
+
+\newpage
+
+\subsection{สรุปผลการทดลองข้อ 5}
+
+\begin{table}[H]
+\centering
+\caption{สรุปพฤติกรรมของ pipe ในแต่ละสถานการณ์}
+\begin{tabular}{p{3.6cm}p{4.6cm}p{5.4cm}}
+\toprule
+\textbf{สถานการณ์} & \textbf{ผลที่สังเกตได้} & \textbf{คำอธิบาย} \\
+\midrule
+5.1 ผู้ส่งอ่านข้อความตัวเอง
+  & ผู้ส่งได้ข้อความคืนครบ 28 ไบต์ ส่วนผู้รับตัวจริงไม่ได้อะไร และค้างจนถูก \code{EINTR}
+  & pipe เป็นคิว FIFO ที่ข้อมูลถูกอ่านแล้วหมดไป ไม่ใช่การ broadcast ใครอ่านก่อนได้ก่อน \\
+\addlinespace
+5.2 ผู้รับอ่านก่อนผู้ส่งส่ง
+  & \code{read()} block นาน 3.00 วินาที เฟสที่สองคืนค่า 0 ภายใน 0.00 วินาที
+  & ว่างและยังมีผู้เขียนอยู่จะ block ส่วนว่างและไม่มีผู้เขียนเหลือแล้วจะได้ EOF \\
+\addlinespace
+5.3 ส่งหลายข้อความก่อนอ่าน
+  & \code{write()} 3 ครั้งถูกอ่านด้วย \code{read()} ครั้งเดียว 81 ไบต์ และเมื่ออ่านทีละ 8 ไบต์ ข้อความถูกผ่าครึ่ง
+  & pipe เป็น byte stream ที่รักษาลำดับแต่ไม่เก็บขอบเขตข้อความ การแบ่งข้อความเป็นหน้าที่ของแอปพลิเคชัน \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{อภิปรายผล}
+
+จากการทดลองทั้งสามกรณี สรุปคุณสมบัติสำคัญของ pipe ที่ได้เรียนรู้ได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{pipe ไม่มีแนวคิดเรื่องผู้ส่งและผู้รับ}:
+        ข้อ 5.1 แสดงว่าเคอร์เนลไม่ได้จดจำว่าใครเป็นผู้เขียนข้อมูลลงไป
+        pipe เป็นเพียงคิวไบต์แบบ FIFO ที่ใครก็ตามซึ่งถือปลายอ่านอยู่สามารถ
+        ดึงข้อมูลออกไปได้ และเมื่อถูกอ่านแล้วข้อมูลจะหายไปจากคิวทันที
+        ไม่ได้ถูกส่งซ้ำให้ผู้อ่านคนอื่น การกำหนดบทบาทผู้ส่งกับผู้รับจึงต้องทำ
+        ด้วยวินัยของโปรแกรมเมอร์เอง คือการปิดปลายที่ไม่ใช้ตามที่ทำในข้อ 4
+
+  \item \textbf{การไม่ปิดปลายที่ไม่ใช้ทำให้ตรวจจับ EOF ไม่ได้}:
+        ในข้อ 5.1 parent ค้างอยู่ใน \code{read()} แทนที่จะได้รับ EOF
+        ทั้งที่ child จบไปแล้ว เพราะตัว parent เองยังถือปลายเขียนไว้
+        เคอร์เนลจะรายงาน EOF ก็ต่อเมื่อปลายเขียด \textbf{ทุกตัว} ในระบบถูกปิด
+        เปรียบเทียบกับข้อ 5.2 ที่ปิดปลายที่ไม่ใช้อย่างถูกต้อง จะเห็นว่า
+        \code{read()} คืนค่า 0 ได้ทันทีเมื่อผู้เขียนหมดไป
+
+  \item \textbf{blocking read เป็นกลไกซิงโครไนซ์ในตัว}:
+        ข้อ 5.2 วัดได้ว่า \code{read()} หยุดรอนาน 3.00 วินาที ตรงกับ
+        \code{sleep()} ของผู้ส่งพอดี แสดงว่า process ถูกพักไว้ในสถานะ blocked
+        และคืน CPU ให้ผู้อื่นใช้ ไม่ใช่การวนรอแบบ busy waiting
+        คุณสมบัตินี้คือสิ่งเดียวกับที่นำไปใช้แก้ปัญหาลำดับ output ในข้อ 4
+
+  \item \textbf{pipe เป็น byte stream ไม่ใช่ message queue}:
+        ข้อ 5.3 แสดงชัดเจนสองทาง คือหลายข้อความถูกรวบมาใน \code{read()}
+        ครั้งเดียว และข้อความเดียวถูกแบ่งไปอยู่ใน \code{read()} หลายครั้ง
+        pipe รับประกันเพียง \emph{ลำดับ} ของไบต์ว่าเป็น FIFO เท่านั้น
+        แต่ไม่รับประกัน \emph{ขอบเขต} ของข้อความ ดังนั้นการแบ่งข้อความ
+        (framing) จึงเป็นหน้าที่ของแอปพลิเคชัน เช่น ใช้ระเบียนขนาดคงที่
+        ใส่ความยาวนำหน้า หรือใช้ตัวคั่นอย่าง \code{'\textbackslash 0'}
+        และ \code{'\textbackslash n'} ดังที่ข้อ 4 ส่ง \code{strlen(msg)+1}
+        เพื่อให้รวมตัวปิดสตริงไปด้วย
+
+  \item \textbf{ความสำคัญของการมีกลไกกันโปรแกรมค้าง}:
+        การทดลองข้อ 5.1 จะค้างถาวรถ้าไม่มี \code{alarm(3)} คอยขัดจังหวะ
+        เพราะเป็นสถานการณ์ที่ผู้รับรอข้อมูลที่ไม่มีวันมาถึง
+        การใส่ timeout ไว้จึงเป็นแนวปฏิบัติที่จำเป็นเมื่อทดลองกับ
+        การสื่อสารแบบ blocking
+\end{itemize}
+
+\end{document}

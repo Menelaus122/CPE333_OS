@@ -1,0 +1,107 @@
+# ผลการรันจริง - CPE333 PS02 ข้อ 4 (Communication through a Pipe)
+# Environment: Ubuntu 24.04.1 LTS (WSL2), kernel 6.6.87.2-microsoft-standard-WSL2, gcc 13.3.0
+# Compile: gcc -Wall -Wextra -o q4_pipe q4_pipe.c   -> ผ่าน ไม่มี warning
+
+################################################################
+# ผลลัพธ์ที่โจทย์กำหนด
+################################################################
+
+Child: Child PID: xxxxxx
+Parent: Parent PID: yyyyyy
+Parent: Hello from child PID: xxxxxx
+
+
+################################################################
+# ผลการรันจริง
+################################################################
+
+$ gcc -Wall -Wextra -o q4_pipe q4_pipe.c
+$ ./q4_pipe
+Child: Child PID: 28274
+Parent: Parent PID: 28273
+Parent: Hello from child PID: 28274
+
+--- รันซ้ำ 5 ครั้ง (แสดงแบบบรรทัดเดียวคั่นด้วย | เพื่อให้เทียบง่าย) ---
+Child: Child PID: 29279 | Parent: Parent PID: 29277 | Parent: Hello from child PID: 29279
+Child: Child PID: 29282 | Parent: Parent PID: 29280 | Parent: Hello from child PID: 29282
+Child: Child PID: 29285 | Parent: Parent PID: 29283 | Parent: Hello from child PID: 29285
+Child: Child PID: 29288 | Parent: Parent PID: 29286 | Parent: Hello from child PID: 29288
+Child: Child PID: 29291 | Parent: Parent PID: 29289 | Parent: Hello from child PID: 29291
+
+--- กรณี redirect ลงไฟล์ (ตรวจปัญหา buffering) ---
+$ ./q4_pipe > out.txt
+$ cat out.txt
+Child: Child PID: 29293
+Parent: Parent PID: 29292
+Parent: Hello from child PID: 29293
+
+# รูปแบบตรงกับที่โจทย์กำหนดทุกบรรทัด และไม่มีข้อความซ้ำจาก buffer
+# เพราะไม่มี printf() ก่อน fork() และมี fflush() กำกับ
+
+
+################################################################
+# การตรวจสอบความถูกต้อง
+################################################################
+
+--- 1. ลำดับ output เป็น deterministic หรือไม่ (รัน 200 ครั้ง) ---
+    บรรทัดแรกเป็น "Child:"   ->  200 / 200
+    บรรทัดแรกเป็น "Parent:"  ->    0 / 200
+    สรุป: ลำดับถูกต้องทุกครั้ง ไม่มี race
+
+--- 2. ข้อความที่ parent อ่านได้ตรงกับ PID ของ child จริงหรือไม่ (รัน 10 ครั้ง) ---
+    PID ในบรรทัดที่ 1 ตรงกับ PID ในบรรทัดที่ 3  ->  10 / 10
+    สรุป: ข้อมูลส่งผ่าน pipe ครบถ้วน ไม่มีการปนเปื้อน
+
+--- 3. process ตกค้าง / zombie ---
+    0 ตัว  (parent เรียก wait(NULL) เก็บกวาด child เรียบร้อย)
+
+--- 4. คอมไพล์ ---
+    gcc -Wall -Wextra  ->  ไม่มี warning
+
+
+################################################################
+# *** ปัญหาที่พบและการแก้ไข ***
+################################################################
+
+--- อาการก่อนแก้ ---
+โค้ดฉบับแรกให้ parent พิมพ์บรรทัดของตัวเองก่อน แล้วค่อยเรียก read()
+
+    printf("Parent: Parent PID: %d\n", getpid());
+    fflush(stdout);
+    n = read(fd[0], buf, sizeof buf - 1);
+    ...
+    printf("Parent: %s\n", buf);
+
+ผลคือลำดับ output ไม่ตรงกับที่โจทย์กำหนด เพราะไม่มีอะไรรับประกันว่า child
+จะได้ CPU ก่อน parent หลังจาก fork() ทดสอบ 40 ครั้งได้ผลดังนี้
+
+    บรรทัดแรกเป็น "Child:"   ->   1 / 40
+    บรรทัดแรกเป็น "Parent:"  ->  39 / 40
+
+ตัวอย่างผลที่ผิด (สองบรรทัดแรกสลับกัน)
+
+    Parent: Parent PID: 27729      <-- ควรเป็นบรรทัดที่ 2
+    Child: Child PID: 27730        <-- ควรเป็นบรรทัดที่ 1
+    Parent: Hello from child PID: 27730
+
+--- วิธีแก้ ---
+ย้าย read() ขึ้นมาไว้ "ก่อน" printf ของ parent
+
+    n = read(fd[0], buf, sizeof buf - 1);   /* blocks */
+    ...
+    printf("Parent: Parent PID: %d\n", getpid());
+    printf("Parent: %s\n", buf);
+
+--- เหตุผลว่าทำไมวิธีนี้จึงรับประกันลำดับได้จริง ---
+เป็นความสัมพันธ์แบบ happens-before ที่ต่อกันเป็นลูกโซ่
+
+    (1) child: fflush(stdout)  ->  write(1, "Child: ...") ลงหน้าจอ
+    (2) child: write(fd[1], msg, ...) ลง pipe          [เกิดหลัง (1) เสมอ]
+    (3) parent: read(fd[0]) คืนค่า                      [เกิดหลัง (2) เสมอ]
+    (4) parent: printf("Parent: ...") ลงหน้าจอ          [เกิดหลัง (3) เสมอ]
+
+ดังนั้น (1) ต้องเกิดก่อน (4) เสมอ ไม่ใช่แค่ "มีโอกาสสูง"
+เป็นการใช้ blocking read ของ pipe เป็นจุดซิงโครไนซ์ในตัว
+ไม่ต้องใช้ sleep() ซึ่งเป็นการเดาเวลา และไม่ต้องสร้าง pipe เส้นที่สอง
+
+ยืนยันผลหลังแก้: รัน 200 ครั้ง ได้ลำดับถูกต้อง 200/200

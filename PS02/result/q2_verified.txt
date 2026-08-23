@@ -1,0 +1,94 @@
+# ผลการรันจริง - CPE333 PS02 ข้อ 2 (Process Status & sleep)
+# Environment: Ubuntu 24.04.1 LTS (WSL2), kernel 6.6.87.2-microsoft-standard-WSL2, gcc 13.3.0
+# Compile: gcc -Wall -Wextra -o q2_1 q2_1_child_first.c   -> ผ่าน ไม่มี warning
+#          gcc -Wall -Wextra -o q2_2 q2_2_parent_first.c  -> ผ่าน ไม่มี warning
+
+################################################################
+# 2.1  Child ตายก่อน / Parent ยังทำงานอยู่  -> เกิด ZOMBIE
+################################################################
+
+$ ./q2_1 &
+[parent] PID = 6908, child PID = 6910
+[parent] NOT calling wait(). Sleeping 30 s.
+[parent] Inspect now with:  ps -ef | grep -e q2_1 -e defunct
+[child ] PID = 6910, PPID = 6908 -- exiting right now
+
+--- ps -ef | grep -e q2_1 -e defunct   (ระหว่างที่ parent ยัง sleep อยู่) ---
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6908   6900  0 18:58 pts/2  00:00:00 ./q2_1
+poomipat  6910   6908  0 18:58 pts/2  00:00:00 [q2_1] <defunct>
+
+--- ps -eo pid,ppid,stat,comm ---
+   PID   PPID STAT COMMAND
+  6908   6900 S+   q2_1        <- parent กำลัง sleep (Sleeping)
+  6910   6908 Z+   q2_1        <- child เป็น ZOMBIE (Z = defunct)
+
+--- ps -el (คอลัมน์ S = state) ---
+F S   UID    PID   PPID  C PRI  NI ADDR SZ WCHAN  TTY      TIME CMD
+0 S  1000   6908   6900  0  80   0 -   670 hrtime pts/2 00:00:00 q2_1
+1 Z  1000   6758   6756  0  80   0 -     0 -      pts/2 00:00:00 q2_1
+                                        ^^^
+                        SZ = 0 : zombie คืนหน่วยความจำไปหมดแล้ว
+
+สรุปตัวเลขสำหรับรายงานข้อ 2.1
+  PID ของ parent            = 6908
+  PID ของ child             = 6910
+  PPID ของ child            = 6908  (ยังเป็น parent ตัวจริง ไม่ถูก reparent)
+  สถานะของ child ใน ps      = Z+  แสดงเป็น [q2_1] <defunct>
+
+--- หลัง parent จบ 30 วินาที ---
+[parent] PID = 6908 exiting; the zombie child 6910 is now re-parented
+         to init/systemd and reaped.
+$ ps -eo pid,ppid,stat,comm | grep q2_1
+(ไม่เหลืออะไรเลย -> zombie ถูกเก็บกวาดทันทีที่ parent ตาย ยืนยันคำอธิบายในโค้ดถูกต้อง)
+
+
+################################################################
+# 2.2  Parent ตายก่อน / Child ยังทำงานอยู่  -> เกิด ORPHAN
+################################################################
+
+$ ./q2_2 &
+[parent] PID = 6857, child PID = 6859 -- exiting immediately
+[child ] PID = 6859, PPID = 6857  (original parent, still alive)
+[child ] PID = 6859, PPID = 6846  (parent is gone -> re-parented)
+[child ] Inspect now with:  ps -ef | grep q2_2
+
+--- ps -ef | grep q2_2   (หลัง parent ตายไปแล้ว) ---
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6859   6846  0 18:57 pts/2  00:00:00 ./q2_2
+
+--- ps -eo pid,ppid,stat,comm ---
+   PID   PPID STAT COMMAND
+  6859   6846 S+   q2_2        <- ยัง Sleeping ปกติ ไม่มี zombie ให้เห็นเลย
+
+สรุปตัวเลขสำหรับรายงานข้อ 2.2
+  PID ของ parent             = 6857
+  PID ของ child              = 6859
+  PPID ของ child ก่อน parent ตาย = 6857  (parent ตัวจริง)
+  PPID ของ child หลัง parent ตาย = 6846  (ถูก reparent ให้ subreaper)
+  สถานะของ child ใน ps       = S+  (ปกติ ไม่ใช่ zombie)
+
+
+################################################################
+# ***สำคัญ*** subreaper ที่รับ orphan ไปเลี้ยง ไม่ใช่ PID 1 บน WSL2
+################################################################
+
+$ ps -p 6846 -o pid=,ppid=,comm=,args=
+   6846   6844 Relay(6848)  /init
+
+--- สายบรรพบุรุษ (ancestry chain) จาก subreaper ขึ้นไปถึง PID 1 ---
+   PID   PPID COMMAND
+  6846   6844 Relay(6848)          <- WSL /init relay  = ตัวที่รับ orphan ไป
+  6844      2 SessionLeader
+     2      1 init-systemd(Ub
+     1      0 systemd              <- PID 1 ตัวจริง
+
+$ ps -p 1 -o pid=,comm=
+     1 systemd
+
+หมายเหตุ: บน Linux ที่ติดตั้งแบบ native หรือใน VM ปกติ ตัวเลข PPID หลัง reparent
+มักจะเป็น 1 (systemd) หรือเลข PID ของ systemd --user
+แต่บน WSL2 กระบวนการ /init ของ WSL ตั้งตัวเองเป็น child subreaper
+(prctl PR_SET_CHILD_SUBREAPER) เอาไว้ เคอร์เนลจึงยก orphan ให้ตัวนี้แทน PID 1
+เพราะกฎของเคอร์เนลคือยกให้ "subreaper ที่ใกล้ที่สุด" ไม่ใช่ "PID 1 เสมอไป"
+เวลาเขียนรายงานต้องรายงานเลขที่เห็นจริง (6846) พร้อมอธิบายเหตุผลข้อนี้

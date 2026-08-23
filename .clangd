@@ -1,0 +1,7 @@
+CompileFlags:
+  Add:
+    - "-I//wsl.localhost/Ubuntu-24.04/usr/lib/gcc/x86_64-linux-gnu/13/include"
+    - "-I//wsl.localhost/Ubuntu-24.04/usr/include/x86_64-linux-gnu"
+    - "-I//wsl.localhost/Ubuntu-24.04/usr/include"
+    - "-D_GNU_SOURCE"
+    - "-D_POSIX_C_SOURCE=200809L"
