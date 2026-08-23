@@ -6,7 +6,7 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: ข้อ 1-3 เขียนสมบูรณ์แล้ว / ข้อ 4-5 ยังเป็นโครงรอเติม
+%  สถานะเอกสาร: ข้อ 1-4 เขียนสมบูรณ์แล้ว / ข้อ 5 ยังเป็นโครงรอเติม
 % =====================================================================
 \documentclass[a4paper,12pt]{article}
 
@@ -171,6 +171,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
  & \code{gcc -Wall -Wextra -o q2\_1 q2\_1\_child\_first.c} \\
  & \code{gcc -Wall -Wextra -o q2\_2 q2\_2\_parent\_first.c} \\
  & \code{gcc -Wall -Wextra -o q3\_forkcount q3\_forkcount.c} \\
+ & \code{gcc -Wall -Wextra -o q4\_pipe q4\_pipe.c} \\
 ผลการคอมไพล์ & ผ่านทุกไฟล์ ไม่มี warning \\
 \bottomrule
 \end{tabular}
@@ -196,7 +197,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 1 & \code{fork()} แบบมีและไม่มี \code{wait()} & เสร็จ & เสร็จ \\
 2 & Process status และ \code{sleep()} (zombie / orphan) & เสร็จ & เสร็จ \\
 3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & เสร็จ & เสร็จ \\
-4 & การสื่อสารผ่าน \code{pipe()} & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+4 & การสื่อสารผ่าน \code{pipe()} & เสร็จ & เสร็จ \\
 5 & กรณีพิเศษของ pipe (5.1--5.3) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
 \bottomrule
 \end{tabular}
@@ -817,10 +818,9 @@ B (เพดาน 6000) & หลังปิดโปรแกรมทั้�
 \section{การสื่อสารผ่าน Pipe}
 % =====================================================================
 
-\todo{ยังไม่ได้เขียนโปรแกรมข้อ 4 -- ต้องสร้างไฟล์ \code{q4\_pipe.c}}
-
-\textbf{ผลลัพธ์ที่โจทย์กำหนด} \quad ต้องได้ output ตามรูปแบบนี้ โดย child เป็นผู้ส่ง
-และ parent เป็นผู้รับ
+โจทย์กำหนดให้สร้าง pipe ด้วย \code{pipe()} แล้ว \code{fork()} โดยให้ \textbf{child
+เป็นผู้ส่ง} และ \textbf{parent เป็นผู้รับ} ผู้ส่งต้องปิดปลายอ่านและผู้รับต้องปิด
+ปลายเขียนก่อนเริ่มสื่อสาร ผลลัพธ์ที่ต้องได้มีรูปแบบดังนี้
 
 \begin{lstlisting}[style=terminal]
 Child: Child PID: xxxxxx
@@ -830,42 +830,169 @@ Parent: Hello from child PID: xxxxxx
 
 \subsection{Source code}
 
-\begin{lstlisting}[caption={q4.c -- child เป็นผู้ส่ง parent เป็นผู้รับ},label={lst:q4}]
+\begin{lstlisting}[caption={q4\_pipe.c -- child เป็นผู้ส่ง parent เป็นผู้รับ},label={lst:q4}]
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/wait.h>
+
+#define BUFSZ 128
 
 int main(void)
 {
     int fd[2];
-    /* TODO: pipe(fd) -> fork()
-     *       child : close(fd[0]) then write()
-     *       parent: close(fd[1]) then read()
-     */
+    pid_t pid;
+    char msg[BUFSZ], buf[BUFSZ];
+    ssize_t n;
+
+    if (pipe(fd) < 0) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER ---------- */
+        close(fd[0]);                       /* sender never reads */
+
+        printf("Child: Child PID: %d\n", getpid());
+        fflush(stdout);
+
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+
+        if (write(fd[1], msg, strlen(msg) + 1) < 0) {   /* +1 sends the '\0' */
+            perror("child write");
+            exit(EXIT_FAILURE);
+        }
+
+        close(fd[1]);                       /* signal EOF to the reader */
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER ---------- */
+    close(fd[1]);                           /* receiver never writes */
+
+    /* Read FIRST, then print. The child flushes its own line to stdout before
+     * it writes into the pipe, so this read() cannot return until the child's
+     * line has already reached the terminal. That makes the output order
+     * deterministic and equal to the one the problem sheet specifies, using
+     * the blocking read as the synchronisation point -- no sleep() needed.
+     * Printing before the read would race the child and, in practice, put the
+     * parent's line first about 39 times out of 40. */
+    n = read(fd[0], buf, sizeof buf - 1);   /* blocks until the child writes */
+    if (n < 0) {
+        perror("parent read");
+        exit(EXIT_FAILURE);
+    }
+    buf[n] = '\0';
+
+    printf("Parent: Parent PID: %d\n", getpid());
+    printf("Parent: %s\n", buf);
+
+    close(fd[0]);
+    wait(NULL);                             /* reap the child */
     return 0;
 }
 \end{lstlisting}
 
-\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายลำดับ \code{pipe()} $\rightarrow$ \code{fork()}
-$\rightarrow$ ปิดปลายที่ไม่ใช้ $\rightarrow$ \code{write()} / \code{read()}
-และเหตุผลที่ต้องปิดปลายที่ไม่ใช้ เพราะถ้าไม่ปิดฝั่ง write ให้ครบทุก process
-แล้ว \code{read()} จะไม่มีวันได้รับ EOF และจะ block ค้างตลอดไป}
+\textbf{คำอธิบายการทำงาน}: โปรแกรมเรียก \code{pipe(fd)} \textbf{ก่อน} \code{fork()} เสมอ เพื่อให้ทั้งสอง process ได้รับสำเนาของ file descriptor ทั้งคู่ไป หลัง \code{fork()} จึงมี descriptor ชี้ไปที่ pipe เดียวกันถึงสี่ตัว แต่ละฝ่ายจึงต้องปิดปลายที่ตนไม่ใช้ทันที คือ child ปิด \code{fd[0]} เพราะเป็นผู้ส่งไม่ต้องอ่าน และ parent ปิด \code{fd[1]} เพราะเป็นผู้รับไม่ต้องเขียน จากนั้น child พิมพ์ PID ของตนเอง สร้างข้อความด้วย \code{snprintf()} แล้ว \code{write()} ลง pipe โดยส่งความยาว \code{strlen(msg)+1} เพื่อให้รวมอักขระ \code{'\textbackslash 0'} ไปด้วย ส่วน parent เรียก \code{read()} ซึ่งจะ block รอจนกว่าจะมีข้อมูล แล้วจึงพิมพ์ PID ของตนเองตามด้วยข้อความที่ได้รับ และปิดท้ายด้วย \code{wait(NULL)} เพื่อเก็บกวาด child ไม่ให้เหลือ zombie
+
+\newpage
 
 \subsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 4}]
-$ ./q4
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 4 (รันซ้ำหลายครั้ง)}]
+$ gcc -Wall -Wextra -o q4_pipe q4_pipe.c
+$ ./q4_pipe
+Child: Child PID: 28274
+Parent: Parent PID: 28273
+Parent: Hello from child PID: 28274
 
+$ ./q4_pipe
+Child: Child PID: 29279
+Parent: Parent PID: 29277
+Parent: Hello from child PID: 29279
 
+$ ./q4_pipe
+Child: Child PID: 29282
+Parent: Parent PID: 29280
+Parent: Hello from child PID: 29282
+
+--- redirected to a file (buffering check) ---
+$ ./q4_pipe > out.txt
+$ cat out.txt
+Child: Child PID: 29293
+Parent: Parent PID: 29292
+Parent: Hello from child PID: 29293
 \end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{ผลการตรวจสอบความถูกต้องของข้อ 4}
+\begin{tabular}{lc}
+\toprule
+\textbf{รายการที่ตรวจ} & \textbf{ผล} \\
+\midrule
+คอมไพล์ด้วย \code{gcc -Wall -Wextra} & ผ่าน ไม่มี warning \\
+รูปแบบ output ตรงกับที่โจทย์กำหนด & ตรงทุกบรรทัด \\
+ลำดับ output ถูกต้อง (ทดสอบ 200 ครั้ง) & 200 / 200 \\
+PID ในข้อความที่รับ ตรงกับ PID ของ child (10 ครั้ง) & 10 / 10 \\
+process ตกค้างหรือ zombie & 0 ตัว \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{อภิปรายผล}
 
-\todo{เขียนอภิปราย} ประเด็นที่ควรกล่าวถึง เช่น ทำไม pipe จึงเป็นการสื่อสารทางเดียว
-(unidirectional) ทำไม file descriptor จึงถูกสืบทอดไปยัง child ได้
-และ \code{read()} มีพฤติกรรม blocking อย่างไร
+จากการทดลองสื่อสารระหว่าง process ผ่าน pipe สรุปประเด็นสำคัญได้ดังนี้
 
+\begin{itemize}[leftmargin=*]
+  \item \textbf{เหตุผลที่ file descriptor ถูกสืบทอดไปยัง child ได้}:
+        \code{fork()} คัดลอกตาราง file descriptor ของ parent ไปให้ child ทั้งชุด
+        ดังนั้นการเรียก \code{pipe()} \emph{ก่อน} \code{fork()} จึงทำให้ทั้งสอง
+        process มีทางเข้าถึง pipe เดียวกัน นี่คือเหตุผลที่ pipe ใช้สื่อสารได้เฉพาะ
+        ระหว่าง process ที่มีความสัมพันธ์เป็นเครือญาติกันเท่านั้น
+        ถ้าเรียก \code{pipe()} หลัง \code{fork()} จะได้ pipe คนละเส้นและคุยกันไม่ได้
+
+  \item \textbf{เหตุผลที่ต้องปิดปลายที่ไม่ใช้}:
+        หลัง \code{fork()} จะมี descriptor ชี้ไปที่ pipe เดียวกันถึงสี่ตัว
+        หากผู้รับไม่ปิดปลายเขียนของตนเอง \code{read()} จะไม่มีวันได้รับ EOF
+        เพราะเคอร์เนลจะรายงาน EOF ก็ต่อเมื่อปลายเขียน \textbf{ทุกตัว}
+        ในระบบถูกปิดแล้วเท่านั้น โปรแกรมจะค้างรออยู่ตลอดไป
+        ในทางกลับกันถ้าผู้ส่งไม่ปิดปลายอ่าน ก็จะสิ้นเปลือง descriptor
+        และเสี่ยงอ่านข้อความของตัวเองกลับมาโดยไม่ตั้งใจ ซึ่งเป็นกรณีที่จะทดลองในข้อ 5
+
+  \item \textbf{พฤติกรรม blocking ของ \code{read()}}:
+        เมื่อ pipe ยังว่าง \code{read()} จะพา process เข้าสู่สถานะ blocked
+        แล้วปล่อย CPU ให้ผู้อื่น จนกว่าจะมีข้อมูลเข้ามาหรือปลายเขียนถูกปิดหมด
+        จึงไม่ใช่การวนรอแบบสิ้นเปลือง CPU (busy waiting) และคุณสมบัตินี้เอง
+        ที่ทำให้ pipe ทำหน้าที่เป็นกลไกซิงโครไนซ์ได้ในตัว
+
+  \item \textbf{ปัญหาลำดับ output ที่พบและวิธีแก้}:
+        โค้ดฉบับแรกให้ parent พิมพ์บรรทัดของตนเองก่อนแล้วค่อยเรียก \code{read()}
+        ซึ่งไม่มีอะไรรับประกันว่า child จะได้ CPU ก่อน ผลการทดสอบ 40 ครั้งพบว่า
+        บรรทัดแรกเป็นของ parent ถึง 39 ครั้ง ทำให้สองบรรทัดแรกสลับกัน
+        ไม่ตรงกับรูปแบบที่โจทย์กำหนด แก้โดยย้าย \code{read()} ขึ้นมาไว้ก่อน
+        \code{printf()} ของ parent ซึ่งสร้างความสัมพันธ์แบบ happens-before
+        ต่อกันเป็นลูกโซ่ คือ child ต้อง \code{fflush()} บรรทัดของตนออกหน้าจอก่อน
+        จึงจะ \code{write()} ลง pipe และ \code{read()} ของ parent จะคืนค่าได้
+        ก็ต่อเมื่อการเขียนนั้นเกิดขึ้นแล้ว บรรทัดของ child จึงต้องปรากฏก่อน
+        บรรทัดของ parent เสมอ ไม่ใช่เพียงแค่มีโอกาสสูง
+        วิธีนี้ใช้ blocking read เป็นจุดซิงโครไนซ์ในตัว จึงดีกว่าการใส่
+        \code{sleep()} ซึ่งเป็นเพียงการเดาเวลาและยังคงมีโอกาสผิดพลาด
+        ผลหลังแก้คือลำดับถูกต้อง 200 จาก 200 ครั้ง
+
+  \item \textbf{ไม่พบปัญหา buffer ซ้ำเหมือนข้อ 1}:
+        เมื่อ redirect output ลงไฟล์ ผลลัพธ์ยังคงถูกต้องครบสามบรรทัดไม่มีข้อความซ้ำ
+        เพราะโปรแกรมนี้ไม่มีการเรียก \code{printf()} ก่อน \code{fork()}
+        buffer ของ stdout จึงว่างอยู่แล้วในขณะที่ทำสำเนา address space
+\end{itemize}
 \newpage
 % =====================================================================
 \section{การทดลองกรณีพิเศษของ Pipe}
