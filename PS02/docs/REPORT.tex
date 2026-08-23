@@ -1,0 +1,652 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2026 - Problem Session 2
+%  Process Creation & Pipes
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX หรือ LuaLaTeX เท่านั้น (pdfLaTeX ใช้ไม่ได้ เพราะใช้ fontspec)
+%  Overleaf: Menu > Compiler > XeLaTeX
+%  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
+%
+%  สถานะเอกสาร: ข้อ 1 เขียนสมบูรณ์แล้ว / ข้อ 2-5 ยังเป็นโครงรอเติม
+% =====================================================================
+\documentclass[a4paper,12pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+% --- เลือกอย่างใดอย่างหนึ่ง ---
+% (A) เครื่องตัวเอง / มีฟอนต์ TH Sarabun New ติดตั้งอยู่แล้ว
+\setmainfont{TH Sarabun New}[Scale=1.4]
+
+% (B) Overleaf หรือเครื่องที่มี Noto  <-- ปลอดภัยที่สุดถ้าคอมไพล์บน Overleaf
+% \setmainfont{Noto Serif Thai}[
+%   Scale=1.0,
+%   UprightFont = * Regular,
+%   BoldFont    = * Bold,
+% ]
+
+% (C) ถ้าอัปโหลดไฟล์ .ttf เข้าโปรเจกต์เอง (วางไว้ในโฟลเดอร์ fonts/)
+% \setmainfont{THSarabunNew}[
+%   Path      = ./fonts/,
+%   Extension = .ttf,
+%   UprightFont = *,
+%   BoldFont    = *-Bold,
+%   ItalicFont  = *-Italic,
+%   Scale     = 1.4,
+% ]
+
+% ฟอนต์ monospace สำหรับโค้ด (ไม่มีสระไทย -> คอมเมนต์ในโค้ดควรเป็นอังกฤษ)
+\setmonofont{Consolas}[Scale=0.85]
+
+% การตัดคำภาษาไทย (สำคัญมาก ไม่งั้นบรรทัดจะทะลุขอบกระดาษ)
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+\definecolor{todored}{RGB}{178,34,34}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=8pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=15pt,
+  framexleftmargin=15pt,
+  morekeywords={pid_t,ssize_t,size_t,fork,wait,waitpid,pipe,read,write,close,getpid,getppid,sleep,exit,perror,fflush},
+}
+
+\lstdefinestyle{terminal}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=5pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+
+% ------------------------- คำสั่งลัด -------------------------
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\todo}[1]{\textcolor{todored}{\textbf{[ยังไม่ได้ทำ: #1]}}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2026}
+\rhead{\small Problem Session 2}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+
+% --- Logo ---
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+
+% --- Document Title ---
+{\Large\bfseries รายงาน}\\[0.4cm]
+{\Large\bfseries PS02: Process Creation \& Pipes}\\[0.4cm]
+
+\vfill
+
+% --- Instructor ---
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+
+% --- Authors ---
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+
+\vfill
+
+% --- Institution Footer ---
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% ------------------------- สารบัญ -------------------------
+\tableofcontents
+\newpage
+
+% ------------------------- สภาพแวดล้อมที่ใช้ทดลอง -------------------------
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+
+\begin{tabular}{ll}
+\toprule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11) \\
+Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code{uname -r}) \\
+คอมไพเลอร์ & \code{gcc} (Ubuntu 13.3.0-6ubuntu2\textasciitilde24.04.1) 13.3.0 \\
+คำสั่งคอมไพล์ & \code{gcc -Wall -Wextra -o q1\_1 q1\_1\_helloworld.c} \\
+ & \code{gcc -Wall -Wextra -o q1\_2 q1\_2\_wait.c} \\
+ผลการคอมไพล์ & ผ่านทั้งสองไฟล์ ไม่มี warning \\
+\bottomrule
+\end{tabular}
+
+\vspace{1em}
+
+\textbf{หมายเหตุเรื่อง WSL2} \quad WSL2 รัน Linux kernel จริง ดังนั้น \code{fork()}, \code{wait()},
+\code{pipe()} และคำสั่ง \code{ps} ทำงานได้ตามปกติ อย่างไรก็ตามตัวเลขขีดจำกัดจำนวน process ในข้อ 3
+อาจต่างจาก Linux ที่ติดตั้งแบบ native หรือแบบ VM เพราะ WSL2 จัดสรรหน่วยความจำให้ VM แบบไดนามิก
+
+\newpage
+
+% ------------------------- สรุปความคืบหน้า -------------------------
+\section*{สรุปความคืบหน้าของรายงานฉบับนี้}
+\addcontentsline{toc}{section}{สรุปความคืบหน้าของรายงานฉบับนี้}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{clcc}
+\toprule
+\textbf{ข้อ} & \textbf{หัวข้อ} & \textbf{โค้ด} & \textbf{ผลการทดลอง} \\
+\midrule
+1 & \code{fork()} แบบมีและไม่มี \code{wait()} & เสร็จ & เสร็จ \\
+2 & Process status และ \code{sleep()} (zombie / orphan) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+4 & การสื่อสารผ่าน \code{pipe()} & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+5 & กรณีพิเศษของ pipe (5.1--5.3) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textcolor{todored}{\textbf{หมายเหตุ}} ส่วนที่ยังไม่ได้ทำถูกทำเครื่องหมายไว้ด้วยข้อความสีแดง
+\code{[ยังไม่ได้ทำ: \ldots]} ในเนื้อรายงาน เพื่อให้หาจุดที่ต้องเติมได้ง่าย
+ก่อนส่งจริงต้องเติมให้ครบทุกจุดและลบคำสั่ง \code{\textbackslash todo} ออก
+
+\newpage
+% =====================================================================
+\section{fork() แบบมีและไม่มี wait()}
+% =====================================================================
+
+\subsection{Source code}
+
+\subsubsection{1.1 โปรแกรม helloworld (ไม่มี \code{wait()})}
+
+\begin{lstlisting}[caption={q1\_1\_helloworld.c -- fork() without wait()},label={lst:q1_1}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+int main(void)
+{
+    printf("Hello World!\n");
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* child */
+        printf("I am the child, my PID = %d, my parent PID = %d\n",
+               getpid(), getppid());
+    } else {
+        /* parent */
+        printf("I am the parent, my PID = %d, my child PID = %d\n",
+               getpid(), pid);
+    }
+
+    printf("Common line printed by PID %d\n", getpid());
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: เรียก \code{fork()} เพื่อสร้าง child process หากเป็น child (\code{pid == 0}) จะพิมพ์ PID ของตนเองและ parent ส่วน parent จะพิมพ์ PID ของตนเองและลูก เนื่องจากไม่มี \code{wait()} parent จึงจบการทำงานโดยไม่รอ child
+
+\newpage
+
+\subsubsection{1.2 โปรแกรมที่เพิ่ม \code{wait()}}
+
+\begin{lstlisting}[caption={q1\_2\_wait.c -- fork() with wait()},label={lst:q1_2}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+    printf("Hello World!\n");
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* child */
+        printf("I am the child, my PID = %d, my parent PID = %d\n",
+               getpid(), getppid());
+    } else {
+        /* parent */
+        wait(NULL);
+        printf("I am the parent, my PID = %d, my child PID = %d\n",
+               getpid(), pid);
+    }
+
+    printf("Common line printed by PID %d\n", getpid());
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: เพิ่มการเรียก \code{wait(NULL)} ในฝั่ง parent เพื่อสั่งให้ parent หยุดรอ (Blocked) จนกว่า child จะทำงานเสร็จและคืนสถานะเรียบร้อย บังคับให้ลำดับการแสดงผลของ child เกิดขึ้นก่อน parent เสมอ
+
+\newpage
+
+\subsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 1.1 (ไม่มี wait())}]
+$ gcc -Wall -Wextra -o q1_1 q1_1_helloworld.c
+$ ./q1_1
+Hello World!
+I am the parent, my PID = 3642, my child PID = 3643
+Common line printed by PID 3642
+I am the child, my PID = 3643, my parent PID = 3642
+Common line printed by PID 3643
+
+$ ./q1_1
+Hello World!
+I am the parent, my PID = 3644, my child PID = 3645
+Common line printed by PID 3644
+I am the child, my PID = 3645, my parent PID = 3632      <-- PPID changed (Orphan)!
+Common line printed by PID 3645
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 1.2 (มี wait())}]
+$ gcc -Wall -Wextra -o q1_2 q1_2_wait.c
+$ ./q1_2
+Hello World!
+I am the child, my PID = 3649, my parent PID = 3648
+Common line printed by PID 3649
+I am the parent, my PID = 3648, my child PID = 3649
+Common line printed by PID 3648
+\end{lstlisting}
+
+\subsection{อภิปรายผล}
+
+จากการทดลองเปรียบเทียบระหว่างโปรแกรมข้อ 1.1 (ไม่มี \code{wait()}) และข้อ 1.2 (มี \code{wait()}) สรุปความแตกต่างที่สำคัญได้ดังนี้
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การซิงโครไนซ์และลำดับ Output}:
+        ในข้อ 1.1 ทั้ง Parent และ Child แย่งกันทำงานอย่างอิสระ ลำดับการพิมพ์ข้อความจึงขึ้นอยู่กับ Kernel Scheduler และไม่แน่นอน (Non-deterministic) ในขณะที่ข้อ 1.2 การเรียก \code{wait(NULL)} จะทำให้ Parent หยุดรอ (Blocked) จนกว่า Child จะทำงานเสร็จ ลำดับ Output จึงมีความแน่นอน (Deterministic) โดยข้อความของ Child จะปรากฏก่อนเสมอ
+
+  \item \textbf{ปรากฏการณ์ Orphan Process}:
+        ในข้อ 1.1 มีโอกาสที่ Parent จะทำงานเสร็จและจบโปรแกรมไปก่อน ทำให้ Child กลายเป็น Orphan Process และถูกเคอร์เนลยกให้ \code{init} (หรือ Subreaper) เป็น Parent ใหม่แทน (สังเกตได้จาก PPID ของ Child ที่เปลี่ยนไปในการรันครั้งที่ 2) ส่วนในข้อ 1.2 จะไม่เกิดเหตุการณ์นี้เนื่องจาก Parent รอ Child อยู่เสมอ
+\end{itemize}
+
+\newpage
+% =====================================================================
+\section{Process Status และ sleep()}
+% =====================================================================
+
+\todo{ยังไม่ได้เขียนโปรแกรมข้อ 2 -- ต้องสร้างไฟล์ \code{q2\_procstatus.c}}
+
+\textbf{แนวทางที่ต้องทำ} \quad เขียนโปรแกรมที่ \code{fork()} แล้วใช้ \code{sleep()}
+คุมลำดับการตายของ parent กับ child ให้ได้สองสถานการณ์ตามโจทย์ ระหว่างที่โปรแกรมยัง
+ไม่จบ ให้เปิดอีก terminal หนึ่งแล้วรัน \code{ps -ef | grep <ชื่อโปรแกรม>}
+เพื่อบันทึกสถานะและ PPID
+
+\subsection{Source code}
+
+\begin{lstlisting}[caption={q2.c -- ควบคุมลำดับการตายด้วย sleep()},label={lst:q2}]
+/* TODO:
+ * 2.1 child dies first  -> parent sleeps long, child returns immediately
+ * 2.2 parent dies first -> parent returns immediately, child sleeps long
+ * In both cases the parent must NOT call wait(), so that the
+ * zombie / orphan behaviour becomes visible in ps.
+ */
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายว่าวาง \code{sleep()} ไว้ตรงไหน
+เพื่อบังคับให้เกิดสถานการณ์แต่ละแบบ}
+
+\subsection{ผลการทดลอง}
+
+\subsubsection{2.1 Child ตายแล้ว แต่ Parent ยังทำงานอยู่}
+
+\begin{lstlisting}[style=terminal,caption={ผลของ \texttt{ps -ef} ในกรณีที่ 2.1}]
+$ ps -ef | grep q2
+UID    PID    PPID   C STIME TTY   TIME     CMD
+
+
+\end{lstlisting}
+
+\begin{tabular}{ll}
+\toprule
+PID ของ parent & \\
+PID ของ child & \\
+PPID ของ child & \\
+สถานะของ child ที่เห็นใน \code{ps} & \\
+\bottomrule
+\end{tabular}
+
+\subsubsection{2.2 Parent ตายแล้ว แต่ Child ยังทำงานอยู่}
+
+\begin{lstlisting}[style=terminal,caption={ผลของ \texttt{ps -ef} ในกรณีที่ 2.2}]
+$ ps -ef | grep q2
+
+
+\end{lstlisting}
+
+\begin{tabular}{ll}
+\toprule
+PID ของ parent & \\
+PID ของ child & \\
+PPID ของ child (ก่อน parent ตาย) & \\
+PPID ของ child (หลัง parent ตาย) & \\
+\bottomrule
+\end{tabular}
+
+\subsection{อภิปรายผล}
+
+\subsubsection{เปรียบเทียบสองสถานการณ์}
+
+\todo{เขียนอภิปราย} ประเด็นหลักคือกรณี 2.1 จะได้ \textbf{zombie process}
+ส่วนกรณี 2.2 จะได้ \textbf{orphan process} ที่ถูก reparent
+ซึ่งเป็นปรากฏการณ์เดียวกับที่สังเกตได้แล้วโดยบังเอิญในข้อ 1.1 การรันครั้งที่ 2
+
+\subsubsection{ปรากฏการณ์ \code{<defunct>}}
+
+\textbf{ความหมาย} \quad \todo{อธิบายว่า \code{<defunct>} คือ zombie process
+คือ process ที่จบการทำงานไปแล้ว แต่ยังไม่มี parent มา \code{wait()} เก็บ exit status ไป
+เคอร์เนลจึงต้องเก็บ entry ไว้ในตารางกระบวนการต่อ}
+
+\textbf{สาเหตุ} \quad \todo{parent ยังไม่ได้เรียก \code{wait()} หรือ \code{waitpid()}}
+
+\textbf{ผลกระทบ} \quad \todo{ยังกิน entry ในตารางกระบวนการและจอง PID ไว้
+ถ้าสะสมมาก ๆ จะทำให้ระบบสร้าง process ใหม่ไม่ได้ ซึ่งเชื่อมโยงกับขีดจำกัดในข้อ 3}
+
+\newpage
+% =====================================================================
+\section{จำนวน process สูงสุดที่ fork ได้}
+% =====================================================================
+
+\todo{ยังไม่ได้เขียนโปรแกรมข้อ 3 -- ต้องสร้างไฟล์ \code{q3\_forkcount.c}}
+
+\textbf{ข้อควรระวัง} \quad ต้องตั้ง \code{ulimit -u} ก่อนรันทุกครั้ง เช่น
+\code{ulimit -u 200} เพื่อไม่ให้ระบบค้าง และควรใช้รูปแบบ recursive ที่ parent
+\code{wait()} รอ child เสมอตามที่โจทย์แนะนำ ไม่ใช่การ \code{fork()} แบบวนลูป
+ซึ่งจะกลายเป็น fork bomb
+
+\subsection{Source code}
+
+\begin{lstlisting}[caption={q3.c -- นับจำนวนครั้งที่ fork() สำเร็จ},label={lst:q3}]
+/* TODO: recursive form -- parent waits for child, child forks the next
+ * child, until fork() fails. Report the last successful count.
+ */
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายวิธีนับ กลไกการหยุด
+และมาตรการป้องกันไม่ให้ระบบค้าง}
+
+\subsection{ผลการทดลอง}
+
+\subsubsection{3.1 การวัดครั้งแรก}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์การวัดครั้งแรก}]
+$ ulimit -u
+$ ./q3
+
+
+\end{lstlisting}
+
+\subsubsection{3.2 เมื่อมีโปรแกรมอื่นทำงานค้างอยู่}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์เมื่อรันโปรแกรมอื่นค้างไว้ และหลังปิดโปรแกรมเหล่านั้น}]
+
+
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{เปรียบเทียบจำนวน \code{fork()} ที่สำเร็จในแต่ละสถานการณ์}
+\begin{tabular}{lcc}
+\toprule
+\textbf{สถานการณ์} & \textbf{จำนวน process ที่รันอยู่} & \textbf{fork() สำเร็จ (ครั้ง)} \\
+\midrule
+ก่อนรันโปรแกรมเพิ่ม & & \\
+ระหว่างรันโปรแกรมเพิ่ม & & \\
+หลังปิดโปรแกรมทั้งหมด & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{อภิปรายผล}
+
+\todo{เขียนอภิปราย} ประเด็นที่ควรกล่าวถึง
+\begin{itemize}[leftmargin=*]
+  \item อะไรคือขีดจำกัดที่แท้จริง (\code{RLIMIT\_NPROC} / หน่วยความจำ / ขนาดตารางกระบวนการ)
+  \item \code{fork()} คืนค่าอะไร และ \code{errno} เป็นอะไรเมื่อล้มเหลว
+        (\code{EAGAIN} หรือ \code{ENOMEM})
+  \item ทำไมตัวเลขจึงเปลี่ยนไปตามจำนวนโปรแกรมที่รันอยู่ และทำไมจึงไม่กลับมาเท่าเดิมเป๊ะ
+\end{itemize}
+
+\newpage
+% =====================================================================
+\section{การสื่อสารผ่าน Pipe}
+% =====================================================================
+
+\todo{ยังไม่ได้เขียนโปรแกรมข้อ 4 -- ต้องสร้างไฟล์ \code{q4\_pipe.c}}
+
+\textbf{ผลลัพธ์ที่โจทย์กำหนด} \quad ต้องได้ output ตามรูปแบบนี้ โดย child เป็นผู้ส่ง
+และ parent เป็นผู้รับ
+
+\begin{lstlisting}[style=terminal]
+Child: Child PID: xxxxxx
+Parent: Parent PID: yyyyyy
+Parent: Hello from child PID: xxxxxx
+\end{lstlisting}
+
+\subsection{Source code}
+
+\begin{lstlisting}[caption={q4.c -- child เป็นผู้ส่ง parent เป็นผู้รับ},label={lst:q4}]
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+    int fd[2];
+    /* TODO: pipe(fd) -> fork()
+     *       child : close(fd[0]) then write()
+     *       parent: close(fd[1]) then read()
+     */
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายลำดับ \code{pipe()} $\rightarrow$ \code{fork()}
+$\rightarrow$ ปิดปลายที่ไม่ใช้ $\rightarrow$ \code{write()} / \code{read()}
+และเหตุผลที่ต้องปิดปลายที่ไม่ใช้ เพราะถ้าไม่ปิดฝั่ง write ให้ครบทุก process
+แล้ว \code{read()} จะไม่มีวันได้รับ EOF และจะ block ค้างตลอดไป}
+
+\subsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 4}]
+$ ./q4
+
+
+\end{lstlisting}
+
+\subsection{อภิปรายผล}
+
+\todo{เขียนอภิปราย} ประเด็นที่ควรกล่าวถึง เช่น ทำไม pipe จึงเป็นการสื่อสารทางเดียว
+(unidirectional) ทำไม file descriptor จึงถูกสืบทอดไปยัง child ได้
+และ \code{read()} มีพฤติกรรม blocking อย่างไร
+
+\newpage
+% =====================================================================
+\section{การทดลองกรณีพิเศษของ Pipe}
+% =====================================================================
+
+\todo{ยังไม่ได้ทำการทดลองข้อ 5 ทั้งหมด -- ต้องดัดแปลงโค้ดข้อ 4 เป็นสามเวอร์ชัน}
+
+\subsection{5.1 ผู้ส่งพยายามอ่านข้อความของตัวเองกลับ}
+
+\textbf{วิธีทดลอง} \quad \todo{ให้ child ไม่ปิด \code{fd[0]} แล้วลอง \code{read()}
+กลับหลังจาก \code{write()} เสร็จ}
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.1}]
+/* TODO */
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.1}]
+
+
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายว่าสุดท้ายใครได้ข้อมูลไป
+เพราะ pipe เป็นคิวแบบ FIFO ที่ข้อมูลถูก \emph{อ่านแล้วหมดไป} ไม่ใช่การ broadcast
+ผู้อ่านคนแรกที่มาถึงจะดึงข้อมูลออกไป อีกฝ่ายจึงไม่เหลืออะไรให้อ่านและอาจ block ค้าง}
+
+\subsection{5.2 ผู้รับอ่านก่อนที่ผู้ส่งจะส่ง}
+
+\textbf{วิธีทดลอง} \quad \todo{ให้ child \code{sleep()} สักครู่ก่อน \code{write()}
+เพื่อบังคับให้ parent เรียก \code{read()} ก่อนที่จะมีข้อมูลใน pipe}
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.2}]
+/* TODO */
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.2}]
+
+
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายพฤติกรรม blocking read
+ว่า \code{read()} จะรอจนกว่าจะมีข้อมูล และเงื่อนไขที่ \code{read()} จะคืนค่า 0 (EOF)
+คือเมื่อ write-end ถูกปิดหมดทุก process}
+
+\subsection{5.3 ผู้ส่งส่งหลายข้อความก่อนที่ผู้รับจะอ่าน}
+
+\textbf{วิธีทดลอง} \quad \todo{ให้ child \code{write()} หลายครั้งติดกัน
+แล้ว parent ค่อยเรียก \code{read()} ทีหลัง}
+
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.3}]
+/* TODO */
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.3}]
+
+
+\end{lstlisting}
+
+\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายว่า pipe เป็น byte stream
+ที่ไม่รักษาขอบเขตของข้อความ (no message boundary) ข้อความหลายชิ้นจึงถูกอ่านรวมกันมา
+ใน \code{read()} ครั้งเดียวได้ และกล่าวถึงขนาด buffer ของ pipe (ปกติ 64 KB บน Linux)
+ที่ทำให้ \code{write()} block เมื่อ buffer เต็ม}
+
+\subsection{สรุปผลการทดลองข้อ 5}
+
+\begin{table}[H]
+\centering
+\caption{สรุปพฤติกรรมของ pipe ในแต่ละสถานการณ์}
+\begin{tabular}{p{4.5cm}p{4cm}p{5cm}}
+\toprule
+\textbf{สถานการณ์} & \textbf{ผลที่สังเกตได้} & \textbf{คำอธิบาย} \\
+\midrule
+5.1 ผู้ส่งอ่านข้อความตัวเอง & & \\
+5.2 ผู้รับอ่านก่อนส่ง & & \\
+5.3 ส่งหลายข้อความก่อนอ่าน & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% =====================================================================
+\section*{สรุปผลการทดลอง}
+\addcontentsline{toc}{section}{สรุปผลการทดลอง}
+% =====================================================================
+
+\textbf{สิ่งที่ได้เรียนรู้จากข้อ 1}
+
+\begin{enumerate}[leftmargin=*]
+  \item \code{fork()} คือการเรียกฟังก์ชันเพียงครั้งเดียวที่คืนค่าสองครั้ง
+        เป็นกลไกพื้นฐานที่ทำให้โค้ดชุดเดียวแตกออกเป็นสองเส้นทางการทำงาน
+  \item ถ้าไม่มีกลไกซิงโครไนซ์ ลำดับการทำงานของ parent กับ child เป็นสิ่งที่
+        \textbf{คาดเดาไม่ได้} และขึ้นกับ scheduler ล้วน ๆ การรันโปรแกรมเดิมซ้ำสามครั้ง
+        ให้ผลไม่ซ้ำกันเลย
+  \item \code{wait()} เปลี่ยนโปรแกรมจาก non-deterministic เป็น deterministic
+        และเป็นวิธีป้องกัน zombie process ที่ตรงไปตรงมาที่สุด
+  \item ได้เห็น \textbf{orphan process} และการ reparent โดยบังเอิญจากการรันข้อ 1.1
+        ซึ่งเป็นปรากฏการณ์เดียวกับที่ข้อ 2.2 ต้องการให้ทดลอง
+  \item \code{fork()} คัดลอก \textbf{ทุกอย่าง} ใน address space รวมถึง stdio buffer
+        ที่ยังไม่ได้ flush ทำให้เกิดข้อความซ้ำเมื่อ redirect output ลงไฟล์
+        เป็นกับดักที่พบได้บ่อยและแก้ได้ด้วย \code{fflush(stdout)} ก่อน \code{fork()}
+\end{enumerate}
+
+\textbf{ปัญหาที่พบและวิธีแก้}
+
+\begin{itemize}[leftmargin=*]
+  \item \emph{ข้อความ \code{"Hello World!"} ปรากฏสองครั้ง} เมื่อ redirect output ลงไฟล์
+        ตอนแรกเข้าใจผิดว่าโปรแกรมเขียนผิด ภายหลังพบว่าเกิดจาก stdio buffering
+        แก้โดยเพิ่ม \code{fflush(stdout);} ก่อนเรียก \code{fork()}
+  \item \emph{ผลการรันไม่ซ้ำเดิม} ทำให้บันทึกผลได้ยาก จึงต้องรันหลายครั้งและรายงานทุกครั้ง
+        เพื่อแสดงให้เห็นความไม่แน่นอน แทนที่จะรายงานเพียงครั้งเดียว
+\end{itemize}
+
+\textbf{งานที่ยังเหลือ} \quad \todo{ข้อ 2, 3, 4 และ 5 -- ต้องเขียนโปรแกรม
+รันเก็บผล และเขียนอภิปรายให้ครบก่อนส่ง}
+
+% ------------------------- อ้างอิง -------------------------
+\section*{เอกสารอ้างอิง}
+\addcontentsline{toc}{section}{เอกสารอ้างอิง}
+\begin{enumerate}[leftmargin=*]
+  \item Linux manual pages: \code{fork(2)}, \code{wait(2)}, \code{pipe(2)}, \code{ps(1)},
+        \code{setvbuf(3)}.
+  \item เอกสารประกอบการสอน CPE 333 Operating Systems, บทที่ว่าด้วย Process Management.
+\end{enumerate}
+
+\end{document}

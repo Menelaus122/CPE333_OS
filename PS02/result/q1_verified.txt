@@ -1,0 +1,55 @@
+# ผลการรันจริง - CPE333 PS02 ข้อ 1
+# Environment: Ubuntu 24.04.1 LTS (WSL2), kernel 6.6.87.2-microsoft-standard-WSL2, gcc 13.3.0
+# Compile: gcc -Wall -Wextra -o q1_1 q1_1_helloworld.c
+#          gcc -Wall -Wextra -o q1_2 q1_2_wait.c
+# (รันผ่าน stdbuf -oL เพื่อบังคับ line-buffered ให้เหมือนตอนรันบน terminal จริง)
+
+===== Q1.1 (fork ไม่มี wait) run 1 =====
+Hello World!
+I am the parent, my PID = 3642, my child PID = 3643
+Common line printed by PID 3642
+I am the child, my PID = 3643, my parent PID = 3642
+Common line printed by PID 3643
+
+===== Q1.1 (fork ไม่มี wait) run 2 =====  <-- child กลายเป็น orphan
+Hello World!
+I am the parent, my PID = 3644, my child PID = 3645
+Common line printed by PID 3644
+I am the child, my PID = 3645, my parent PID = 3632
+Common line printed by PID 3645
+
+===== Q1.1 (fork ไม่มี wait) run 3 =====
+Hello World!
+I am the parent, my PID = 3646, my child PID = 3647
+Common line printed by PID 3646
+I am the child, my PID = 3647, my parent PID = 3646
+Common line printed by PID 3647
+
+===== Q1.2 (fork + wait) run 1 =====
+Hello World!
+I am the child, my PID = 3649, my parent PID = 3648
+Common line printed by PID 3649
+I am the parent, my PID = 3648, my child PID = 3649
+Common line printed by PID 3648
+
+===== Q1.2 (fork + wait) run 2 =====
+Hello World!
+I am the child, my PID = 3651, my parent PID = 3650
+Common line printed by PID 3651
+I am the parent, my PID = 3650, my child PID = 3651
+Common line printed by PID 3650
+
+===== Q1.2 (fork + wait) run 3 =====
+Hello World!
+I am the child, my PID = 3653, my parent PID = 3652
+Common line printed by PID 3653
+I am the parent, my PID = 3652, my child PID = 3653
+Common line printed by PID 3652
+
+===== Q1.1 กรณี redirect ลงไฟล์ (./q1_1 > out.txt) =====
+Hello World!
+I am the parent, my PID = 3300, my child PID = 3301
+Common line printed by PID 3300
+Hello World!          <-- "Hello World!" ซ้ำ เพราะ stdout เป็น fully-buffered
+I am the child, my PID = 3301, my parent PID = 3300
+Common line printed by PID 3301
