@@ -6,7 +6,7 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: ข้อ 1 เขียนสมบูรณ์แล้ว / ข้อ 2-5 ยังเป็นโครงรอเติม
+%  สถานะเอกสาร: ข้อ 1-2 เขียนสมบูรณ์แล้ว / ข้อ 3-5 ยังเป็นโครงรอเติม
 % =====================================================================
 \documentclass[a4paper,12pt]{article}
 
@@ -168,7 +168,9 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 คอมไพเลอร์ & \code{gcc} (Ubuntu 13.3.0-6ubuntu2\textasciitilde24.04.1) 13.3.0 \\
 คำสั่งคอมไพล์ & \code{gcc -Wall -Wextra -o q1\_1 q1\_1\_helloworld.c} \\
  & \code{gcc -Wall -Wextra -o q1\_2 q1\_2\_wait.c} \\
-ผลการคอมไพล์ & ผ่านทั้งสองไฟล์ ไม่มี warning \\
+ & \code{gcc -Wall -Wextra -o q2\_1 q2\_1\_child\_first.c} \\
+ & \code{gcc -Wall -Wextra -o q2\_2 q2\_2\_parent\_first.c} \\
+ผลการคอมไพล์ & ผ่านทุกไฟล์ ไม่มี warning \\
 \bottomrule
 \end{tabular}
 
@@ -191,7 +193,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 \textbf{ข้อ} & \textbf{หัวข้อ} & \textbf{โค้ด} & \textbf{ผลการทดลอง} \\
 \midrule
 1 & \code{fork()} แบบมีและไม่มี \code{wait()} & เสร็จ & เสร็จ \\
-2 & Process status และ \code{sleep()} (zombie / orphan) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+2 & Process status และ \code{sleep()} (zombie / orphan) & เสร็จ & เสร็จ \\
 3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
 4 & การสื่อสารผ่าน \code{pipe()} & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
 5 & กรณีพิเศษของ pipe (5.1--5.3) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
@@ -200,7 +202,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 \end{table}
 
 \textcolor{todored}{\textbf{หมายเหตุ}} ส่วนที่ยังไม่ได้ทำถูกทำเครื่องหมายไว้ด้วยข้อความสีแดง
-\code{[ยังไม่ได้ทำ: \ldots]} ในเนื้อรายงาน เพื่อให้หาจุดที่ต้องเติมได้ง่าย
+\textbf{[ยังไม่ได้ทำ: \ldots]} ในเนื้อรายงาน เพื่อให้หาจุดที่ต้องเติมได้ง่าย
 ก่อนส่งจริงต้องเติมให้ครบทุกจุดและลบคำสั่ง \code{\textbackslash todo} ออก
 
 \newpage
@@ -330,83 +332,228 @@ Common line printed by PID 3648
 \section{Process Status และ sleep()}
 % =====================================================================
 
-\todo{ยังไม่ได้เขียนโปรแกรมข้อ 2 -- ต้องสร้างไฟล์ \code{q2\_procstatus.c}}
-
-\textbf{แนวทางที่ต้องทำ} \quad เขียนโปรแกรมที่ \code{fork()} แล้วใช้ \code{sleep()}
-คุมลำดับการตายของ parent กับ child ให้ได้สองสถานการณ์ตามโจทย์ ระหว่างที่โปรแกรมยัง
-ไม่จบ ให้เปิดอีก terminal หนึ่งแล้วรัน \code{ps -ef | grep <ชื่อโปรแกรม>}
-เพื่อบันทึกสถานะและ PPID
+การทดลองนี้ใช้ \code{sleep()} เป็นเครื่องมือควบคุม \emph{ลำดับการตาย} ของ parent
+และ child เพื่อสร้างสถานการณ์สองแบบที่ตรงข้ามกัน แล้วใช้คำสั่ง \code{ps}
+ตรวจสอบสถานะของ process ในช่วงเวลาที่สนใจ ทั้งสองโปรแกรม \textbf{จงใจไม่เรียก}
+\code{wait()} เพื่อให้เห็นพฤติกรรมที่เกิดขึ้นเมื่อ parent ไม่เก็บกวาดลูกของตนเอง
 
 \subsection{Source code}
 
-\begin{lstlisting}[caption={q2.c -- ควบคุมลำดับการตายด้วย sleep()},label={lst:q2}]
-/* TODO:
- * 2.1 child dies first  -> parent sleeps long, child returns immediately
- * 2.2 parent dies first -> parent returns immediately, child sleeps long
- * In both cases the parent must NOT call wait(), so that the
- * zombie / orphan behaviour becomes visible in ps.
- */
+\subsubsection{2.1 Child ตายก่อน โดย Parent ยังทำงานอยู่}
+
+\begin{lstlisting}[caption={q2\_1\_child\_first.c -- child dies first, parent never reaps},label={lst:q2_1}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define PARENT_LIFETIME 30   /* seconds the parent stays alive after child dies */
+
+int main(void)
+{
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* CHILD: dies almost immediately */
+        printf("[child ] PID = %d, PPID = %d -- exiting right now\n",
+               getpid(), getppid());
+        fflush(stdout);
+        exit(0);
+    }
+
+    /* PARENT: outlives the child but never reaps it */
+    printf("[parent] PID = %d, child PID = %d\n", getpid(), pid);
+    printf("[parent] NOT calling wait(). Sleeping %d s.\n", PARENT_LIFETIME);
+    printf("[parent] Inspect now with:  ps -ef | grep -e q2_1 -e defunct\n");
+    fflush(stdout);
+
+    sleep(PARENT_LIFETIME);
+
+    printf("[parent] PID = %d exiting; the zombie child %d is now re-parented "
+           "to init/systemd and reaped.\n", getpid(), pid);
+    return 0;
+}
 \end{lstlisting}
 
-\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายว่าวาง \code{sleep()} ไว้ตรงไหน
-เพื่อบังคับให้เกิดสถานการณ์แต่ละแบบ}
+\textbf{คำอธิบายการทำงาน}: หลัง \code{fork()} ฝั่ง child จะพิมพ์ PID ของตนเองแล้วเรียก \code{exit(0)} ทันที ส่วน parent เข้าสู่ \code{sleep(30)} ทำให้เกิดช่วงเวลา 30 วินาทีที่ child ตายไปแล้วแต่ parent ยังมีชีวิตอยู่และยังไม่ได้เรียก \code{wait()} จึงเป็นช่วงที่เปิดอีก terminal หนึ่งเข้าไปตรวจด้วย \code{ps} ได้ทัน การเรียก \code{fflush(stdout)} ก่อน \code{exit()} และก่อน \code{sleep()} เป็นการบังคับให้ข้อความถูกเขียนออกทันที ไม่ค้างอยู่ใน buffer
+
+\newpage
+
+\subsubsection{2.2 Parent ตายก่อน โดย Child ยังทำงานอยู่}
+
+\begin{lstlisting}[caption={q2\_2\_parent\_first.c -- parent dies first, child becomes an orphan},label={lst:q2_2}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define CHILD_LIFETIME 30
+
+int main(void)
+{
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0) {
+        /* CHILD: outlives the parent */
+        printf("[child ] PID = %d, PPID = %d  (original parent, still alive)\n",
+               getpid(), getppid());
+        fflush(stdout);
+
+        sleep(2);   /* give the parent time to die */
+
+        printf("[child ] PID = %d, PPID = %d  (parent is gone -> re-parented)\n",
+               getpid(), getppid());
+        printf("[child ] Inspect now with:  ps -ef | grep q2_2\n");
+        fflush(stdout);
+
+        sleep(CHILD_LIFETIME);
+
+        printf("[child ] PID = %d exiting, final PPID = %d\n",
+               getpid(), getppid());
+        exit(0);
+    }
+
+    /* PARENT: exits immediately, without waiting */
+    printf("[parent] PID = %d, child PID = %d -- exiting immediately\n",
+           getpid(), pid);
+    fflush(stdout);
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: สลับบทบาทจากข้อ 2.1 คือ parent พิมพ์ข้อความแล้วจบการทำงานทันที ส่วน child อยู่ต่ออีก 30 วินาที จุดสำคัญคือ child เรียก \code{getppid()} \textbf{สองครั้ง} โดยมี \code{sleep(2)} คั่นกลาง ครั้งแรกพิมพ์ตอน parent ยังมีชีวิต ครั้งที่สองพิมพ์หลัง parent ตายไปแล้ว ทำให้เห็นค่า PPID ที่เปลี่ยนไปได้จากตัวโปรแกรมเองโดยไม่ต้องพึ่ง \code{ps}
+
+\newpage
 
 \subsection{ผลการทดลอง}
 
 \subsubsection{2.1 Child ตายแล้ว แต่ Parent ยังทำงานอยู่}
 
-\begin{lstlisting}[style=terminal,caption={ผลของ \texttt{ps -ef} ในกรณีที่ 2.1}]
-$ ps -ef | grep q2
-UID    PID    PPID   C STIME TTY   TIME     CMD
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์และสถานะจาก \texttt{ps} ในกรณีที่ 2.1}]
+$ gcc -Wall -Wextra -o q2_1 q2_1_child_first.c
+$ ./q2_1 &
+[parent] PID = 6908, child PID = 6910
+[parent] NOT calling wait(). Sleeping 30 s.
+[child ] PID = 6910, PPID = 6908 -- exiting right now
 
+$ ps -ef | grep -e q2_1 -e defunct | grep -v grep
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6908   6900  0 18:58 pts/2  00:00:00 ./q2_1
+poomipat  6910   6908  0 18:58 pts/2  00:00:00 [q2_1] <defunct>
 
+$ ps -eo pid,ppid,stat,comm | grep q2_1 | grep -v grep
+   PID   PPID STAT COMMAND
+  6908   6900 S+   q2_1        <- parent sleeping
+  6910   6908 Z+   q2_1        <- child is a ZOMBIE
+
+$ ps -el | grep q2_1
+F S   UID    PID   PPID  C PRI  NI ADDR SZ WCHAN  TTY      TIME CMD
+0 S  1000   6908   6900  0  80   0 -   670 hrtime pts/2 00:00:00 q2_1
+1 Z  1000   6910   6908  0  80   0 -     0 -      pts/2 00:00:00 q2_1
+                                        ^^ SZ = 0 : all memory already released
 \end{lstlisting}
 
+\begin{table}[H]
+\centering
+\caption{สรุปค่าที่สังเกตได้ในกรณีที่ 2.1}
 \begin{tabular}{ll}
 \toprule
-PID ของ parent & \\
-PID ของ child & \\
-PPID ของ child & \\
-สถานะของ child ที่เห็นใน \code{ps} & \\
+\textbf{รายการ} & \textbf{ค่าที่สังเกตได้} \\
+\midrule
+PID ของ parent & 6908 \\
+PID ของ child & 6910 \\
+PPID ของ child & 6908 \quad (ยังเป็น parent ตัวจริง ไม่ถูก reparent) \\
+สถานะของ child ใน \code{ps} & \code{Z+} แสดงผลเป็น \code{[q2\_1] <defunct>} \\
+หน่วยความจำของ child (\code{SZ}) & 0 \\
 \bottomrule
 \end{tabular}
+\end{table}
+
+เมื่อรอจนครบ 30 วินาทีและ parent จบการทำงาน ตรวจซ้ำด้วย \code{ps} อีกครั้งพบว่า
+ไม่เหลือ process ชื่อ \code{q2\_1} อยู่ในระบบเลย แสดงว่า zombie ถูกเก็บกวาดทันที
+ที่ parent ตาย
+
+\newpage
 
 \subsubsection{2.2 Parent ตายแล้ว แต่ Child ยังทำงานอยู่}
 
-\begin{lstlisting}[style=terminal,caption={ผลของ \texttt{ps -ef} ในกรณีที่ 2.2}]
-$ ps -ef | grep q2
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์และสถานะจาก \texttt{ps} ในกรณีที่ 2.2}]
+$ gcc -Wall -Wextra -o q2_2 q2_2_parent_first.c
+$ ./q2_2 &
+[parent] PID = 6857, child PID = 6859 -- exiting immediately
+[child ] PID = 6859, PPID = 6857  (original parent, still alive)
+[child ] PID = 6859, PPID = 6846  (parent is gone -> re-parented)
 
+$ ps -ef | grep q2_2 | grep -v grep
+UID       PID   PPID  C STIME TTY     TIME     CMD
+poomipat  6859   6846  0 18:57 pts/2  00:00:00 ./q2_2
 
+$ ps -eo pid,ppid,stat,comm | grep q2_2 | grep -v grep
+   PID   PPID STAT COMMAND
+  6859   6846 S+   q2_2        <- normal sleeping state, NO zombie at all
 \end{lstlisting}
 
+\begin{table}[H]
+\centering
+\caption{สรุปค่าที่สังเกตได้ในกรณีที่ 2.2}
 \begin{tabular}{ll}
 \toprule
-PID ของ parent & \\
-PID ของ child & \\
-PPID ของ child (ก่อน parent ตาย) & \\
-PPID ของ child (หลัง parent ตาย) & \\
+\textbf{รายการ} & \textbf{ค่าที่สังเกตได้} \\
+\midrule
+PID ของ parent & 6857 \\
+PID ของ child & 6859 \\
+PPID ของ child (ก่อน parent ตาย) & 6857 \quad (parent ตัวจริง) \\
+PPID ของ child (หลัง parent ตาย) & \textbf{6846} \quad (ถูก reparent) \\
+สถานะของ child ใน \code{ps} & \code{S+} (ปกติ ไม่ใช่ zombie) \\
 \bottomrule
 \end{tabular}
+\end{table}
+
+\textbf{ตรวจสอบเพิ่มเติมว่า PID 6846 คือ process ใด}
+
+\begin{lstlisting}[style=terminal,caption={สายบรรพบุรุษของ process ที่รับ orphan ไปดูแล}]
+$ ps -p 6846 -o pid=,ppid=,comm=,args=
+   6846   6844 Relay(6848)  /init
+
+$ # walk the ancestry chain up to PID 1
+   PID   PPID COMMAND
+  6846   6844 Relay(6848)       <- WSL /init relay : the adopting subreaper
+  6844      2 SessionLeader
+     2      1 init-systemd(Ub
+     1      0 systemd           <- the real PID 1
+\end{lstlisting}
+
+ผลลัพธ์นี้แสดงว่า child \textbf{ไม่ได้} ถูกยกให้ PID 1 โดยตรงตามที่มักเข้าใจกัน
+แต่ถูกยกให้กระบวนการ \code{/init} ของ WSL ซึ่งลงทะเบียนตัวเองเป็น
+\emph{child subreaper} ไว้ด้วย \code{prctl(PR\_SET\_CHILD\_SUBREAPER)}
+เพราะกฎของเคอร์เนลคือยก orphan ให้ \textbf{subreaper ที่ใกล้ที่สุด}
+ไม่ใช่ยกให้ PID 1 เสมอไป บนระบบ Linux ที่ติดตั้งแบบ native หรือใน VM ทั่วไป
+ค่านี้มักออกมาเป็น 1 หรือเป็น PID ของ \code{systemd --user}
+
+\newpage
 
 \subsection{อภิปรายผล}
 
-\subsubsection{เปรียบเทียบสองสถานการณ์}
+จากการทดลองควบคุมลำดับการจบการทำงานของกระบวนการด้วย \code{sleep()} ในข้อ 2.1 และ 2.2 สรุปข้อแตกต่างและประเด็นสำคัญได้ดังนี้
 
-\todo{เขียนอภิปราย} ประเด็นหลักคือกรณี 2.1 จะได้ \textbf{zombie process}
-ส่วนกรณี 2.2 จะได้ \textbf{orphan process} ที่ถูก reparent
-ซึ่งเป็นปรากฏการณ์เดียวกับที่สังเกตได้แล้วโดยบังเอิญในข้อ 1.1 การรันครั้งที่ 2
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ข้อ 2.1 ปรากฏการณ์ Zombie Process}:
+        เมื่อ Child ตายก่อนแต่ Parent ยังทำงานอยู่โดยไม่ได้เรียก \code{wait()} เคอร์เนลจะคืนหน่วยความจำของ Child ทันที (\code{SZ = 0}) แต่ยังคงจอง PID และ Process Table Entry ค้างไว้ ทำให้เกิดสถานะ \code{Z} หรือ \code{<defunct>} จนกว่า Parent จะจบโปรแกรมหรือเรียก \code{wait()} เพื่ออ่าน Exit Status
 
-\subsubsection{ปรากฏการณ์ \code{<defunct>}}
+  \item \textbf{ข้อ 2.2 ปรากฏการณ์ Orphan Process และการ Reparent}:
+        เมื่อ Parent ตายก่อนโดยที่ Child ยังคงทำงานอยู่ Child จะกลายเป็นกระบวนการกำพร้า (Orphan) เคอร์เนลจะยก Child ให้กับ Subreaper ที่ใกล้ที่สุด (เช่น \code{systemd} หรือ \code{/init} ของ WSL) เป็น Parent คนใหม่ทันที สังเกตได้จากค่า PPID ของ Child ที่เปลี่ยนไปในการเรียก \code{getppid()} ครั้งที่สอง
 
-\textbf{ความหมาย} \quad \todo{อธิบายว่า \code{<defunct>} คือ zombie process
-คือ process ที่จบการทำงานไปแล้ว แต่ยังไม่มี parent มา \code{wait()} เก็บ exit status ไป
-เคอร์เนลจึงต้องเก็บ entry ไว้ในตารางกระบวนการต่อ}
-
-\textbf{สาเหตุ} \quad \todo{parent ยังไม่ได้เรียก \code{wait()} หรือ \code{waitpid()}}
-
-\textbf{ผลกระทบ} \quad \todo{ยังกิน entry ในตารางกระบวนการและจอง PID ไว้
-ถ้าสะสมมาก ๆ จะทำให้ระบบสร้าง process ใหม่ไม่ได้ ซึ่งเชื่อมโยงกับขีดจำกัดในข้อ 3}
-
+  \item \textbf{ความแตกต่างสำคัญและปรากฏการณ์ \code{<defunct>}}:
+        Zombie (\code{<defunct>}) คือกระบวนการที่สิ้นสุดการทำงานแล้วแต่ยังถูกจองค้างในตารางกระบวนการ หากสะสมมากจะสิ้นเปลือง PID และทำให้สร้าง Process ใหม่ไม่ได้ ต่างจาก Orphan ที่เป็นกระบวนการซึ่งยังคงทำงานตามปกติ และเมื่อ Orphan สิ้นสุดการทำงาน Parent คนใหม่ (Subreaper) จะทำหน้าที่เรียก \code{wait()} เก็บกวาดให้อัตโนมัติโดยไม่เกิด Zombie ทิ้งไว้
+\end{itemize}
 \newpage
 % =====================================================================
 \section{จำนวน process สูงสุดที่ fork ได้}
