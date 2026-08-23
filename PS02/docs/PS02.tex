@@ -6,13 +6,14 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: ข้อ 1-4 เขียนสมบูรณ์แล้ว / ข้อ 5 ยังเป็นโครงรอเติม
+%  สถานะเอกสาร: เขียนครบทั้ง 5 ข้อแล้ว
 % =====================================================================
 \documentclass[a4paper,12pt]{article}
 
 % ------------------------- Layout -------------------------
 \usepackage[margin=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
 \usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
 \usepackage{parskip}
 \usepackage{enumitem}
 \usepackage{booktabs}
@@ -172,6 +173,9 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
  & \code{gcc -Wall -Wextra -o q2\_2 q2\_2\_parent\_first.c} \\
  & \code{gcc -Wall -Wextra -o q3\_forkcount q3\_forkcount.c} \\
  & \code{gcc -Wall -Wextra -o q4\_pipe q4\_pipe.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_1 q5\_1\_sender\_reads\_own.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_2 q5\_2\_read\_before\_send.c} \\
+ & \code{gcc -Wall -Wextra -o q5\_3 q5\_3\_many\_messages.c} \\
 ผลการคอมไพล์ & ผ่านทุกไฟล์ ไม่มี warning \\
 \bottomrule
 \end{tabular}
@@ -184,30 +188,6 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 
 \newpage
 
-% ------------------------- สรุปความคืบหน้า -------------------------
-\section*{สรุปความคืบหน้าของรายงานฉบับนี้}
-\addcontentsline{toc}{section}{สรุปความคืบหน้าของรายงานฉบับนี้}
-
-\begin{table}[H]
-\centering
-\begin{tabular}{clcc}
-\toprule
-\textbf{ข้อ} & \textbf{หัวข้อ} & \textbf{โค้ด} & \textbf{ผลการทดลอง} \\
-\midrule
-1 & \code{fork()} แบบมีและไม่มี \code{wait()} & เสร็จ & เสร็จ \\
-2 & Process status และ \code{sleep()} (zombie / orphan) & เสร็จ & เสร็จ \\
-3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & เสร็จ & เสร็จ \\
-4 & การสื่อสารผ่าน \code{pipe()} & เสร็จ & เสร็จ \\
-5 & กรณีพิเศษของ pipe (5.1--5.3) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textcolor{todored}{\textbf{หมายเหตุ}} ส่วนที่ยังไม่ได้ทำถูกทำเครื่องหมายไว้ด้วยข้อความสีแดง
-\textbf{[ยังไม่ได้ทำ: \ldots]} ในเนื้อรายงาน เพื่อให้หาจุดที่ต้องเติมได้ง่าย
-ก่อนส่งจริงต้องเติมให้ครบทุกจุดและลบคำสั่ง \code{\textbackslash todo} ออก
-
-\newpage
 % =====================================================================
 \section{fork() แบบมีและไม่มี wait()}
 % =====================================================================
@@ -998,122 +978,224 @@ process ตกค้างหรือ zombie & 0 ตัว \\
 \section{การทดลองกรณีพิเศษของ Pipe}
 % =====================================================================
 
-\todo{ยังไม่ได้ทำการทดลองข้อ 5 ทั้งหมด -- ต้องดัดแปลงโค้ดข้อ 4 เป็นสามเวอร์ชัน}
+ข้อนี้ดัดแปลงโปรแกรมข้อ 4 ออกเป็นสามเวอร์ชัน เพื่อทดสอบพฤติกรรมของ pipe
+ในสถานการณ์ที่ผิดไปจากการใช้งานปกติ เนื่องจากโค้ดทั้งสามมีโครงสร้างหลัก
+เหมือนข้อ 4 ในรายงานนี้จึงแสดงเฉพาะ \textbf{ส่วนที่แก้ไข} ของแต่ละเวอร์ชัน
+โปรแกรมทุกตัวมีกลไกกันการค้างถาวรไว้ด้วย
 
 \subsection{5.1 ผู้ส่งพยายามอ่านข้อความของตัวเองกลับ}
 
-\textbf{วิธีทดลอง} \quad \todo{ให้ child ไม่ปิด \code{fd[0]} แล้วลอง \code{read()}
-กลับหลังจาก \code{write()} เสร็จ}
+\textbf{วิธีทดลอง}: จงใจ \emph{ไม่ปิด} descriptor ฝั่งใดเลย ทำให้ child ถือทั้งปลายอ่านและปลายเขียน จากนั้นให้ child เขียนข้อความลง pipe แล้วรีบ \code{read()} กลับทันที ส่วน parent ซึ่งเป็นผู้รับตัวจริงหน่วงด้วย \code{sleep(1)} ก่อนจึงอ่าน และตั้ง \code{alarm(3)} ไว้เป็นตาข่ายกันโปรแกรมค้างถาวร
 
-\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.1}]
-/* TODO */
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.1},label={lst:q5_1}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER, but it also reads ---------- */
+        /* NOTE: deliberately NOT closing fd[0] -- that is the whole point. */
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+        write(fd[1], msg, strlen(msg) + 1);
+
+        n = read(fd[0], buf, sizeof buf - 1);      /* read back its OWN pipe */
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("[child ] read back %zd bytes: \"%s\"\n", n, buf);
+        }
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = the intended RECEIVER ---------- */
+    sa.sa_handler = on_alarm;
+    sa.sa_flags   = 0;            /* no SA_RESTART: we WANT read() to fail */
+    sigaction(SIGALRM, &sa, NULL);
+
+    sleep(1);                     /* let the child write AND read first */
+
+    alarm(3);                     /* safety net so we never hang */
+    n = read(fd[0], buf, sizeof buf - 1);
+    alarm(0);
 \end{lstlisting}
 
 \begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.1}]
-
-
+$ ./q5_1_sender_reads_own
+[child ] writing: "Hello from child PID: 29443"
+[child ] now reading from fd[0] (its OWN pipe) ...
+[child ] read back 28 bytes: "Hello from child PID: 29443"   <-- its own message!
+[parent] now trying to read the message ...
+[parent] read FAILED: Interrupted system call
+[parent] -> the pipe was empty: the sender had already consumed its own message.
 \end{lstlisting}
 
-\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายว่าสุดท้ายใครได้ข้อมูลไป
-เพราะ pipe เป็นคิวแบบ FIFO ที่ข้อมูลถูก \emph{อ่านแล้วหมดไป} ไม่ใช่การ broadcast
-ผู้อ่านคนแรกที่มาถึงจะดึงข้อมูลออกไป อีกฝ่ายจึงไม่เหลืออะไรให้อ่านและอาจ block ค้าง}
+\textbf{สิ่งที่สังเกตได้}: child อ่านข้อความของตัวเองกลับมาได้ครบทั้ง 28 ไบต์ โดยไม่มีอะไรห้ามเลย ผลคือ parent ซึ่งเป็นผู้รับตัวจริงไม่ได้รับอะไรเลย ข้อมูลหายไปจากระบบ และที่สำคัญคือ parent ไม่ได้รับ EOF แต่ค้างอยู่ใน \code{read()} จนกระทั่ง \code{alarm(3)} ยิง \code{SIGALRM} ทำให้ \code{read()} คืน $-1$ พร้อม \code{errno} $=$ \code{EINTR} ทดสอบซ้ำ 3 ครั้งได้ผลเหมือนกันทุกครั้ง
+
+\newpage
 
 \subsection{5.2 ผู้รับอ่านก่อนที่ผู้ส่งจะส่ง}
 
-\textbf{วิธีทดลอง} \quad \todo{ให้ child \code{sleep()} สักครู่ก่อน \code{write()}
-เพื่อบังคับให้ parent เรียก \code{read()} ก่อนที่จะมีข้อมูลใน pipe}
+\textbf{วิธีทดลอง}: ให้ parent เรียก \code{read()} ทันทีตั้งแต่ pipe ยังว่าง ส่วน child หน่วง \code{sleep(3)} ก่อนจึงเขียน วัดเวลาที่ \code{read()} ใช้ไปด้วย \code{clock\_gettime()} เพื่อพิสูจน์ว่า parent ถูกพักอยู่ในเคอร์เนลจริง จากนั้นในเฟสที่สองให้ parent อ่านซ้ำอีกครั้งหลังจาก child ปิดปลายเขียนและจบไปแล้ว
 
-\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.2}]
-/* TODO */
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.2},label={lst:q5_2}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER, but a slow one ---------- */
+        close(fd[0]);
+        sleep(SEND_DELAY);                 /* 3 seconds late on purpose */
+
+        snprintf(msg, sizeof msg, "Hello from child PID: %d", getpid());
+        write(fd[1], msg, strlen(msg) + 1);
+
+        close(fd[1]);        /* closing the last write end -> reader sees EOF */
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER, reads far too early ---------- */
+    close(fd[1]);
+
+    t0 = now();                            /* phase 1: pipe is still empty */
+    n  = read(fd[0], buf, sizeof buf - 1);
+    printf("[parent] read() returned after %.2f s with %zd bytes\n",
+           now() - t0, n);
+
+    t0 = now();                            /* phase 2: no writer left */
+    n  = read(fd[0], buf, sizeof buf - 1);
+    printf("[parent] read() returned %zd after %.2f s\n", n, now() - t0);
 \end{lstlisting}
 
 \begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.2}]
-
-
+$ ./q5_2_read_before_send
+[parent] calling read() immediately, pipe is still empty ...
+[child ] sleeping 3 s before sending ...
+[child ] sending now: "Hello from child PID: 29447"
+[child ] write end closed, exiting.
+[parent] read() returned after 3.00 s with 28 bytes: "Hello from child PID: 29447"
+[parent] -> read() BLOCKED, it did not fail and did not return 0.
+[parent] reading again, now that every write end is closed ...
+[parent] read() returned 0 after 0.00 s  -> EOF (no writer left, so no blocking)
 \end{lstlisting}
 
-\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายพฤติกรรม blocking read
-ว่า \code{read()} จะรอจนกว่าจะมีข้อมูล และเงื่อนไขที่ \code{read()} จะ return 0 (EOF)
-คือเมื่อ write-end ถูกปิดหมดทุก process}
+\textbf{สิ่งที่สังเกตได้}: การเรียก \code{read()} บน pipe ที่ว่างไม่ได้ผิดพลาดและไม่ได้คืนค่า 0 แต่ \textbf{block รอ} เวลาที่วัดได้คือ 3.00 วินาที ตรงกับ \code{sleep()} ของฝั่งผู้ส่งพอดี ซึ่งพิสูจน์ว่า parent ถูกพักไว้ในสถานะ blocked จริง ไม่ได้วนรอแบบ busy waiting ส่วนในเฟสที่สองเมื่อปลายเขียนถูกปิดหมดทุกตัวแล้ว \code{read()} คืนค่า 0 คือ EOF ทันทีภายใน 0.00 วินาที ไม่ block อีกต่อไป ทดสอบซ้ำ 3 ครั้งได้เวลาตรงกันทุกครั้ง
+
+\newpage
 
 \subsection{5.3 ผู้ส่งส่งหลายข้อความก่อนที่ผู้รับจะอ่าน}
 
-\textbf{วิธีทดลอง} \quad \todo{ให้ child \code{write()} หลายครั้งติดกัน
-แล้ว parent ค่อยเรียก \code{read()} ทีหลัง}
+\textbf{วิธีทดลอง}: เฟสที่หนึ่งให้ child เขียน 3 ข้อความรวดเดียวขณะที่ parent ยัง \code{sleep(1)} อยู่ แล้วให้ parent เรียก \code{read()} เพียงครั้งเดียวด้วย buffer ขนาดใหญ่ เฟสที่สองให้ child เขียนอีก 3 ข้อความ แล้วให้ parent อ่านทีละ 8 ไบต์ ใช้อักขระ \code{|} เป็นตัวคั่นข้อความเพื่อให้มองเห็นขอบเขตได้ด้วยตา
 
-\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.3}]
-/* TODO */
+\begin{lstlisting}[caption={ส่วนของโค้ดที่แก้ไขในข้อ 5.3},label={lst:q5_3}]
+    if (pid == 0) {
+        /* ---------- CHILD = SENDER ---------- */
+        close(fd[0]);
+
+        for (i = 1; i <= NMSG; i++) {      /* batch 1: three writes in a row */
+            snprintf(msg, sizeof msg, "MSG%d from child PID: %d|", i, getpid());
+            write(fd[1], msg, strlen(msg));         /* '|' is our delimiter */
+        }
+
+        sleep(2);      /* let the parent finish phase 1 before phase 2 starts */
+
+        for (i = NMSG + 1; i <= 2 * NMSG; i++) {    /* batch 2 */
+            snprintf(msg, sizeof msg, "MSG%d|", i);
+            write(fd[1], msg, strlen(msg));
+        }
+        close(fd[1]);
+        exit(EXIT_SUCCESS);
+    }
+
+    /* ---------- PARENT = RECEIVER, reads late ---------- */
+    close(fd[1]);
+    sleep(1);                              /* let the child queue 3 messages */
+
+    n = read(fd[0], buf, sizeof buf - 1);  /* PHASE 1: one big read() */
+    dump("[parent] got", buf, n);
+
+    sleep(2);
+                                           /* PHASE 2: 8 bytes at a time */
+    while ((n = read(fd[0], buf, SMALL)) > 0)
+        dump("[parent]   chunk", buf, n);
 \end{lstlisting}
 
 \begin{lstlisting}[style=terminal,caption={ผลลัพธ์ของข้อ 5.3}]
-
-
+$ ./q5_3_many_messages
+[child ] write #1: "MSG1 from child PID: 29450|"
+[child ] write #2: "MSG2 from child PID: 29450|"
+[child ] write #3: "MSG3 from child PID: 29450|"
+[parent] PHASE 1: one big read()
+[parent] got 81 bytes: [MSG1 from child PID: 29450|MSG2 from child PID: 29450|MSG3 from child PID: 29450|]
+[parent] -> 3 separate write() calls arrived in ONE read(). Message boundaries are gone.
+[child ] write #4: "MSG4|"
+[child ] write #5: "MSG5|"
+[child ] write #6: "MSG6|"
+[parent] PHASE 2: reading 8 bytes at a time
+[parent]   chunk 8 bytes: [MSG4|MSG]        <- MSG5 is cut in half here
+[parent]   chunk 7 bytes: [5|MSG6|]         <- and continues here
+[parent] read() returned 0 -> EOF, sender is gone.
 \end{lstlisting}
 
-\textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายว่า pipe เป็น byte stream
-ที่ไม่รักษาขอบเขตของข้อความ (no message boundary) ข้อความหลายชิ้นจึงถูกอ่านรวมกันมา
-ใน \code{read()} ครั้งเดียวได้ และกล่าวถึงขนาด buffer ของ pipe (ปกติ 64 KB บน Linux)
-ที่ทำให้ \code{write()} block เมื่อ buffer เต็ม}
+\textbf{สิ่งที่สังเกตได้}: ในเฟสที่หนึ่ง การเรียก \code{write()} 3 ครั้งถูกอ่านกลับมาได้ด้วย \code{read()} เพียงครั้งเดียวรวม 81 ไบต์ ($27 \times 3$) ข้อความทั้งสามถูกต่อกันเป็นสายเดียวโดยไม่มีร่องรอยว่าแต่ละ \code{write()} เริ่มและจบตรงไหน ส่วนในเฟสที่สองเมื่ออ่านทีละ 8 ไบต์ ข้อความ \code{MSG5|} ถูกผ่าครึ่ง โดยครึ่งแรกไปอยู่ท้าย chunk ที่หนึ่งและครึ่งหลังไปอยู่ต้น chunk ที่สอง อย่างไรก็ตามลำดับของข้อมูลยังคงถูกต้องแบบ FIFO เสมอ ทดสอบซ้ำ 5 ครั้งได้ผลเหมือนกันทุกครั้ง
+
+\newpage
 
 \subsection{สรุปผลการทดลองข้อ 5}
 
 \begin{table}[H]
 \centering
 \caption{สรุปพฤติกรรมของ pipe ในแต่ละสถานการณ์}
-\begin{tabular}{p{4.5cm}p{4cm}p{5cm}}
+\begin{tabular}{p{3.6cm}p{4.6cm}p{5.4cm}}
 \toprule
 \textbf{สถานการณ์} & \textbf{ผลที่สังเกตได้} & \textbf{คำอธิบาย} \\
 \midrule
-5.1 ผู้ส่งอ่านข้อความตัวเอง & & \\
-5.2 ผู้รับอ่านก่อนส่ง & & \\
-5.3 ส่งหลายข้อความก่อนอ่าน & & \\
+5.1 ผู้ส่งอ่านข้อความตัวเอง
+  & ผู้ส่งได้ข้อความคืนครบ 28 ไบต์ ส่วนผู้รับตัวจริงไม่ได้อะไร และค้างจนถูก \code{EINTR}
+  & pipe เป็นคิว FIFO ที่ข้อมูลถูกอ่านแล้วหมดไป ไม่ใช่การ broadcast ใครอ่านก่อนได้ก่อน \\
+\addlinespace
+5.2 ผู้รับอ่านก่อนผู้ส่งส่ง
+  & \code{read()} block นาน 3.00 วินาที เฟสที่สองคืนค่า 0 ภายใน 0.00 วินาที
+  & ว่างและยังมีผู้เขียนอยู่จะ block ส่วนว่างและไม่มีผู้เขียนเหลือแล้วจะได้ EOF \\
+\addlinespace
+5.3 ส่งหลายข้อความก่อนอ่าน
+  & \code{write()} 3 ครั้งถูกอ่านด้วย \code{read()} ครั้งเดียว 81 ไบต์ และเมื่ออ่านทีละ 8 ไบต์ ข้อความถูกผ่าครึ่ง
+  & pipe เป็น byte stream ที่รักษาลำดับแต่ไม่เก็บขอบเขตข้อความ การแบ่งข้อความเป็นหน้าที่ของแอปพลิเคชัน \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\newpage
-% =====================================================================
-\section*{สรุปผลการทดลอง}
-\addcontentsline{toc}{section}{สรุปผลการทดลอง}
-% =====================================================================
+\subsection{อภิปรายผล}
 
-\textbf{สิ่งที่ได้เรียนรู้จากข้อ 1}
-
-\begin{enumerate}[leftmargin=*]
-  \item \code{fork()} คือการเรียกฟังก์ชันเพียงครั้งเดียวที่ return สองครั้ง
-        เป็นกลไกพื้นฐานที่ทำให้โค้ดชุดเดียวแตกออกเป็นสองเส้นทางการทำงาน
-  \item ถ้าไม่มีกลไกซิงโครไนซ์ ลำดับการทำงานของ parent กับ child เป็นสิ่งที่
-        \textbf{คาดเดาไม่ได้} และขึ้นกับ scheduler ล้วน ๆ การรันโปรแกรมเดิมซ้ำสามครั้ง
-        ให้ผลไม่ซ้ำกันเลย
-  \item \code{wait()} เปลี่ยนโปรแกรมจาก non-deterministic เป็น deterministic
-        และเป็นวิธีป้องกัน zombie process ที่ตรงไปตรงมาที่สุด
-  \item ได้เห็น \textbf{orphan process} และการ reparent โดยบังเอิญจากการรันข้อ 1.1
-        ซึ่งเป็นปรากฏการณ์เดียวกับที่ข้อ 2.2 ต้องการให้ทดลอง
-  \item \code{fork()} คัดลอก \textbf{ทุกอย่าง} ใน address space รวมถึง stdio buffer
-        ที่ยังไม่ได้ flush ทำให้เกิดข้อความซ้ำเมื่อ redirect output ลงไฟล์
-        เป็นกับดักที่พบได้บ่อยและแก้ได้ด้วย \code{fflush(stdout)} ก่อน \code{fork()}
-\end{enumerate}
-
-\textbf{ปัญหาที่พบและวิธีแก้}
+จากการทดลองทั้งสามกรณี สรุปคุณสมบัติสำคัญของ pipe ที่ได้เรียนรู้ได้ดังนี้
 
 \begin{itemize}[leftmargin=*]
-  \item \emph{ข้อความ \code{"Hello World!"} ปรากฏสองครั้ง} เมื่อ redirect output ลงไฟล์
-        ตอนแรกเข้าใจผิดว่าโปรแกรมเขียนผิด ภายหลังพบว่าเกิดจาก stdio buffering
-        แก้โดยเพิ่ม \code{fflush(stdout);} ก่อนเรียก \code{fork()}
-  \item \emph{ผลการรันไม่ซ้ำเดิม} ทำให้บันทึกผลได้ยาก จึงต้องรันหลายครั้งและรายงานทุกครั้ง
-        เพื่อแสดงให้เห็นความไม่แน่นอน แทนที่จะรายงานเพียงครั้งเดียว
+  \item \textbf{pipe ไม่มีแนวคิดเรื่องผู้ส่งและผู้รับ}:
+        ข้อ 5.1 แสดงว่าเคอร์เนลไม่ได้จดจำว่าใครเป็นผู้เขียนข้อมูลลงไป
+        pipe เป็นเพียงคิวไบต์แบบ FIFO ที่ใครก็ตามซึ่งถือปลายอ่านอยู่สามารถ
+        ดึงข้อมูลออกไปได้ และเมื่อถูกอ่านแล้วข้อมูลจะหายไปจากคิวทันที
+        ไม่ได้ถูกส่งซ้ำให้ผู้อ่านคนอื่น การกำหนดบทบาทผู้ส่งกับผู้รับจึงต้องทำ
+        ด้วยวินัยของโปรแกรมเมอร์เอง คือการปิดปลายที่ไม่ใช้ตามที่ทำในข้อ 4
+
+  \item \textbf{การไม่ปิดปลายที่ไม่ใช้ทำให้ตรวจจับ EOF ไม่ได้}:
+        ในข้อ 5.1 parent ค้างอยู่ใน \code{read()} แทนที่จะได้รับ EOF
+        ทั้งที่ child จบไปแล้ว เพราะตัว parent เองยังถือปลายเขียนไว้
+        เคอร์เนลจะรายงาน EOF ก็ต่อเมื่อปลายเขียด \textbf{ทุกตัว} ในระบบถูกปิด
+        เปรียบเทียบกับข้อ 5.2 ที่ปิดปลายที่ไม่ใช้อย่างถูกต้อง จะเห็นว่า
+        \code{read()} คืนค่า 0 ได้ทันทีเมื่อผู้เขียนหมดไป
+
+  \item \textbf{blocking read เป็นกลไกซิงโครไนซ์ในตัว}:
+        ข้อ 5.2 วัดได้ว่า \code{read()} หยุดรอนาน 3.00 วินาที ตรงกับ
+        \code{sleep()} ของผู้ส่งพอดี แสดงว่า process ถูกพักไว้ในสถานะ blocked
+        และคืน CPU ให้ผู้อื่นใช้ ไม่ใช่การวนรอแบบ busy waiting
+        คุณสมบัตินี้คือสิ่งเดียวกับที่นำไปใช้แก้ปัญหาลำดับ output ในข้อ 4
+
+  \item \textbf{pipe เป็น byte stream ไม่ใช่ message queue}:
+        ข้อ 5.3 แสดงชัดเจนสองทาง คือหลายข้อความถูกรวบมาใน \code{read()}
+        ครั้งเดียว และข้อความเดียวถูกแบ่งไปอยู่ใน \code{read()} หลายครั้ง
+        pipe รับประกันเพียง \emph{ลำดับ} ของไบต์ว่าเป็น FIFO เท่านั้น
+        แต่ไม่รับประกัน \emph{ขอบเขต} ของข้อความ ดังนั้นการแบ่งข้อความ
+        (framing) จึงเป็นหน้าที่ของแอปพลิเคชัน เช่น ใช้ระเบียนขนาดคงที่
+        ใส่ความยาวนำหน้า หรือใช้ตัวคั่นอย่าง \code{'\textbackslash 0'}
+        และ \code{'\textbackslash n'} ดังที่ข้อ 4 ส่ง \code{strlen(msg)+1}
+        เพื่อให้รวมตัวปิดสตริงไปด้วย
+
+  \item \textbf{ความสำคัญของการมีกลไกกันโปรแกรมค้าง}:
+        การทดลองข้อ 5.1 จะค้างถาวรถ้าไม่มี \code{alarm(3)} คอยขัดจังหวะ
+        เพราะเป็นสถานการณ์ที่ผู้รับรอข้อมูลที่ไม่มีวันมาถึง
+        การใส่ timeout ไว้จึงเป็นแนวปฏิบัติที่จำเป็นเมื่อทดลองกับ
+        การสื่อสารแบบ blocking
 \end{itemize}
-
-\textbf{งานที่ยังเหลือ} \quad \todo{ข้อ 2, 3, 4 และ 5 -- ต้องเขียนโปรแกรม
-รันเก็บผล และเขียนอภิปรายให้ครบก่อนส่ง}
-
-% ------------------------- อ้างอิง -------------------------
-\section*{เอกสารอ้างอิง}
-\addcontentsline{toc}{section}{เอกสารอ้างอิง}
-\begin{enumerate}[leftmargin=*]
-  \item Linux manual pages: \code{fork(2)}, \code{wait(2)}, \code{pipe(2)}, \code{ps(1)},
-        \code{setvbuf(3)}.
-  \item เอกสารประกอบการสอน CPE 333 Operating Systems, บทที่ว่าด้วย Process Management.
-\end{enumerate}
 
 \end{document}
