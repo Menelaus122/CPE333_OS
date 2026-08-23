@@ -6,7 +6,7 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex REPORT.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: ข้อ 1-2 เขียนสมบูรณ์แล้ว / ข้อ 3-5 ยังเป็นโครงรอเติม
+%  สถานะเอกสาร: ข้อ 1-3 เขียนสมบูรณ์แล้ว / ข้อ 4-5 ยังเป็นโครงรอเติม
 % =====================================================================
 \documentclass[a4paper,12pt]{article}
 
@@ -170,6 +170,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
  & \code{gcc -Wall -Wextra -o q1\_2 q1\_2\_wait.c} \\
  & \code{gcc -Wall -Wextra -o q2\_1 q2\_1\_child\_first.c} \\
  & \code{gcc -Wall -Wextra -o q2\_2 q2\_2\_parent\_first.c} \\
+ & \code{gcc -Wall -Wextra -o q3\_forkcount q3\_forkcount.c} \\
 ผลการคอมไพล์ & ผ่านทุกไฟล์ ไม่มี warning \\
 \bottomrule
 \end{tabular}
@@ -194,7 +195,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 \midrule
 1 & \code{fork()} แบบมีและไม่มี \code{wait()} & เสร็จ & เสร็จ \\
 2 & Process status และ \code{sleep()} (zombie / orphan) & เสร็จ & เสร็จ \\
-3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
+3 & จำนวน process สูงสุดที่ \code{fork()} ได้ & เสร็จ & เสร็จ \\
 4 & การสื่อสารผ่าน \code{pipe()} & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
 5 & กรณีพิเศษของ pipe (5.1--5.3) & ยังไม่ได้ทำ & ยังไม่ได้ทำ \\
 \bottomrule
@@ -559,66 +560,258 @@ $ # walk the ancestry chain up to PID 1
 \section{จำนวน process สูงสุดที่ fork ได้}
 % =====================================================================
 
-\todo{ยังไม่ได้เขียนโปรแกรมข้อ 3 -- ต้องสร้างไฟล์ \code{q3\_forkcount.c}}
-
-\textbf{ข้อควรระวัง} \quad ต้องตั้ง \code{ulimit -u} ก่อนรันทุกครั้ง เช่น
-\code{ulimit -u 200} เพื่อไม่ให้ระบบค้าง และควรใช้รูปแบบ recursive ที่ parent
-\code{wait()} รอ child เสมอตามที่โจทย์แนะนำ ไม่ใช่การ \code{fork()} แบบวนลูป
-ซึ่งจะกลายเป็น fork bomb
+การทดลองนี้ต้องการหาว่าระบบยอมให้เรียก \code{fork()} ได้สำเร็จกี่ครั้ง
+โดยใช้โครงสร้างแบบ \textbf{โซ่ (chain)} ตามที่ Hint ของโจทย์แนะนำ คือทุก process
+สร้างลูกเพียงตัวเดียวแล้วรอด้วย \code{waitpid()} โซ่จึงยาวขึ้นทีละหนึ่งและคลายตัว
+กลับจากปลายสุดอย่างเป็นระเบียบ ซึ่ง \textbf{ไม่ใช่ fork bomb} และหยุดได้ทุกเมื่อ
 
 \subsection{Source code}
 
-\begin{lstlisting}[caption={q3.c -- นับจำนวนครั้งที่ fork() สำเร็จ},label={lst:q3}]
-/* TODO: recursive form -- parent waits for child, child forks the next
- * child, until fork() fails. Report the last successful count.
- */
+\subsubsection{ส่วนหลัก: ฟังก์ชัน \code{chain()} และการรายงานผล}
+
+\begin{lstlisting}[caption={q3\_forkcount.c -- the chain and the reporting path},label={lst:q3a}]
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/resource.h>
+
+#define HARD_CAP 200000        /* never build a chain longer than this */
+
+struct result {
+    int count;                 /* number of successful fork() calls */
+    int err;                   /* errno that stopped us (0 = hit HARD_CAP) */
+};
+
+static int pfd[2];
+
+/* Send the tally up the chain to the root and leave. */
+static _Noreturn void report(int count, int err)
+{
+    struct result r;
+    r.count = count;
+    r.err   = err;
+    if (write(pfd[1], &r, sizeof r) != (ssize_t)sizeof r)
+        _exit(1);
+    _exit(0);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winfinite-recursion"
+
+/* I am the process produced by fork() call number `level`. */
+static void chain(int level)
+{
+    pid_t pid;
+
+    if (level >= HARD_CAP)
+        report(level, 0);      /* stopped by our own ceiling */
+
+    pid = fork();
+
+    if (pid < 0)
+        /* fork #(level+1) failed -> `level` forks succeeded in total */
+        report(level, errno);
+
+    if (pid == 0)
+        chain(level + 1);      /* the child keeps digging */
+
+    /* parent of this link: hold still until the chain below me unwinds */
+    waitpid(pid, NULL, 0);
+    _exit(0);
+}
+
+#pragma GCC diagnostic pop
 \end{lstlisting}
 
-\textbf{คำอธิบายการทำงาน} \quad \todo{อธิบายวิธีนับ กลไกการหยุด
-และมาตรการป้องกันไม่ให้ระบบค้าง}
+\textbf{คำอธิบายการทำงาน}: \code{chain(level)} หมายถึง ``ฉันคือ process ที่เกิดจาก \code{fork()} ครั้งที่ \code{level}'' แต่ละตัวจะ \code{fork()} หนึ่งครั้ง ถ้าสำเร็จ ลูกจะเรียก \code{chain(level+1)} ขุดลึกต่อไป ส่วนพ่อจะติดอยู่ที่ \code{waitpid()} ไม่ทำอะไรจนกว่าโซ่ข้างล่างจะคลายกลับมา ทำให้มีเพียง process เดียวเท่านั้นที่ทำงานอยู่ในแต่ละขณะ เมื่อ \code{fork()} ล้มเหลว process ที่ลึกที่สุดจะส่งผลรวมและ \code{errno} กลับไปให้ root ผ่าน pipe ด้วย \code{report()} ส่วน \code{HARD\_CAP} เป็นเพดานของโปรแกรมเองไว้กันพลาด และคำสั่ง \code{\#pragma} จำเป็นต้องมีเพราะ gcc มองว่า \code{chain()} เป็น infinite recursion ซึ่งเป็นการเตือนที่ผิดพลาด เนื่องจากการเรียกซ้ำเกิดใน process ใหม่คนละตัวและหยุดเมื่อ \code{fork()} ล้มเหลว
+
+\newpage
+
+\subsubsection{ส่วน \code{main()}: กำหนดเพดานและรับผลลัพธ์}
+
+\begin{lstlisting}[caption={q3\_forkcount.c -- main(): optional ceiling and result collection},label={lst:q3b}]
+int main(int argc, char *argv[])
+{
+    pid_t pid;
+    struct result r = { 0, 0 };
+    struct rlimit rl;
+
+    if (argc > 1) {            /* optional artificial ceiling for rehearsal */
+        rlim_t want = (rlim_t)strtoul(argv[1], NULL, 10);
+        if (getrlimit(RLIMIT_NPROC, &rl) == 0) {
+            rl.rlim_cur = want;
+            if (rl.rlim_max != RLIM_INFINITY && rl.rlim_cur > rl.rlim_max)
+                rl.rlim_cur = rl.rlim_max;
+            if (setrlimit(RLIMIT_NPROC, &rl) != 0)
+                perror("setrlimit");
+        }
+    }
+
+    if (getrlimit(RLIMIT_NPROC, &rl) == 0)
+        printf("RLIMIT_NPROC in effect: soft = %ld, hard = %ld\n",
+               (long)rl.rlim_cur, (long)rl.rlim_max);
+
+    printf("Root PID = %d. Forking a chain until fork() fails ...\n", getpid());
+    fflush(stdout);
+
+    if (pipe(pfd) < 0) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid < 0) {
+        r.count = 0;
+        r.err   = errno;
+    } else if (pid == 0) {
+        close(pfd[0]);
+        chain(1);              /* this process came from fork() #1 */
+        _exit(0);              /* unreachable */
+    } else {
+        close(pfd[1]);         /* only the descendants write */
+        waitpid(pid, NULL, 0);
+        if (read(pfd[0], &r, sizeof r) != (ssize_t)sizeof r) {
+            fprintf(stderr, "could not read result from pipe\n");
+            exit(EXIT_FAILURE);
+        }
+        close(pfd[0]);
+    }
+
+    printf("fork() succeeded %d times.\n", r.count);
+    if (r.err == 0)
+        printf("Stopped by the program's own HARD_CAP (%d), not by the OS.\n",
+               HARD_CAP);
+    else
+        printf("fork() #%d failed with errno %d (%s).\n",
+               r.count + 1, r.err, strerror(r.err));
+
+    return 0;
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน}: \code{main()} สร้าง pipe ก่อนแล้วจึง \code{fork()} เพื่อเริ่มโซ่ ฝั่ง root ปิดปลายเขียน (\code{pfd[1]}) เพราะมีแต่ลูกหลานที่จะเขียน ส่วนลูกตัวแรกปิดปลายอ่าน (\code{pfd[0]}) การที่ root เรียก \code{waitpid()} ก่อนแล้วค่อย \code{read()} ไม่ทำให้เกิด deadlock เพราะข้อมูลขนาด 8 ไบต์ถูกเขียนค้างไว้ใน buffer ของ pipe ตั้งแต่ตอนที่ process ปลายสุดยังมีชีวิตอยู่ และเนื่องจากขนาดน้อยกว่า \code{PIPE\_BUF} การเขียนจึงเป็น atomic ไม่มีทางถูกแทรก ส่วนอาร์กิวเมนต์ \code{argv[1]} เป็นทางเลือกให้ตั้งเพดานจำลองด้วย \code{setrlimit()} เพื่อซ้อมการทดลองในระดับที่ปลอดภัยก่อนรันจริง
+
+\newpage
 
 \subsection{ผลการทดลอง}
 
+ทำการทดลอง 2 ชุดด้วยเพดานต่างกัน เพื่อยืนยันว่าข้อสรุปไม่ได้ขึ้นกับขนาดของเพดาน
+ชุด A ใช้ \code{ulimit -u 300} ซึ่งรันเร็ว ส่วนชุด B ใช้ \code{ulimit -u 6000}
+ซึ่งใกล้เคียงสถานการณ์จริงมากกว่า
+
 \subsubsection{3.1 การวัดครั้งแรก}
 
-\begin{lstlisting}[style=terminal,caption={ผลลัพธ์การวัดครั้งแรก}]
-$ ulimit -u
-$ ./q3
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์การวัดครั้งแรกของทั้งสองชุด}]
+$ gcc -Wall -Wextra -o q3_forkcount q3_forkcount.c
 
+--- Set A ---
+$ ulimit -u 300
+$ ./q3_forkcount
+RLIMIT_NPROC in effect: soft = 300, hard = 300
+Root PID = 25252. Forking a chain until fork() fails ...
+fork() succeeded 255 times.
+fork() #256 failed with errno 11 (Resource temporarily unavailable).
 
+--- Set B ---
+$ ulimit -u 6000
+$ ./q3_forkcount
+RLIMIT_NPROC in effect: soft = 6000, hard = 6000
+Root PID = 6921. Forking a chain until fork() fails ...
+fork() succeeded 5953 times.
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
 \end{lstlisting}
 
 \subsubsection{3.2 เมื่อมีโปรแกรมอื่นทำงานค้างอยู่}
 
-\begin{lstlisting}[style=terminal,caption={ผลลัพธ์เมื่อรันโปรแกรมอื่นค้างไว้ และหลังปิดโปรแกรมเหล่านั้น}]
+ชุด B ทำการวัดต่อเนื่อง 3 เฟสภายใต้เงื่อนไขเดียวกัน โดยตรวจนับจำนวน thread
+ของผู้ใช้ก่อนวัดทุกครั้ง เพื่อยืนยันว่าสภาพระบบกลับสู่จุดเริ่มต้นจริง
 
+\begin{lstlisting}[style=terminal,caption={ผลลัพธ์ทั้งสามเฟสของชุด B (ulimit -u 6000)}]
+===== PHASE 1 : before starting any extra program =====
+UID threads now: 8
+$ ./q3_forkcount
+fork() succeeded 5953 times.
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
 
+===== PHASE 2 : with 100 extra programs running =====
+$ for i in $(seq 1 100); do sleep 900 & done
+UID threads now: 108
+$ ./q3_forkcount
+fork() succeeded 5853 times.            <- exactly 100 fewer
+fork() #5854 failed with errno 11 (Resource temporarily unavailable).
+
+===== PHASE 3 : after stopping all extra programs =====
+$ kill $PIDS
+UID threads now: 8
+$ ./q3_forkcount
+fork() succeeded 5953 times.            <- back to the original value
+fork() #5954 failed with errno 11 (Resource temporarily unavailable).
 \end{lstlisting}
 
 \begin{table}[H]
 \centering
 \caption{เปรียบเทียบจำนวน \code{fork()} ที่สำเร็จในแต่ละสถานการณ์}
-\begin{tabular}{lcc}
+\begin{tabular}{llcc}
 \toprule
-\textbf{สถานการณ์} & \textbf{จำนวน process ที่รันอยู่} & \textbf{fork() สำเร็จ (ครั้ง)} \\
+\textbf{ชุด} & \textbf{สถานการณ์} & \textbf{process อื่นที่เพิ่ม} & \textbf{fork() สำเร็จ (ครั้ง)} \\
 \midrule
-ก่อนรันโปรแกรมเพิ่ม & & \\
-ระหว่างรันโปรแกรมเพิ่ม & & \\
-หลังปิดโปรแกรมทั้งหมด & & \\
+A (เพดาน 300)  & ก่อนรันโปรแกรมเพิ่ม   & --   & 255 \\
+A (เพดาน 300)  & ระหว่างรันโปรแกรมเพิ่ม & 20   & 235 \\
+A (เพดาน 300)  & หลังปิดโปรแกรมทั้งหมด  & --   & 256 \\
+\midrule
+B (เพดาน 6000) & ก่อนรันโปรแกรมเพิ่ม   & --   & 5953 \\
+B (เพดาน 6000) & ระหว่างรันโปรแกรมเพิ่ม & 100  & 5853 \\
+B (เพดาน 6000) & หลังปิดโปรแกรมทั้งหมด  & --   & 5953 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{อภิปรายผล}
 
-\todo{เขียนอภิปราย} ประเด็นที่ควรกล่าวถึง
-\begin{itemize}[leftmargin=*]
-  \item อะไรคือขีดจำกัดที่แท้จริง (\code{RLIMIT\_NPROC} / หน่วยความจำ / ขนาดตารางกระบวนการ)
-  \item \code{fork()} คืนค่าอะไร และ \code{errno} เป็นอะไรเมื่อล้มเหลว
-        (\code{EAGAIN} หรือ \code{ENOMEM})
-  \item ทำไมตัวเลขจึงเปลี่ยนไปตามจำนวนโปรแกรมที่รันอยู่ และทำไมจึงไม่กลับมาเท่าเดิมเป๊ะ
-\end{itemize}
+จากการทดลองวัดจำนวน \code{fork()} ที่สำเร็จภายใต้สภาพระบบที่ต่างกัน
+สรุปประเด็นสำคัญได้ดังนี้
 
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ขีดจำกัดที่แท้จริงคือ \code{RLIMIT\_NPROC}}:
+        \code{fork()} return $-1$ พร้อม \code{errno} $= 11$ ซึ่งคือ \code{EAGAIN}
+        (Resource temporarily unavailable) เหมือนกันทุกครั้งในทุกการทดลอง
+        ไม่ใช่ \code{ENOMEM} แสดงว่าสิ่งที่หยุดเราคือโควตาจำนวน process ต่อผู้ใช้
+        ไม่ใช่หน่วยความจำหรือขนาดของตารางกระบวนการ
+
+  \item \textbf{จำนวนที่ได้ไม่เท่ากับเพดานเพราะโควตาถูกใช้ไปก่อนแล้ว}:
+        เพดาน 300 ได้ 255 ครั้ง (ส่วนต่าง 45) และเพดาน 6000 ได้ 5953 ครั้ง
+        (ส่วนต่าง 47) เนื่องจาก \code{RLIMIT\_NPROC} นับ process ของ UID นั้น
+        ทั้ง user namespace ไม่ใช่นับเฉพาะที่โปรแกรมเราสร้าง ส่วนต่างจึงคือ
+        process ที่ผู้ใช้มีอยู่ก่อนแล้ว เช่น shell, WSL relay และ session อื่น
+        ที่เปิดค้างไว้ สังเกตว่า \code{ps} มองเห็นเพียง 8 ตัวใน session ปัจจุบัน
+        แต่ถูกหักไป 47 แสดงว่ามีอีกราว 39 ตัวที่อยู่นอก session ปัจจุบัน
+        แต่ยังถูกนับรวมในโควตาเดียวกัน
+
+  \item \textbf{จำนวนลดลงตามจำนวนโปรแกรมที่รันค้างแบบหนึ่งต่อหนึ่ง}:
+        เมื่อเปิดโปรแกรม \code{sleep} ค้างไว้ 100 ตัว จำนวน \code{fork()}
+        ที่สำเร็จลดลงจาก 5953 เหลือ 5853 คือลดลง \textbf{100 พอดีเป๊ะ}
+        ไม่ขาดไม่เกิน เช่นเดียวกับชุด A ที่เปิด 20 ตัวแล้วลดลง 20 พอดี
+        ยืนยันว่าโควตานี้เป็นทรัพยากรที่แชร์กันทั้งผู้ใช้ ไม่ใช่โควตาต่อโปรแกรม
+
+  \item \textbf{ค่าจะกลับมาเท่าเดิมก็ต่อเมื่อควบคุมตัวแปรได้ครบ}:
+        ชุด B กลับมาที่ 5953 เท่าเดิมเป๊ะ เพราะปิดเฉพาะ PID ที่เปิดเองและตรวจนับ
+        thread ยืนยันว่ากลับมาที่ 8 เท่าเดิมก่อนวัดซ้ำ ในขณะที่ชุด A ได้ 256 ครั้ง
+        ซึ่งมากกว่าเดิม 1 เพราะระหว่างการทดลองมี process อื่นของผู้ใช้จบไปพอดี
+        ทำให้โควตาว่างเพิ่มขึ้น จึงสรุปได้ว่าตัวเลขที่วัดได้เป็นค่าที่ขึ้นกับสภาพ
+        ของระบบ ณ ขณะนั้น ไม่ใช่ค่าคงที่ประจำเครื่อง
+
+  \item \textbf{ต้นทุนของโครงสร้างแบบ recursive chain}:
+        การวัดแต่ละครั้งในชุด B ใช้เวลา 755--895 วินาที และใช้หน่วยความจำสูงสุด
+        ราว 13 GB ที่ความยาวโซ่ประมาณ 5{,}900 process เพราะ process ที่ระดับ $N$
+        มี stack frame สะสม $N$ เฟรม ทุกครั้งที่ \code{fork()} เคอร์เนลต้องคัดลอก
+        page table ที่ใหญ่ขึ้นเรื่อย ๆ ทำให้ทั้งเวลาและหน่วยความจำโตแบบ $O(N^2)$
+        นี่คือเหตุผลที่ไม่สามารถรันจนถึงเพดานจริง 62{,}827 ได้บนเครื่องที่มี
+        หน่วยความจำ 15.7 GB และเป็นเหตุผลที่ต้องกำหนด \code{ulimit -u}
+        ให้ต่ำลงก่อนการทดลองทุกครั้ง
+\end{itemize}
 \newpage
 % =====================================================================
 \section{การสื่อสารผ่าน Pipe}
@@ -713,7 +906,7 @@ $ ./q4
 \end{lstlisting}
 
 \textbf{สิ่งที่สังเกตได้และการอภิปราย} \quad \todo{อธิบายพฤติกรรม blocking read
-ว่า \code{read()} จะรอจนกว่าจะมีข้อมูล และเงื่อนไขที่ \code{read()} จะคืนค่า 0 (EOF)
+ว่า \code{read()} จะรอจนกว่าจะมีข้อมูล และเงื่อนไขที่ \code{read()} จะ return 0 (EOF)
 คือเมื่อ write-end ถูกปิดหมดทุก process}
 
 \subsection{5.3 ผู้ส่งส่งหลายข้อความก่อนที่ผู้รับจะอ่าน}
@@ -760,7 +953,7 @@ $ ./q4
 \textbf{สิ่งที่ได้เรียนรู้จากข้อ 1}
 
 \begin{enumerate}[leftmargin=*]
-  \item \code{fork()} คือการเรียกฟังก์ชันเพียงครั้งเดียวที่คืนค่าสองครั้ง
+  \item \code{fork()} คือการเรียกฟังก์ชันเพียงครั้งเดียวที่ return สองครั้ง
         เป็นกลไกพื้นฐานที่ทำให้โค้ดชุดเดียวแตกออกเป็นสองเส้นทางการทำงาน
   \item ถ้าไม่มีกลไกซิงโครไนซ์ ลำดับการทำงานของ parent กับ child เป็นสิ่งที่
         \textbf{คาดเดาไม่ได้} และขึ้นกับ scheduler ล้วน ๆ การรันโปรแกรมเดิมซ้ำสามครั้ง
