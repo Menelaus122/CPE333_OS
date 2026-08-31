@@ -1,0 +1,253 @@
+# ผลการรันจริง - CPE333 PS03 ข้อ 1 (Linux commands for process manipulation & monitoring)
+# Environment : Ubuntu 24.04.1 LTS, kernel 6.6.87.2-microsoft-standard-WSL2
+# Tools       : procps-ng 4.0.4 (ps/top/kill/pgrep/pkill), util-linux (renice/taskset), psmisc (killall)
+# Captured at : 2026-08-31 14:55:08 +07
+
+----- 0. คอมไพล์โปรแกรมช่วยทดลอง -----
+$ gcc -Wall -Wextra -O0 -o q1_burn q1_burn.c      => OK, no warning
+$ gcc -Wall -Wextra -o q1_sigdemo q1_sigdemo.c   => OK, no warning
+
+====================================================================
+ส่วนที่ 1 : ps เทียบกับ top
+====================================================================
+
+----- 1.0 สภาพแวดล้อม -----
+Linux 6.6.87.2-microsoft-standard-WSL2 x86_64
+Ubuntu 24.04.1 LTS
+nproc = 22 logical CPUs
+ps from procps-ng 4.0.4
+
+----- 1.1 ps (ไม่ใส่ option) - เห็นเฉพาะ process ของ terminal ตัวเองเท่านั้น -----
+$ ps
+    PID TTY          TIME CMD
+   5688 pts/4    00:00:00 bash
+   5689 pts/4    00:00:00 bash
+   5691 pts/4    00:00:00 sed
+   5744 pts/4    00:00:00 ps
+
+----- 1.2 ps aux | head -8   (BSD syntax : ทุก process ในระบบ) -----
+$ ps aux | head -8
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0  21792 12084 ?        Ss   12:03   0:01 /sbin/init
+root           2  0.0  0.0   3072  1760 ?        Sl   12:03   0:00 /init
+root           7  0.0  0.0   3132  2112 ?        Sl   12:03   0:07 plan9 --control-socket 7 --log-level 4 --server-fd 8 
+root          56  0.0  0.0  66828 14196 ?        S<s  12:03   0:01 /usr/lib/systemd/systemd-journald
+root         102  0.0  0.0  25016  5984 ?        Ss   12:03   0:06 /usr/lib/systemd/systemd-udevd
+systemd+     152  0.0  0.0  21336 12672 ?        Ss   12:03   0:00 /usr/lib/systemd/systemd-resolved
+systemd+     161  0.0  0.0  91028  7568 ?        Ssl  12:03   0:00 /usr/lib/systemd/systemd-timesyncd
+
+----- 1.3 ps -ef | head -8   (UNIX syntax : มีคอลัมน์ PPID ให้เห็นความเป็นพ่อลูก) -----
+$ ps -ef | head -8
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 12:03 ?        00:00:01 /sbin/init
+root           2       1  0 12:03 ?        00:00:00 /init
+root           7       2  0 12:03 ?        00:00:07 plan9 --control-socket 7 --log-level 4 --server-fd 8 --pipe-fd 10 --
+root          56       1  0 12:03 ?        00:00:01 /usr/lib/systemd/systemd-journald
+root         102       1  0 12:03 ?        00:00:06 /usr/lib/systemd/systemd-udevd
+systemd+     152       1  0 12:03 ?        00:00:00 /usr/lib/systemd/systemd-resolved
+systemd+     161       1  0 12:03 ?        00:00:00 /usr/lib/systemd/systemd-timesyncd
+
+----- 1.4 ps -eo ... --sort=-%cpu   (เลือกคอลัมน์เองและเรียงลำดับได้) -----
+$ taskset -c 0 ./q1_burn 30 MONITOR_ME &      # a CPU-hungry process to watch
+$ ps -eo pid,ppid,ni,pri,stat,%cpu,%mem,etime,comm --sort=-%cpu | head -6
+    PID    PPID  NI PRI STAT %CPU %MEM     ELAPSED COMMAND
+   5749    5689   0  19 R+    109  0.0       00:02 q1_burn
+      7       2   0  19 Sl    0.0  0.0    02:51:41 init
+    102       1   0  19 Ss    0.0  0.0    02:51:41 systemd-udevd
+   5683     102   0  19 S     0.0  0.0       01:46 (udev-worker)
+      1       0   0  19 Ss    0.0  0.0    02:51:42 systemd
+
+----- 1.5 ps เป็นภาพนิ่งครั้งเดียว (one-shot snapshot) จึงจบทันที -----
+$ /usr/bin/time -f "real %e s" ps aux > /dev/null
+real 0.00 s
+$ ps -e --no-headers | wc -l
+39
+
+----- 1.6 top -b -n 1   (batch mode ถ่ายภาพครั้งเดียวเพื่อเก็บลงรายงาน) -----
+$ top -b -n 1 | head -13
+top - 14:55:11 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.5 us,  0.0 sy,  0.0 ni, 95.5 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+MiB Mem :  15716.6 total,  13911.9 free,   1368.4 used,    694.1 buff/cache     
+MiB Swap:   4096.0 total,   4096.0 free,      0.0 used.  14348.3 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:02.43 q1_burn
+      1 root      20   0   21792  12084   9092 S   0.0   0.1   0:01.89 systemd
+      2 root      20   0    3072   1760   1760 S   0.0   0.0   0:00.10 init-systemd(Ub
+      7 root      20   0    3132   2112   1760 S   0.0   0.0   0:07.89 init
+     56 root      19  -1   66828  14196  13492 S   0.0   0.1   0:01.41 systemd-journal
+    102 root      20   0   25016   5984   4928 S   0.0   0.0   0:06.86 systemd-udevd
+
+----- 1.7 top -b -n 2 -d 1   (สองภาพห่างกัน 1 วินาที : top คำนวณ %CPU ใหม่ทุกรอบ) -----
+$ top -b -n 2 -d 1 | grep -E "^top -|^Tasks|^%Cpu|q1_burn"
+top - 14:55:11 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.4 us,  0.0 sy,  0.0 ni, 95.6 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:02.66 q1_burn
+top - 14:55:12 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.5 us,  0.0 sy,  0.0 ni, 95.4 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:03.76 q1_burn
+
+====================================================================
+ส่วนที่ 2 : คำสั่ง nice และ renice
+====================================================================
+
+----- 2.1 ค่า nice ตั้งต้นของ process ใหม่ และการสั่ง nice -----
+$ nice                                  ->  0
+$ nice -n 10 nice                       ->  10
+$ nice -n 19 nice                       ->  19
+$ nice -n 5 nice -n 5 nice   (increments add up)  ->  10
+
+----- 2.2 กรณีควบคุม : burner 2 ตัว ค่า nice เท่ากัน (0 กับ 0) ผูกไว้ที่ CPU 0 ทั้งคู่ นาน 15 วินาที -----
+$ taskset -c 0 ./q1_burn 15 A_nice0 &
+$ taskset -c 0 ./q1_burn 15 B_nice0 &
+$ ps -o pid,ni,pri,psr,stat,%cpu,time,args -p <pid1>,<pid2>      # while both are running
+    PID  NI PRI PSR STAT %CPU     TIME COMMAND
+   5765   0  19   0 R+   55.3 00:00:02 /tmp/ps03_q1/q1_burn 15 A_nice0
+   5766   0  19   0 R+   55.5 00:00:02 /tmp/ps03_q1/q1_burn 15 B_nice0
+[A_nice0] pid=5765 nice=0 rounds=19068 wall=15.00s
+[B_nice0] pid=5766 nice=0 rounds=19119 wall=15.00s
+
+----- 2.3 กรณีทดลอง : burner 2 ตัว ค่า nice ต่างกัน (0 กับ 19) ผูกไว้ที่ CPU 0 ทั้งคู่ นาน 15 วินาที -----
+$ taskset -c 0            ./q1_burn 15 HIGH_nice0 &
+$ taskset -c 0 nice -n 19 ./q1_burn 15 LOW_nice19 &
+$ ps -o pid,ni,pri,psr,stat,%cpu,time,args -p <pid1>,<pid2>      # while both are running
+    PID  NI PRI PSR STAT %CPU     TIME COMMAND
+   5771   0  19   0 R+    106 00:00:04 /tmp/ps03_q1/q1_burn 15 HIGH_nice0
+   5772  19   0   0 RN+   1.7 00:00:00 /tmp/ps03_q1/q1_burn 15 LOW_nice19
+$ top -b -n 1 -p <pid1> -p <pid2>
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5771 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:04.48 q1_burn
+   5772 poomipat  39  19    2548   1056   1056 R   0.0   0.0   0:00.07 q1_burn
+[HIGH_nice0] pid=5771 nice=0 rounds=29924 wall=15.00s
+[LOW_nice19] pid=5772 nice=19 rounds=465 wall=15.00s
+
+----- 2.4 renice : เปลี่ยนค่า nice ของ process ที่กำลังรันอยู่แล้ว -----
+$ ps -o pid,ni,pri,stat,comm -p <pid>        # before renice
+    PID  NI PRI STAT COMMAND
+   5777   0  19 R+   q1_burn
+$ renice -n 15 -p 5777
+5777 (process ID) old priority 0, new priority 15
+$ ps -o pid,ni,pri,stat,comm -p <pid>        # after renice
+    PID  NI PRI STAT COMMAND
+   5777  15   4 RN+  q1_burn
+[renice_target] pid=5777 nice=15 rounds=30658 wall=12.00s
+
+----- 2.5 เฉพาะ root เท่านั้นที่ลดค่า nice (คือเพิ่ม priority) ได้ -----
+current user : poomipat  (uid=1000)
+$ nice -n -5 nice
+nice: cannot set niceness: Permission denied
+0
+$ sleep 60 &        -> pid 5785
+$ renice -n -5 -p 5785
+renice: failed to set priority for 5785 (process ID): Permission denied
+exit status = 1
+$ renice -n +8 -p 5785        # raising the nice value is always allowed
+5785 (process ID) old priority 0, new priority 8
+    PID  NI PRI STAT COMMAND
+   5785   8  11 SN+  sleep
+$ renice -n 0 -p 5785         # lowering it back is refused, even for our own process
+renice: failed to set priority for 5785 (process ID): Permission denied
+exit status = 1
+
+====================================================================
+ส่วนที่ 3 : การ kill process และ job
+====================================================================
+
+----- 3.1 kill -l : รายชื่อสัญญาณทั้งหมดที่ส่งได้ -----
+$ kill -l
+ 1) SIGHUP	 2) SIGINT	 3) SIGQUIT	 4) SIGILL	 5) SIGTRAP
+ 6) SIGABRT	 7) SIGBUS	 8) SIGFPE	 9) SIGKILL	10) SIGUSR1
+11) SIGSEGV	12) SIGUSR2	13) SIGPIPE	14) SIGALRM	15) SIGTERM
+16) SIGSTKFLT	17) SIGCHLD	18) SIGCONT	19) SIGSTOP	20) SIGTSTP
+21) SIGTTIN	22) SIGTTOU	23) SIGURG	24) SIGXCPU	25) SIGXFSZ
+26) SIGVTALRM	27) SIGPROF	28) SIGWINCH	29) SIGIO	30) SIGPWR
+31) SIGSYS	34) SIGRTMIN	35) SIGRTMIN+1	36) SIGRTMIN+2	37) SIGRTMIN+3
+38) SIGRTMIN+4	39) SIGRTMIN+5	40) SIGRTMIN+6	41) SIGRTMIN+7	42) SIGRTMIN+8
+43) SIGRTMIN+9	44) SIGRTMIN+10	45) SIGRTMIN+11	46) SIGRTMIN+12	47) SIGRTMIN+13
+48) SIGRTMIN+14	49) SIGRTMIN+15	50) SIGRTMAX-14	51) SIGRTMAX-13	52) SIGRTMAX-12
+53) SIGRTMAX-11	54) SIGRTMAX-10	55) SIGRTMAX-9	56) SIGRTMAX-8	57) SIGRTMAX-7
+58) SIGRTMAX-6	59) SIGRTMAX-5	60) SIGRTMAX-4	61) SIGRTMAX-3	62) SIGRTMAX-2
+63) SIGRTMAX-1	64) SIGRTMAX	
+
+----- 3.2 kill <PID> : สัญญาณตั้งต้นคือ SIGTERM (15) -----
+$ sleep 300 &        -> pid 5790
+    PID    PPID STAT COMMAND
+   5790    5689 S+   sleep
+$ kill 5790
+$ ps -o pid,stat,comm -p 5790        # no data row = the process is gone
+    PID STAT COMMAND
+exit status of ps = 1
+
+----- 3.3 process ที่ดักจับ SIGTERM ไว้ : kill เฉย ๆ ไม่พอ ต้องใช้ kill -9 -----
+[sigdemo] pid = 5794, catching SIGTERM(15) and SIGINT(2)
+$ kill 5794            # SIGTERM -> the handler runs, the process survives
+[sigdemo] caught SIGTERM (15) -- handler ran, still alive
+$ kill -INT 5794       # SIGINT  -> the handler runs, the process survives
+[sigdemo] caught SIGINT  (2)  -- handler ran, still alive
+$ ps -o pid,stat,comm -p 5794
+    PID STAT COMMAND
+   5794 S+   q1_sigdemo
+$ kill -9 5794         # SIGKILL can be neither caught nor ignored
+bash:  5794 Killed                  /tmp/ps03_q1/q1_sigdemo
+$ ps -o pid,stat,comm -p 5794
+    PID STAT COMMAND
+exit status of ps = 1
+
+----- 3.4 kill -STOP / kill -CONT : พักและปลุก process แทนการฆ่า -----
+$ ps -o pid,stat,comm -p 5803        # S = sleeping
+    PID STAT COMMAND
+   5803 S+   sleep
+$ kill -STOP 5803
+$ ps -o pid,stat,comm -p 5803        # T = stopped
+    PID STAT COMMAND
+   5803 T+   sleep
+$ kill -CONT 5803
+$ ps -o pid,stat,comm -p 5803        # back to S again
+    PID STAT COMMAND
+   5803 S+   sleep
+
+----- 3.5 การฆ่า JOB ด้วย job spec %n -----
+$ jobs -l
+[1]   5813 Running                 sleep 400 &
+[2]-  5814 Running                 sleep 500 &
+[3]+  5815 Running                 sleep 600 &
+$ kill %2            # send SIGTERM to job number 2
+[2]-  Terminated              sleep 500
+$ jobs -l
+[1]-  5813 Running                 sleep 400 &
+[3]+  5815 Running                 sleep 600 &
+$ kill -9 %1 %3      # kill the two remaining jobs
+bash:  5813 Killed                  sleep 400
+bash:  5815 Killed                  sleep 600
+$ jobs -l            # no output = no job left
+
+----- 3.6 pgrep / pkill / killall : อ้างถึง process ด้วยชื่อแทน PID -----
+$ pgrep -a sleep
+5822 sleep 700
+5823 sleep 700
+5824 sleep 700
+$ pkill -f 'sleep 700'      # kill every process whose full command line matches
+[1]   Terminated              sleep 700
+[2]-  Terminated              sleep 700
+[3]+  Terminated              sleep 700
+$ pgrep -a sleep
+exit status of pgrep = 1   (1 = nothing matched)
+
+$ pgrep -a q1_sigdemo
+5830 /tmp/ps03_q1/q1_sigdemo
+5831 /tmp/ps03_q1/q1_sigdemo
+$ killall -9 q1_sigdemo      # kill by exact program name
+bash:  5830 Killed                  /tmp/ps03_q1/q1_sigdemo > /dev/null
+bash:  5831 Killed                  /tmp/ps03_q1/q1_sigdemo > /dev/null
+$ pgrep -a q1_sigdemo
+exit status of pgrep = 1
+
+----- 3.7 kill -0 : ถามว่า PID นั้นยังมีอยู่ไหม โดยไม่ส่งสัญญาณจริง -----
+$ kill -0 5837   -> pid 5837 is alive (exit status 0)
+$ kill -0 5837   -> bash: kill: (5837) - No such process (exit status 1)
+
+=== จบการเก็บผลข้อ 1 ===
