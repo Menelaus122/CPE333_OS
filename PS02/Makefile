@@ -21,7 +21,7 @@ $(SRC_DIR)/%: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $< -o $@
 
 pdf:
-	cd $(DOC_DIR) && $(XELATEX) REPORT.tex && $(XELATEX) REPORT.tex
+	cd $(DOC_DIR) && $(XELATEX) PS02.tex && $(XELATEX) PS02.tex
 
 clean:
 	rm -f $(SRC_DIR)/*.o $(SRC_DIR)/q1_1 $(SRC_DIR)/q1_2 $(SRC_DIR)/q2 $(SRC_DIR)/q3 $(SRC_DIR)/q4 $(SRC_DIR)/q5

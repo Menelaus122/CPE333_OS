@@ -1,0 +1,1200 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2026 - Problem Session 3
+%  Process Manipulation and Monitoring
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX หรือ LuaLaTeX เท่านั้น (pdfLaTeX ใช้ไม่ได้ เพราะใช้ fontspec)
+%  Overleaf: Menu > Compiler > XeLaTeX
+%  Local   : xelatex PS03.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
+%
+%  สถานะเอกสาร: เขียนครบทั้งสามข้อที่ต้องส่ง (ข้อ 1, 2 และ 5)
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+% --- เลือกอย่างใดอย่างหนึ่ง ---
+% (A) เครื่องตัวเอง / มีฟอนต์ TH Sarabun New ติดตั้งอยู่แล้ว
+\setmainfont{TH Sarabun New}[Scale=1.45]
+
+% (B) Overleaf หรือเครื่องที่มี Noto  <-- ปลอดภัยที่สุดถ้าคอมไพล์บน Overleaf
+% \setmainfont{Noto Serif Thai}[Scale=1.0, UprightFont = * Regular, BoldFont = * Bold]
+
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย (สำคัญมาก ไม่งั้นบรรทัดจะทะลุขอบกระดาษ)
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={pid_t,ssize_t,size_t,rusage,timeval,fork,wait,waitpid,read,write,close,
+                getpid,getppid,getpriority,gettimeofday,signal,pause,sleep,exit,perror,fflush},
+}
+
+\lstdefinestyle{bashstyle}{
+  language=bash,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2026}
+\rhead{\small Problem Session 3}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงาน}\\[0.4cm]
+{\Large\bfseries PS03: Process Manipulation and Monitoring}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+\begin{tabular}{@{}lp{12.4cm}@{}}
+\toprule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11), kernel \code{6.6.87.2-microsoft-standard-WSL2} \\
+จำนวน CPU & 22 logical CPUs (\code{nproc}) \\
+เครื่องมือ & \code{procps-ng 4.0.4} (\code{ps}, \code{top}, \code{kill}, \code{pgrep}, \code{pkill}),
+             \code{util-linux} (\code{renice}, \code{taskset}), \code{psmisc} (\code{killall}) \\
+Shell & \code{GNU bash 5.2.21(1)-release} \\
+คอมไพเลอร์ & \code{gcc 13.3.0} คอมไพล์ด้วย \code{-Wall -Wextra} ผ่านทุกไฟล์ ไม่มี warning \\
+วันที่เก็บผล & 31 สิงหาคม 2569 \\
+\bottomrule
+\end{tabular}
+
+\textbf{ผลการทดลองดิบ} \quad ทุกบรรทัดที่ยกมาในรายงานนี้ตัดมาจากไฟล์
+\code{result/q1\_verified.txt}, \code{result/q2\_verified.txt} และ
+\code{result/q5\_verified.txt} ซึ่งสร้างซ้ำได้ด้วย \code{make result}
+(สคริปต์ \code{run\_q1.sh}, \code{run\_q2.sh}, \code{run\_q5.sh} ในโฟลเดอร์ \code{src})
+ในรายงานแสดงเฉพาะบรรทัดที่จำเป็นต่อการอภิปราย ส่วนที่ตัดออกจะมีเครื่องหมาย
+\code{...} หรือหมายเหตุ \code{(lines omitted)} กำกับไว้
+
+\textbf{หมายเหตุสองเรื่องเกี่ยวกับวิธีทดลอง} \quad
+(1) เครื่องที่ใช้มี 22 CPU ถ้าปล่อยให้โปรแกรมทดสอบวิ่งอิสระ ทุก process
+จะได้ CPU คนละแกนและจะ \emph{ไม่เห็น} ผลของค่า \code{nice} เลย
+การทดลองข้อ 1.2 จึงใช้ \code{taskset -c 0} บังคับให้ทุก process ทดสอบอยู่บน
+CPU แกนเดียวกัน เพื่อสร้างการแย่ง CPU ซึ่งเป็นเงื่อนไขเดียวที่ \code{nice} มีความหมาย
+(2) \code{CTRL+Z} และคำสั่ง \code{jobs}/\code{fg}/\code{bg} ต้องการ shell แบบ
+interactive ที่มี tty จริง การเก็บผลข้อ 2 จึงใช้ \code{script(1)} สร้าง
+pseudo terminal แล้วป้อนคำสั่งทีละบรรทัดเหมือนคนพิมพ์ ส่วน \code{CTRL+Z}
+ส่งเป็นไบต์ \code{0x1A} ให้ line discipline ของ tty แปลงเป็น \code{SIGTSTP} เอง
+transcript ที่ได้จึงเป็นของ terminal จริง ไม่ใช่การจำลอง
+
+% =====================================================================
+\section{ข้อ 1: คำสั่ง Linux สำหรับจัดการและเฝ้าดู process และ job}
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\subsection{ความแตกต่างระหว่าง \code{top} และ \code{ps}}
+% ---------------------------------------------------------------------
+
+ทั้งสองคำสั่งอ่านข้อมูลจากแหล่งเดียวกันคือ \code{/proc} ความต่างจึงไม่ได้อยู่ที่
+\emph{ข้อมูล} แต่อยู่ที่ \emph{วิธีนำเสนอ} \code{ps} เป็นคำสั่งแบบ one-shot
+คืออ่าน \code{/proc} รอบเดียว พิมพ์ผล แล้วจบทันที ส่วน \code{top} เป็นโปรแกรม
+interactive ที่วนอ่านซ้ำทุกช่วงเวลา (ตั้งต้น 3 วินาที) แล้ววาดหน้าจอใหม่ทับของเดิม
+จนกว่าผู้ใช้จะกด \code{q}
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปความแตกต่างระหว่าง \code{ps} และ \code{top}}
+\begin{tabular}{p{2.6cm}p{5.6cm}p{5.6cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{ps}} & \textbf{\code{top}} \\
+\midrule
+รูปแบบการทำงาน & one-shot อ่านครั้งเดียวแล้วจบ & วนอ่านซ้ำและวาดหน้าจอใหม่เรื่อย ๆ \\
+ความหมาย \%CPU & ค่าเฉลี่ยตลอดอายุ process (เวลา CPU ที่ใช้ทั้งหมด หารด้วยอายุ) & ค่าเฉพาะช่วงรีเฟรชรอบล่าสุด จึงสะท้อนสถานการณ์ปัจจุบัน \\
+ภาพรวมของระบบ & ไม่มี ต้องหาเอง & มีในส่วนหัว ทั้ง load average, จำนวน task แยกสถานะ, \%Cpu(s) และหน่วยความจำ \\
+การโต้ตอบ & ไม่มี & มี กด \code{k} เพื่อ kill, \code{r} เพื่อ renice, \code{M}/\code{P} เพื่อเรียงตาม memory/CPU \\
+นำผลไปใช้ต่อ & เหมาะมาก ต่อ pipe หรือเขียนลงไฟล์ในสคริปต์ได้ทันที & ต้องใช้ \code{-b} (batch) ก่อน จึงจะนำไปใช้ต่อได้ \\
+เลือกคอลัมน์ & ยืดหยุ่นสูงด้วย \code{-o} และเรียงด้วย \code{--sort} & ได้เฉพาะชุดที่โปรแกรมเตรียมไว้ \\
+สถานการณ์ที่เหมาะ & ต้องการ \emph{ค้นหา} process หรือเก็บข้อมูลเข้าสคริปต์ & ต้องการ \emph{เฝ้าดู} ว่าตอนนี้ใครกิน CPU หรือ RAM มากที่สุด \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{ผลการทดลอง}
+
+\code{ps} เปล่า ๆ เห็นเฉพาะ process ของผู้ใช้เดียวกันที่ผูกกับ terminal เดียวกัน
+การจะเห็นทั้งระบบต้องใส่ option ซึ่งมีสองไวยากรณ์ คือแบบ BSD (\code{aux})
+ที่ให้ \code{\%CPU}, \code{\%MEM}, \code{STAT} และแบบ UNIX (\code{-ef})
+ที่ให้คอลัมน์ \code{PPID} สำหรับไล่ความสัมพันธ์พ่อลูก
+
+\begin{lstlisting}[style=terminal,caption={\code{ps} เปล่า ๆ เทียบกับ \code{ps aux} และ \code{ps -ef} (ตัดมาบางบรรทัด)}]
+$ ps
+    PID TTY          TIME CMD
+   5688 pts/4    00:00:00 bash
+   5689 pts/4    00:00:00 bash
+   5691 pts/4    00:00:00 sed
+   5744 pts/4    00:00:00 ps
+
+$ ps aux | head -8
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root           1  0.0  0.0  21792 12084 ?        Ss   12:03   0:01 /sbin/init
+root           2  0.0  0.0   3072  1760 ?        Sl   12:03   0:00 /init
+root           7  0.0  0.0   3132  2112 ?        Sl   12:03   0:07 plan9 --control-socket 7 --log-level 4 --server-fd 8
+
+$ ps -ef | head -8
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 12:03 ?        00:00:01 /sbin/init
+root           2       1  0 12:03 ?        00:00:00 /init
+root           7       2  0 12:03 ?        00:00:07 plan9 --control-socket 7 --log-level 4 --server-fd 8 --pipe-fd 10 --
+\end{lstlisting}
+
+จุดแข็งที่สุดของ \code{ps} คือ \code{-o} ที่เลือกคอลัมน์เองได้และ \code{--sort}
+ที่เรียงลำดับได้ ในการทดลองนี้สั่ง \code{q1\_burn} ให้กิน CPU ค้างไว้เป็นเป้าก่อน
+แล้วจึงเรียงตาม \code{\%CPU} และเนื่องจาก \code{ps} จบทันที จึงวัดเวลาได้ต่ำกว่า
+0.01 วินาที
+
+\begin{lstlisting}[style=terminal,caption={\code{ps -eo ... --sort} และการวัดว่า \code{ps} จบทันที}]
+$ taskset -c 0 ./q1_burn 30 MONITOR_ME &      # a CPU-hungry process to watch
+$ ps -eo pid,ppid,ni,pri,stat,%cpu,%mem,etime,comm --sort=-%cpu | head -6
+    PID    PPID  NI PRI STAT %CPU %MEM     ELAPSED COMMAND
+   5749    5689   0  19 R+    109  0.0       00:02 q1_burn
+      7       2   0  19 Sl    0.0  0.0    02:51:41 init
+    102       1   0  19 Ss    0.0  0.0    02:51:41 systemd-udevd
+
+$ /usr/bin/time -f "real %e s" ps aux > /dev/null
+real 0.00 s
+$ ps -e --no-headers | wc -l
+39
+\end{lstlisting}
+
+\code{top} ต้องใช้ \code{-b} คู่กับ \code{-n} จึงจะเก็บผลลงรายงานได้
+ห้าบรรทัดแรกคือส่วนสรุปภาพรวมของระบบซึ่ง \code{ps} ไม่มีให้เลย
+
+\begin{lstlisting}[style=terminal,caption={\code{top -b -n 1} (ตัดมา 3 แถวแรก)}]
+$ top -b -n 1 | head -13
+top - 14:55:11 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.5 us,  0.0 sy,  0.0 ni, 95.5 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :  15716.6 total,  13911.9 free,   1368.4 used,    694.1 buff/cache
+MiB Swap:   4096.0 total,   4096.0 free,      0.0 used.  14348.3 avail Mem
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:02.43 q1_burn
+      1 root      20   0   21792  12084   9092 S   0.0   0.1   0:01.89 systemd
+      2 root      20   0    3072   1760   1760 S   0.0   0.0   0:00.10 init-systemd(Ub
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{top -b -n 2 -d 1} สองภาพห่างกัน 1 วินาที}]
+$ top -b -n 2 -d 1 | grep -E "^top -|^Tasks|^%Cpu|q1_burn"
+top - 14:55:11 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.4 us,  0.0 sy,  0.0 ni, 95.6 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:02.66 q1_burn
+top - 14:55:12 up  2:51,  2 users,  load average: 0.10, 0.24, 0.30
+Tasks:  39 total,   2 running,  37 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  4.5 us,  0.0 sy,  0.0 ni, 95.4 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+   5749 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:03.76 q1_burn
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ต่างกันที่มิติเวลาเป็นหลัก}: \code{ps} ตอบว่า ``ณ วินาทีนี้มีอะไรอยู่ในระบบ''
+        ส่วน \code{top} ตอบว่า ``ตอนนี้ระบบกำลังทำอะไรอยู่'' ยืนยันได้จากการที่
+        \code{ps aux} ใช้เวลา \code{0.00} วินาทีแล้วจบ ในขณะที่ \code{top}
+        ต้องถูกบังคับด้วย \code{-n 1} ถึงจะยอมจบ
+
+  \item \textbf{ค่า \code{\%CPU} ของสองคำสั่งไม่ใช่ค่าเดียวกัน}: เป็นจุดที่สับสนบ่อยที่สุด
+        ของ \code{ps} คือเวลา CPU ที่ใช้ทั้งหมดหารด้วยอายุ process จึงเป็นค่าเฉลี่ย
+        ย้อนหลัง ส่วนของ \code{top} คิดจากส่วนต่างระหว่างสองรอบรีเฟรชล่าสุด
+        ผลคือ process ที่เคยกิน CPU หนักเมื่อชั่วโมงก่อนแต่ตอนนี้หลับอยู่
+        จะยังมี \code{\%CPU} สูงใน \code{ps} แต่เป็น \code{0.0} ใน \code{top}
+        ในการทดลองนี้ \code{ps} รายงาน \code{109} ให้ \code{q1\_burn} ที่เพิ่งเกิดได้
+        2 วินาที (คอลัมน์ \code{ELAPSED} ปัดเป็นวินาทีเต็ม จึงหารแล้วเกิน 100 เล็กน้อย)
+        ขณะที่ \code{top} รายงาน \code{100.0} ตรงตามจริง
+
+  \item \textbf{\code{top} ให้ภาพรวมของระบบ ส่วน \code{ps} ให้ภาพของ process}:
+        load average, จำนวน zombie, \code{\%Cpu(s)} แยก us/sy/ni/id/wa และหน่วยความจำรวม
+        มีเฉพาะใน \code{top} ถ้าจะเอาจาก \code{ps} ต้องไปอ่าน \code{/proc/loadavg}
+        และ \code{/proc/meminfo} เอง นอกจากนี้ผลการทดลองยังยืนยันว่า \code{top}
+        คำนวณใหม่ทุกรอบจริง คือ \code{TIME+} ของ \code{q1\_burn} เพิ่มจาก
+        \code{0:02.66} เป็น \code{0:03.76} คือ \code{1.10} วินาทีในเวลาจริง 1 วินาที
+        ตรงกับที่รายงาน \code{\%CPU} เป็น \code{100.0} พอดี
+
+  \item \textbf{แต่ละคำสั่งทำสิ่งที่อีกคำสั่งทำไม่ได้}: \code{ps} ชนะขาดเรื่องการนำผล
+        ไปใช้ต่อ เพราะต่อ pipe ได้ทันทีและเลือกคอลัมน์เองได้ (ใช้ตลอดทั้งรายงานนี้)
+        ส่วน \code{top} ``สั่งการ'' ได้ในตัว กด \code{k} ส่ง signal หรือ \code{r}
+        เพื่อ renice ได้โดยไม่ต้องออกจากโปรแกรม จึงครบวงจรกว่าเมื่อต้องแก้ปัญหาเฉพาะหน้า
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{จุดประสงค์ของคำสั่ง \code{nice} และวิธี nice process}
+% ---------------------------------------------------------------------
+
+\code{nice} ใช้ \textbf{บอกใบ้ให้ scheduler ทราบว่า process ตัวนี้สำคัญมากหรือน้อย}
+เมื่อเทียบกับ process อื่นที่แย่ง CPU กันอยู่ ผ่านตัวเลข \emph{nice value}
+ช่วง $-20$ ถึง $+19$ ค่าตั้งต้นคือ \code{0} ค่ายิ่งมากยิ่ง ``ใจดี'' คือยอมสละ CPU
+ให้คนอื่นก่อน ตัวเองจึงได้ priority ต่ำ ส่วนค่าติดลบคือแย่ง CPU มาใช้ก่อน
+จุดที่ต้องเน้นคือ \code{nice} \textbf{ไม่ใช่การจองหรือจำกัดโควตา CPU}
+ถ้าไม่มีใครแย่ง process ที่ \code{nice} เป็น 19 ก็ยังใช้ CPU ได้เต็ม 100\%
+การใช้งานจริงคือสั่งงานหนักที่ไม่รีบ เช่น backup หรือ compile โปรเจกต์ใหญ่
+ให้ทำงานด้วยค่า \code{nice} สูง ๆ เพื่อไม่ให้ไปแย่ง CPU จนหน้าจอผู้ใช้กระตุก
+
+\textbf{วิธี nice process} มีสองกรณีตามจังหวะเวลา คือ (1) กำหนดตั้งแต่เริ่มโปรแกรม
+ด้วย \code{nice -n <value> <command>} และ (2) เปลี่ยนของ process ที่รันอยู่แล้วด้วย
+\code{renice -n <value> -p <PID>} ซึ่งยังระบุเป็นรายผู้ใช้ (\code{-u}) หรือรายกลุ่ม
+(\code{-g}) ได้ด้วย นอกจากนี้ยังเปลี่ยนได้จากหน้าจอ \code{top} โดยกด \code{r}
+ซึ่งเบื้องหลังก็คือ system call \code{setpriority()} เหมือนกัน
+ส่วน \textbf{ข้อจำกัดด้านสิทธิ์} คือผู้ใช้ทั่วไป \emph{เพิ่ม} ค่า \code{nice}
+ได้เสมอ แต่ \emph{ลด} ไม่ได้เลย แม้จะเป็นการลดกลับมาที่ค่าเดิมของ process ตัวเอง
+การลดค่าต้องเป็น \code{root} หรือมีสิทธิ์ \code{CAP\_SYS\_NICE}
+
+\subsubsection{วิธีวัดผล}
+
+เขียนโปรแกรม \code{q1\_burn.c} ที่วนคำนวณกิน CPU ตามเวลาที่กำหนด แล้วรายงานว่า
+ทำงานได้กี่ ``รอบ'' (คอมไพล์ด้วย \code{-O0} เพื่อไม่ให้คอมไพเลอร์ตัดลูปทิ้ง)
+เมื่อรันสองตัวพร้อมกันบน CPU แกนเดียว อัตราส่วนของจำนวนรอบก็คืออัตราส่วนของ CPU
+ที่ scheduler แบ่งให้โดยตรง และมี \emph{กรณีควบคุม} ที่ตั้งค่า \code{nice}
+เท่ากันไว้เทียบด้วย เพื่อให้มั่นใจว่าความต่างที่เห็นมาจากค่า \code{nice} จริง ๆ
+
+\begin{lstlisting}[style=terminal,caption={ค่า nice ตั้งต้น และการที่ \code{nice} เป็นการเพิ่มค่าสะสม ไม่ใช่กำหนดค่าตายตัว}]
+$ nice                                  ->  0
+$ nice -n 10 nice                       ->  10
+$ nice -n 19 nice                       ->  19
+$ nice -n 5 nice -n 5 nice   (increments add up)  ->  10
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={กรณีควบคุม (nice 0 กับ 0) เทียบกับกรณีทดลอง (nice 0 กับ 19) ผูกไว้ที่ CPU 0 ทั้งคู่}]
+$ taskset -c 0 ./q1_burn 15 A_nice0 &
+$ taskset -c 0 ./q1_burn 15 B_nice0 &
+$ ps -o pid,ni,pri,psr,stat,%cpu,time,args -p <pid1>,<pid2>      # while both are running
+    PID  NI PRI PSR STAT %CPU     TIME COMMAND
+   5765   0  19   0 R+   55.3 00:00:02 /tmp/ps03_q1/q1_burn 15 A_nice0
+   5766   0  19   0 R+   55.5 00:00:02 /tmp/ps03_q1/q1_burn 15 B_nice0
+[A_nice0] pid=5765 nice=0 rounds=19068 wall=15.00s
+[B_nice0] pid=5766 nice=0 rounds=19119 wall=15.00s
+
+$ taskset -c 0            ./q1_burn 15 HIGH_nice0 &
+$ taskset -c 0 nice -n 19 ./q1_burn 15 LOW_nice19 &
+$ ps -o pid,ni,pri,psr,stat,%cpu,time,args -p <pid1>,<pid2>      # while both are running
+    PID  NI PRI PSR STAT %CPU     TIME COMMAND
+   5771   0  19   0 R+    106 00:00:04 /tmp/ps03_q1/q1_burn 15 HIGH_nice0
+   5772  19   0   0 RN+   1.7 00:00:00 /tmp/ps03_q1/q1_burn 15 LOW_nice19
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+   5771 poomipat  20   0    2548   1056   1056 R 100.0   0.0   0:04.48 q1_burn
+   5772 poomipat  39  19    2548   1056   1056 R   0.0   0.0   0:00.07 q1_burn
+[HIGH_nice0] pid=5771 nice=0 rounds=29924 wall=15.00s
+[LOW_nice19] pid=5772 nice=19 rounds=465 wall=15.00s
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{renice} เปลี่ยนค่าของ process ที่กำลังรันอยู่}]
+$ ps -o pid,ni,pri,stat,comm -p <pid>        # before renice
+    PID  NI PRI STAT COMMAND
+   5777   0  19 R+   q1_burn
+$ renice -n 15 -p 5777
+5777 (process ID) old priority 0, new priority 15
+$ ps -o pid,ni,pri,stat,comm -p <pid>        # after renice
+    PID  NI PRI STAT COMMAND
+   5777  15   4 RN+  q1_burn
+[renice_target] pid=5777 nice=15 rounds=30658 wall=12.00s
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผู้ใช้ทั่วไปเพิ่มค่า nice ได้ แต่ลดไม่ได้}]
+$ nice -n -5 nice
+nice: cannot set niceness: Permission denied
+0
+
+$ renice -n -5 -p 5785
+renice: failed to set priority for 5785 (process ID): Permission denied
+exit status = 1
+
+$ renice -n +8 -p 5785        # raising the nice value is always allowed
+5785 (process ID) old priority 0, new priority 8
+    PID  NI PRI STAT COMMAND
+   5785   8  11 SN+  sleep
+
+$ renice -n 0 -p 5785         # lowering it back is refused, even for our own process
+renice: failed to set priority for 5785 (process ID): Permission denied
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering\small
+\caption{ผลของค่า nice ต่อการแบ่ง CPU (ทุกกรณีถูกผูกไว้ที่ CPU 0)}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{การทดลอง} & \textbf{nice} & \textbf{รอบที่ทำได้} & \textbf{รอบ/วินาที} & \textbf{สัดส่วน} \\
+\midrule
+ควบคุม: A\_nice0   & 0  & 19{,}068 & 1{,}271 & 1.00 \\
+ควบคุม: B\_nice0   & 0  & 19{,}119 & 1{,}275 & 1.00 \\
+\addlinespace
+ทดลอง: HIGH\_nice0 & 0  & 29{,}924 & 1{,}995 & 64.4 \\
+ทดลอง: LOW\_nice19 & 19 & \phantom{00}465 & \phantom{0,00}31 & 1.00 \\
+\addlinespace
+รันตัวเดียว: renice\_target & 15 & 30{,}658 & 2{,}555 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{nice เท่ากัน scheduler แบ่ง CPU ให้เท่ากันจริง และ nice ต่างกันสร้างความต่างมหาศาล}:
+        กรณีควบคุมได้ 19{,}068 กับ 19{,}119 รอบ ต่างกันเพียง 0.27\%
+        สอดคล้องกับที่ \code{ps} รายงาน \code{\%CPU} ที่ \code{55.3} กับ \code{55.5}
+        พอเปลี่ยนค่า \code{nice} ของตัวหนึ่งเป็น 19 ผลคือ 29{,}924 รอบ เทียบกับ 465 รอบ
+        หรือ \textbf{ประมาณ 64 เท่า} ค่า \code{\%CPU} จาก \code{ps} (\code{106}
+        เทียบกับ \code{1.7}) และ \code{TIME+} จาก \code{top} (\code{0:04.48}
+        เทียบกับ \code{0:00.07}) ก็ชี้ไปทางเดียวกัน
+
+  \item \textbf{nice มีความหมายเฉพาะตอนที่มีการแย่ง CPU}: เป็นข้อสรุปที่ตัวเลขในตาราง
+        แสดงชัดที่สุด \code{renice\_target} ถูกตั้งเป็น \code{nice} 15 ซึ่งถือว่าใจดีมาก
+        แต่เพราะรันอยู่ตัวเดียว จึงทำได้ถึง 2{,}555 รอบต่อวินาที ซึ่ง
+        \emph{สูงที่สุดในทุกการทดลอง} สูงกว่า \code{HIGH\_nice0} ที่ \code{nice}
+        เป็น 0 เสียอีก และเมื่อรวมผลงานของสอง process ในกรณีควบคุมเข้าด้วยกันจะได้
+        $1{,}271 + 1{,}275 = 2{,}546$ รอบต่อวินาที ซึ่งเท่ากับกรณีที่มี process
+        เดียวครองแกนนั้นทั้งแกน (ต่างกัน 0.4\%) แปลว่า CPU หนึ่งแกนถูกใช้จนเต็ม
+        ในทุกกรณี เพียงแต่ถูกแบ่งกันคนละแบบ \code{nice} จึงกำหนดเพียง
+        \emph{ลำดับ} ในการแย่ง ไม่ใช่โควตา
+
+  \item \textbf{ความสัมพันธ์ของคอลัมน์ \code{NI}, \code{PRI} และ \code{PR}}:
+        จากผลการทดลอง \code{PRI} ของ \code{ps} เท่ากับ $19 - \code{NI}$
+        (nice 0 ได้ 19, nice 15 ได้ 4, nice 19 ได้ 0) ส่วน \code{PR} ของ \code{top}
+        เท่ากับ $20 + \code{NI}$ (nice 0 ได้ 20, nice 19 ได้ 39) คือแสดงข้อมูล
+        ชุดเดียวกันแต่ ``กลับด้าน'' กัน ของ \code{ps} ยิ่งมากยิ่งสำคัญ ส่วนของ
+        \code{top} เป็นเลข priority ดิบของเคอร์เนลซึ่งยิ่งน้อยยิ่งสำคัญ
+        นอกจากนี้ \code{STAT} ของ process ที่ \code{nice} มากกว่า 0 จะมีตัว \code{N}
+        เพิ่มมา (\code{RN+}, \code{SN+}) ใช้ตรวจอย่างรวดเร็วได้ว่ามีใครถูก renice ไว้บ้าง
+
+  \item \textbf{สิทธิ์เป็นแบบทางเดียว}: ผู้ใช้ทั่วไป ``สละสิทธิ์'' ได้เสมอ
+        (\code{renice +8} สำเร็จ) แต่ ``ทวงคืน'' ไม่ได้เลย (\code{renice 0} ล้มเหลว
+        ทั้งที่เป็น process ของตัวเองแท้ ๆ) เป็นการป้องกันไม่ให้ผู้ใช้คนใดตั้งค่าติดลบ
+        เพื่อยึด CPU ทั้งเครื่อง อีกจุดที่น่าสนใจคือ \code{nice -n -5} แม้ตั้งค่าไม่สำเร็จ
+        แต่ยัง \emph{รันโปรแกรมต่อ} ด้วยค่าเดิม ไม่ได้ยกเลิกการทำงานทิ้ง
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{การ kill process และ job}
+% ---------------------------------------------------------------------
+
+ชื่อคำสั่ง \code{kill} ทำให้เข้าใจผิดได้ง่าย เพราะหน้าที่จริงคือ
+\textbf{ส่งสัญญาณ (signal) ไปให้ process} ไม่ใช่การฆ่าเสมอไป
+สัญญาณบางตัวสั่งให้หยุดชั่วคราว บางตัวสั่งให้ทำงานต่อ ที่คนเข้าใจว่า \code{kill}
+คือการฆ่าเป็นเพราะสัญญาณ \emph{ตั้งต้น} คือ \code{SIGTERM} ซึ่งมีพฤติกรรม
+โดยปริยายคือให้ process จบการทำงาน
+
+\begin{table}[H]
+\centering\small
+\caption{สัญญาณที่ใช้บ่อย และวิธีระบุเป้าหมาย}
+\begin{tabular}{p{3.9cm}p{4.1cm}@{\hspace{6mm}}p{2.9cm}p{3.4cm}}
+\toprule
+\textbf{สัญญาณ} & \textbf{พฤติกรรมโดยปริยาย} & \textbf{รูปแบบคำสั่ง} & \textbf{เป้าหมาย} \\
+\midrule
+1 SIGHUP  & จบ ใช้เมื่อ terminal ถูกปิด แต่ daemon มักตีความว่าโหลด config ใหม่ & \code{kill 1234} & SIGTERM ให้ PID 1234 \\
+2 SIGINT  & จบ คือสัญญาณจากการกด \code{CTRL+C} & \code{kill -9 1234} & SIGKILL (ระบุด้วยเลขหรือชื่อก็ได้) \\
+3 SIGQUIT & จบพร้อมสร้าง core dump & \code{kill \%1} & \textbf{job} หมายเลข 1 ของ shell นี้ \\
+9 SIGKILL & จบทันที \textbf{ดักจับไม่ได้} & \code{kill -- -1234} & ทุก process ใน process group \\
+15 SIGTERM & ขอให้จบ (ค่าตั้งต้นของ \code{kill}) & \code{pkill -f "pattern"} & ทุกตัวที่ \emph{command line เต็ม} ตรงกับรูปแบบ \\
+18 SIGCONT & สั่งให้ทำงานต่อ & \code{killall progname} & ทุกตัวที่ \emph{ชื่อโปรแกรม} ตรงกันแบบตรงตัว \\
+19 SIGSTOP & หยุดชั่วคราว \textbf{ดักจับไม่ได้} & \code{kill -0 1234} & ไม่ส่งจริง แค่ตรวจว่ายังมีอยู่ไหม \\
+20 SIGTSTP & หยุดชั่วคราว จากการกด \code{CTRL+Z} & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{ผลการทดลอง}
+
+เพื่อพิสูจน์ว่า \code{SIGTERM} ดักจับได้แต่ \code{SIGKILL} ดักจับไม่ได้
+ได้เขียนโปรแกรม \code{q1\_sigdemo.c} ที่ลงทะเบียน handler ไว้กับ \code{SIGTERM}
+และ \code{SIGINT} ด้วย \code{signal()} แล้ววนเรียก \code{pause()} รอสัญญาณ
+เมื่อสัญญาณมาถึง handler จะพิมพ์ข้อความด้วย \code{write()} (ซึ่งเป็น
+async-signal-safe ต่างจาก \code{printf()}) แล้ว \code{pause()} ก็วนรอต่อ
+process จึงไม่มีวันจบด้วยสองสัญญาณนี้
+
+\begin{lstlisting}[style=terminal,caption={\code{kill -l} (ตัดมา 4 แถวแรก) และ \code{kill} ด้วยสัญญาณตั้งต้น}]
+$ kill -l
+ 1) SIGHUP	 2) SIGINT	 3) SIGQUIT	 4) SIGILL	 5) SIGTRAP
+ 6) SIGABRT	 7) SIGBUS	 8) SIGFPE	 9) SIGKILL	10) SIGUSR1
+11) SIGSEGV	12) SIGUSR2	13) SIGPIPE	14) SIGALRM	15) SIGTERM
+   ...
+
+$ sleep 300 &        -> pid 5790
+    PID    PPID STAT COMMAND
+   5790    5689 S+   sleep
+$ kill 5790
+$ ps -o pid,stat,comm -p 5790        # no data row = the process is gone
+    PID STAT COMMAND
+exit status of ps = 1
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={process ที่ดักจับ SIGTERM ไว้ ต้องใช้ \code{kill -9} เท่านั้น}]
+[sigdemo] pid = 5794, catching SIGTERM(15) and SIGINT(2)
+$ kill 5794            # SIGTERM -> the handler runs, the process survives
+[sigdemo] caught SIGTERM (15) -- handler ran, still alive
+$ kill -INT 5794       # SIGINT  -> the handler runs, the process survives
+[sigdemo] caught SIGINT  (2)  -- handler ran, still alive
+$ ps -o pid,stat,comm -p 5794
+    PID STAT COMMAND
+   5794 S+   q1_sigdemo
+$ kill -9 5794         # SIGKILL can be neither caught nor ignored
+bash:  5794 Killed                  /tmp/ps03_q1/q1_sigdemo
+$ ps -o pid,stat,comm -p 5794
+    PID STAT COMMAND
+exit status of ps = 1
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{kill -STOP} / \code{-CONT} พักและปลุกแทนการฆ่า}]
+$ ps -o pid,stat,comm -p 5803        # S = sleeping
+    PID STAT COMMAND
+   5803 S+   sleep
+$ kill -STOP 5803
+$ ps -o pid,stat,comm -p 5803        # T = stopped
+    PID STAT COMMAND
+   5803 T+   sleep
+$ kill -CONT 5803
+$ ps -o pid,stat,comm -p 5803        # back to S again
+    PID STAT COMMAND
+   5803 S+   sleep
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={การฆ่า job ด้วย job spec \code{\%n}}]
+$ jobs -l
+[1]   5813 Running                 sleep 400 &
+[2]-  5814 Running                 sleep 500 &
+[3]+  5815 Running                 sleep 600 &
+$ kill %2            # send SIGTERM to job number 2
+[2]-  Terminated              sleep 500
+$ jobs -l
+[1]-  5813 Running                 sleep 400 &
+[3]+  5815 Running                 sleep 600 &
+$ kill -9 %1 %3      # kill the two remaining jobs
+bash:  5813 Killed                  sleep 400
+bash:  5815 Killed                  sleep 600
+$ jobs -l            # no output = no job left
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{pgrep} / \code{pkill} / \code{killall} อ้างด้วยชื่อ และ \code{kill -0} ตรวจว่ายังอยู่ไหม}]
+$ pgrep -a sleep
+5822 sleep 700
+5823 sleep 700
+5824 sleep 700
+$ pkill -f 'sleep 700'      # kill every process whose full command line matches
+[1]   Terminated              sleep 700
+[2]-  Terminated              sleep 700
+[3]+  Terminated              sleep 700
+$ pgrep -a sleep
+exit status of pgrep = 1   (1 = nothing matched)
+
+$ pgrep -a q1_sigdemo
+5830 /tmp/ps03_q1/q1_sigdemo
+5831 /tmp/ps03_q1/q1_sigdemo
+$ killall -9 q1_sigdemo      # kill by exact program name
+$ pgrep -a q1_sigdemo
+exit status of pgrep = 1
+
+$ kill -0 5837   -> pid 5837 is alive (exit status 0)
+$ kill -0 5837   -> bash: kill: (5837) - No such process (exit status 1)
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\code{SIGTERM} คือการ ``ขอ'' ส่วน \code{SIGKILL} คือการ ``บังคับ''}:
+        \code{q1\_sigdemo} เลือกที่จะพิมพ์ข้อความแล้วอยู่ต่อ ทำให้ \code{kill}
+        และ \code{kill -INT} ไม่มีผลใด ๆ ต่อการมีอยู่ของ process จนต้องใช้
+        \code{kill -9} ซึ่งเคอร์เนลจัดการให้เอง โปรแกรมไม่มีโอกาสแม้แต่จะรู้ตัว
+        ในทางปฏิบัติจึงควรใช้ \code{kill} ก่อนเสมอ เพราะ \code{SIGTERM}
+        เปิดโอกาสให้โปรแกรมเก็บกวาดก่อนจบ เช่นเขียน buffer ลงไฟล์ ปิด socket
+        หรือปลด lock ส่วน \code{kill -9} ตัดจบทันทีทำให้ไฟล์ชั่วคราวค้างและ
+        process ลูกอาจกลายเป็น orphan จึงควรใช้เป็นทางเลือกสุดท้ายหลังรอสัก 5--10 วินาที
+
+  \item \textbf{\code{SIGSTOP} ไม่ใช่การฆ่าและไม่ใช่การหยุดถาวร}: process เปลี่ยนสถานะ
+        จาก \code{S} เป็น \code{T} แล้วกลับมาเป็น \code{S} ได้ด้วย \code{SIGCONT}
+        ระหว่างที่เป็น \code{T} process ยังอยู่ในระบบและยังจองหน่วยความจำเหมือนเดิม
+        เพียงแต่ scheduler จะไม่จัด CPU ให้ ประโยชน์จริงคือใช้แช่แข็งงานหนักไว้ชั่วคราว
+        แล้วค่อยปลุกกลับมาโดยไม่ต้องเริ่มงานใหม่ (สัญญาณคู่นี้คือกลไกเบื้องหลัง
+        \code{CTRL+Z}, \code{fg} และ \code{bg} ที่ทดลองต่อในข้อ 2)
+
+  \item \textbf{\code{\%n} เป็นของ shell ไม่ใช่ของเคอร์เนล}: เคอร์เนลรู้จักแต่ PID
+        เลข job \code{[1] [2] [3]} เป็นสิ่งที่ shell จดไว้เองสำหรับ process ที่ตัวเองสร้าง
+        เวลาสั่ง \code{kill \%2} shell จะแปลงเป็น PID แล้วค่อยส่งสัญญาณ ผลที่ตามมาคือ
+        job spec ใช้ได้เฉพาะใน shell ที่เป็นเจ้าของ job นั้น ถ้าเปิด terminal ใหม่
+        ต้องกลับไปใช้ PID แทน ข้อดีคือสะดวกและอ้างได้หลายตัวพร้อมกันดังที่ทดลองด้วย
+        \code{kill -9 \%1 \%3}
+
+  \item \textbf{\code{pkill -f} สะดวกแต่ต้องระวังมาก}: option \code{-f} จับคู่กับ
+        \emph{command line เต็ม} ซึ่งกว้างกว่าที่คิด ระหว่างเก็บผลการทดลองนี้เกิดปัญหาจริง
+        คือสคริปต์ที่สั่ง \code{pkill -f 'sleep 700'} ได้ฆ่า \emph{ตัวเอง} ไปด้วย
+        เพราะ command line ของสคริปต์มีข้อความนั้นประกอบอยู่ ทำให้ผลการทดลองขาดไปครึ่งหนึ่ง
+        แนวปฏิบัติที่ปลอดภัยคือสั่ง \code{pgrep} ด้วยเงื่อนไขเดียวกันดูก่อนเสมอ
+        แล้วจึงเปลี่ยนเป็น \code{pkill} ส่วน \code{killall} จับคู่กับชื่อโปรแกรมแบบตรงตัว
+        จึงปลอดภัยกว่าแต่ยืดหยุ่นน้อยกว่า และต้องระวังว่าบน UNIX บางตระกูล
+        (เช่น Solaris) คำสั่งชื่อเดียวกันนี้หมายถึงการฆ่าทุก process ในระบบ
+
+  \item \textbf{เรื่องสิทธิ์และข้อยกเว้น}: ผู้ใช้ทั่วไปส่งสัญญาณได้เฉพาะ process ของตัวเอง
+        และแม้แต่ \code{root} ก็ฆ่า process ที่ติดอยู่ในสถานะ \code{D}
+        (uninterruptible sleep เช่นค้างรอ I/O) ด้วย \code{kill -9} ไม่ได้
+        เพราะสัญญาณจะถูกพักไว้จนกว่า process จะออกจากสถานะนั้น
+        ส่วน \code{kill -0} เป็นสำนวนมาตรฐานในสคริปต์ที่ใช้ถามว่า PID ยังอยู่ไหม
+        โดยไม่ก่อผลข้างเคียง มักใช้คู่กับการรอหลังส่ง \code{SIGTERM}
+        ก่อนตัดสินใจว่าต้องใช้ \code{SIGKILL} หรือไม่
+\end{itemize}
+
+% =====================================================================
+\section{ข้อ 2: การรัน shell script แบบ foreground / background และ job control}
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\subsection{สถานการณ์ที่ 1: \code{./ss1\_1.sh} เทียบกับ \code{./ss1\_1.sh \&}}
+% ---------------------------------------------------------------------
+
+ตามคำแนะนำท้ายโจทย์ ได้เขียน \code{ss1\_1.sh} เป็น for loop ที่เรียก \code{sleep 1}
+รอบละหนึ่งวินาทีรวมสิบรอบ แทนการเรียก \code{sleep 10} ครั้งเดียว เพื่อให้เห็น
+ความคืบหน้าระหว่างที่สคริปต์กำลังทำงาน
+
+\begin{lstlisting}[style=bashstyle,caption={ss1\_1.sh},label={lst:ss1_1}]
+#!/bin/bash
+# CPE 333 PS03 - Q2, first situation
+# Calls "sleep" for a total of 10 seconds, one second per iteration,
+# so the progress can be watched while the script is running.
+
+echo "[ss1_1] start  pid=$$  at $(date +%T)"
+
+for i in $(seq 1 10); do
+    sleep 1
+    echo "[ss1_1] tick $i/10"
+done
+
+echo "[ss1_1] done   pid=$$  at $(date +%T)"
+\end{lstlisting}
+
+ไฟล์ที่เพิ่งสร้างใหม่ได้สิทธิ์ \code{rw-r--r--} (\code{644}) ตามค่า \code{umask}
+มาตรฐาน คือไม่มีบิต \code{x} เคอร์เนลจึงปฏิเสธที่จะ \code{exec} ไฟล์นั้น
+ต้องเพิ่มบิต \code{x} ด้วย \code{chmod} ก่อน (อีกวิธีที่ใช้ได้โดยไม่ต้อง \code{chmod}
+คือสั่ง \code{bash ss1\_1.sh} เพราะเป็นการให้ \code{bash} \emph{อ่านไฟล์เป็นข้อมูล}
+ไม่ใช่ให้เคอร์เนล \code{exec} ตัวไฟล์ จึงต้องการเพียงสิทธิ์อ่าน)
+
+\begin{lstlisting}[style=terminal,caption={Permission denied และการแก้ด้วย chmod}]
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rw-r--r-- 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+student@ubuntu:~/PS03$ ./ss1_1.sh
+bash: ./ss1_1.sh: Permission denied
+student@ubuntu:~/PS03$ chmod +x ss1_1.sh
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rwxr-xr-x 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={รันแบบ foreground -- terminal ถูกยึดไว้จนกว่าจะจบ พร้อมภาพจาก \code{ps} ที่สั่งถ่ายไว้ล่วงหน้า}]
+student@ubuntu:~/PS03$ date +%T ; time ./ss1_1.sh ; date +%T
+15:23:40
+[ss1_1] start  pid=6860  at 15:23:40
+[ss1_1] tick 1/10
+[ss1_1] tick 2/10
+[ss1_1] tick 3/10 ... tick 9/10          (7 lines omitted)
+[ss1_1] tick 10/10
+[ss1_1] done   pid=6860  at 15:23:50
+
+real	0m10.030s
+user	0m0.019s
+sys	0m0.019s
+15:23:50
+
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg1.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6860 Ss   bash --norc -i
+   6856    6844    6856    6860 S    bash --norc -i
+   6860    6844    6860    6860 S+   /bin/bash ./ss1_1.sh
+   6866    6860    6860    6860 S+   sleep 1
+   6867    6856    6856    6860 R    ps -o pid,ppid,pgid,tpgid,stat,args
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={รันแบบ background -- prompt กลับมาทันที}]
+student@ubuntu:~/PS03$ date +%T ; ./ss1_1.sh & date +%T
+15:23:54
+[1] 6880
+15:23:54
+student@ubuntu:~/PS03$ [ss1_1] start  pid=6880  at 15:23:54
+jobs -l
+[1]+  6880 Running                 ./ss1_1.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6887 Ss   bash --norc -i
+   6880    6844    6880    6887 S    /bin/bash ./ss1_1.sh
+   6884    6880    6880    6887 S    sleep 1
+   6887    6844    6887    6887 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+[ss1_1] tick 1/10
+student@ubuntu:~/PS03$ wait
+[ss1_1] tick 2/10 ... tick 10/10         (9 lines omitted)
+[ss1_1] done   pid=6880  at 15:24:04
+[1]+  Done                    ./ss1_1.sh
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปความแตกต่างของการรันแบบ foreground และ background}
+\begin{tabular}{p{2.8cm}p{5.5cm}p{5.5cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{./ss1\_1.sh}} & \textbf{\code{./ss1\_1.sh \&}} \\
+\midrule
+prompt กลับเมื่อใด & หลังสคริปต์จบ วัดได้ \code{real 0m10.030s} & ทันที \code{date} ก่อนและหลังได้ \code{15:23:54} เท่ากัน \\
+เจ้าของ terminal & สคริปต์ \code{TPGID} เท่ากับ \code{PGID} ของตัวเอง และ \code{STAT} มี \code{+} & shell ยังเป็นเจ้าของ \code{STAT} ของสคริปต์ไม่มี \code{+} \\
+สถานะเป็น job & ไม่ถูกจดเป็น job & ถูกจดเป็น \code{[1] 6880} และแจ้ง \code{[1]+ Done} เมื่อจบ \\
+พิมพ์คำสั่งอื่น & ไม่ได้ ทุกตัวอักษรจะเข้าคิวรอ & ได้ทันที ทดสอบด้วย \code{jobs} และ \code{ps} ระหว่างที่ job ยังรันอยู่ \\
+สัญญาณจากคีย์บอร์ด & \code{CTRL+C} / \code{CTRL+Z} ส่งถึงสคริปต์ & ส่งไม่ถึง เพราะไม่ได้อยู่ใน foreground process group \\
+stdout & terminal เดียวกัน & terminal เดียวกัน จึงปนกับ prompt \\
+การรอให้จบ & shell รออยู่แล้วอัตโนมัติ & ต้องสั่ง \code{wait} เอง หรือดูจาก \code{jobs} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ความต่างที่แท้จริงคือ ``ใครเป็นเจ้าของ terminal'' ไม่ใช่แค่รอหรือไม่รอ}:
+        ผลจาก \code{ps} ชี้ชัดว่าตอนรันแบบ foreground คอลัมน์ \code{TPGID}
+        ของทุก process มีค่าเป็น \code{6860} ซึ่งคือ \code{PGID} ของ
+        \code{ss1\_1.sh} เอง แปลว่าเคอร์เนลยกสิทธิ์ควบคุม terminal ให้ process group
+        ของสคริปต์ไปแล้ว และ \code{STAT} ของสคริปต์กับ \code{sleep} ลูกของมัน
+        มีเครื่องหมาย \code{+} ต่อท้าย (\code{S+}) ซึ่ง \code{ps} ใช้บอกว่า
+        ``อยู่ใน foreground process group'' ในทางกลับกันตอนรันแบบ background
+        \code{TPGID} ไม่ใช่ของสคริปต์และ \code{STAT} เป็น \code{S} เฉย ๆ
+        นอกจากนี้บรรทัด \code{6844 ... 6860 Ss} ยังแสดงว่า shell ไม่ได้หยุดทำงาน
+        แต่ถูกบล็อกอยู่ใน \code{wait()} รอให้ลูกจบ ซึ่งไม่กิน CPU
+
+  \item \textbf{background ไม่ได้แยก output ออกไป}: เป็นจุดที่เข้าใจผิดบ่อย
+        ผลการทดลองแสดงชัดว่าข้อความ \code{[ss1\_1] start pid=6880} โผล่ต่อท้าย prompt
+        และ \code{[ss1\_1] tick 1/10} แทรกกลางผลลัพธ์ของ \code{ps}
+        เพราะ job เบื้องหลังยังเขียน stdout ลง terminal เดิม ถ้าไม่อยากให้ปนกัน
+        ต้อง redirect เอง เช่น \code{./ss1\_1.sh > out.log 2>\&1 \&}
+
+  \item \textbf{\code{\&} ทำให้ shell จดงานนั้นเป็น job}: shell พิมพ์ \code{[1] 6880}
+        คือเลข job กับ PID ทำให้อ้างด้วย \code{\%1} ได้ภายหลัง และเมื่องานจบจะแจ้ง
+        \code{[1]+ Done} ที่ prompt ถัดไป ส่วน exit status ต้องเก็บผ่าน
+        \code{wait \%1} หรือ \code{\$!} เพราะไม่มี \code{\$?} ให้ดูทันทีเหมือน foreground
+        ข้อควรระวังคือ job ที่รันด้วย \code{\&} ยังผูกกับ terminal เดิม
+        เมื่อปิด terminal เคอร์เนลจะส่ง \code{SIGHUP} ทำให้งานตายตามไปด้วย
+        ถ้าต้องการให้อยู่รอดต้องใช้ \code{nohup} หรือ \code{disown}
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สถานการณ์ที่ 2: \code{CTRL+Z}, \code{jobs}, \code{fg} และ \code{bg}}
+% ---------------------------------------------------------------------
+
+\code{ss1\_2.sh} เรียก \code{sleep 1000} เพื่อให้สคริปต์อยู่นานพอที่จะหยุดด้วย
+\code{CTRL+Z} แล้วปลุกกลับมาด้วย \code{fg} หรือ \code{bg}
+
+\begin{lstlisting}[style=bashstyle,caption={ss1\_2.sh},label={lst:ss1_2}]
+#!/bin/bash
+# CPE 333 PS03 - Q2, second situation
+# Calls "sleep" with 1000 seconds, so the script stays alive long enough
+# to be suspended with CTRL+Z and resumed again with fg / bg.
+
+echo "[ss1_2] start  pid=$$  at $(date +%T)"
+
+sleep 1000
+
+echo "[ss1_2] done   pid=$$  at $(date +%T)"
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={CTRL+Z ทำให้ทั้ง process group หยุด (สถานะ T) แล้ว \code{bg} ปลุกกลับมาทำงานเบื้องหลัง}]
+student@ubuntu:~/PS03$ ./ss1_2.sh
+[ss1_2] start  pid=6914  at 15:24:14
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6920 Ss   bash --norc -i
+   6914    6908    6914    6920 T    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6920 T    sleep 1000
+   6920    6908    6920    6920 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+
+student@ubuntu:~/PS03$ bg %1
+[1]+ ./ss1_2.sh &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Running                 ./ss1_2.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6924 Ss   bash --norc -i
+   6914    6908    6914    6924 S    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6924 S    sleep 1000
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{fg} ดึงกลับมาเป็น foreground และคืนสิทธิ์ terminal ให้ job แล้วปิดงานด้วย \code{kill \%1}}]
+student@ubuntu:~/PS03$ fg %1
+./ss1_2.sh
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+[2]   Done                    ( sleep 2; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg2.txt 2>&1 )
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg2.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6914 Ss   bash --norc -i
+   6914    6908    6914    6914 S+   /bin/bash ./ss1_2.sh
+   6916    6914    6914    6914 S+   sleep 1000
+   6927    6908    6927    6914 S    bash --norc -i
+   6930    6927    6927    6914 R    ps -o pid,ppid,pgid,tpgid,stat,args
+
+student@ubuntu:~/PS03$ kill %1
+
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Terminated              ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+การทดลองเพิ่มเติมด้านล่างแสดงกรณีที่ \code{bg} \emph{ใช้ไม่ได้} และต้องใช้ \code{fg}
+เท่านั้น คือ job ที่ต้องอ่านข้อมูลจากคีย์บอร์ด
+
+\begin{lstlisting}[style=terminal,caption={job ที่อ่าน stdin จะถูกหยุดเองด้วย SIGTTIN}]
+student@ubuntu:~/PS03$ ( read -p "type your name: " n ; echo "[bgread] you typed: $n" ) &
+[1] 6939
+student@ubuntu:~/PS03$ type your name: jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ bg %1
+[1]+ ( read -p "type your name: " n; echo "[bgread] you typed: $n" ) &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ fg %1
+( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+CPE333
+[bgread] you typed: CPE333
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering\small
+\caption{กลไกเบื้องหลัง CTRL+Z, bg และ fg}
+\begin{tabular}{p{2.0cm}p{2.6cm}p{3.6cm}p{5.4cm}}
+\toprule
+\textbf{การกระทำ} & \textbf{สัญญาณที่ส่ง} & \textbf{สถานะที่เปลี่ยน} & \textbf{ใครคุม terminal ต่อ} \\
+\midrule
+\code{CTRL+Z} & \code{SIGTSTP} (20) & \code{S+} $\rightarrow$ \code{T} ทั้ง process group & shell ทวง terminal คืน prompt กลับมา \\
+\code{bg \%1} & \code{SIGCONT} (18) & \code{T} $\rightarrow$ \code{S} (ไม่มี \code{+}) & shell ยังคุมอยู่เหมือนเดิม prompt ใช้ได้ทันที \\
+\code{fg \%1} & \code{SIGCONT} (18) & \code{T} $\rightarrow$ \code{S+} & ยกให้ job แล้วรอจน job จบหรือถูกหยุดอีก \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\code{CTRL+Z} คือการ ``พัก'' ไม่ใช่การ ``ฆ่า'' และส่งถึงทั้ง process group}:
+        \code{ps} ยืนยันว่า process ยังอยู่ครบ เพียงเปลี่ยนสถานะจาก \code{S+}
+        เป็น \code{T} ต่างจาก \code{CTRL+C} ที่ส่ง \code{SIGINT} แล้วจบไปเลย
+        ที่สำคัญคือทั้ง \code{6914 /bin/bash ./ss1\_2.sh} และลูกของมันคือ
+        \code{6916 sleep 1000} เปลี่ยนเป็น \code{T} พร้อมกันทั้งที่กดเพียงครั้งเดียว
+        เพราะทั้งคู่มี \code{PGID} เดียวกันคือ \code{6914} และ terminal ส่งสัญญาณ
+        ให้ทั้ง foreground process group หากเคอร์เนลส่งให้เฉพาะตัว \code{bash}
+        ของสคริปต์ ตัว \code{sleep} ก็จะนับเวลาต่อไป ซึ่งไม่ใช่สิ่งที่ผู้ใช้คาดหวัง
+
+  \item \textbf{ความต่างของ \code{fg} กับ \code{bg} อยู่ที่สิทธิ์ควบคุม terminal
+        ไม่ใช่ที่การปลุก}: ทั้งสองคำสั่งส่ง \code{SIGCONT} เหมือนกันทุกประการ
+        job จึงกลับมาทำงานต่อได้ทั้งคู่ (สถานะเปลี่ยนจาก \code{T} เป็น \code{S}
+        ทั้งสองกรณี) สิ่งที่ต่างคือ \code{bg} ปล่อยให้ shell ถือ terminal ไว้เหมือนเดิม
+        prompt จึงกลับมาใช้ทันที ส่วน \code{fg} เรียก \code{tcsetpgrp()}
+        ยกสิทธิ์ควบคุม terminal ให้ process group ของ job แล้ว shell ก็เข้าไปรอ
+        หลักฐานคือภาพจาก \code{ps} ตอนที่ job อยู่ใน foreground มี \code{TPGID}
+        เป็น \code{6914} และ \code{STAT} เป็น \code{S+} เทียบกับตอน \code{bg}
+        ที่เป็น \code{S} เฉย ๆ นอกจากนี้ \code{jobs} ยังเป็นตารางของ shell เอง
+        ไม่ใช่ของเคอร์เนล โดย \code{+} หมายถึง current job (ตัวที่ \code{fg}
+        หรือ \code{bg} จะเลือกถ้าไม่ระบุ \code{\%n}) และ \code{-} คือ previous job
+
+  \item \textbf{มีงานบางประเภทที่ \code{bg} ใช้ไม่ได้เลย}: การทดลองสุดท้ายแสดงชัดที่สุด
+        job ที่เรียก \code{read} เพื่ออ่านคีย์บอร์ดถูกเคอร์เนลหยุดทันทีด้วย
+        \code{SIGTTIN} และ \code{jobs} รายงานเหตุผลตรง ๆ ว่า \code{Stopped (tty input)}
+        ที่สำคัญคือเมื่อสั่ง \code{bg \%1} job กลับไปหยุดที่เดิมอีกครั้งด้วยเหตุผลเดียวกัน
+        เพราะ \code{bg} ให้แค่ \code{SIGCONT} ไม่ได้ให้สิทธิ์อ่าน terminal
+        ต้องสั่ง \code{fg \%1} เท่านั้น job จึงอ่านข้อความ \code{CPE333}
+        ที่พิมพ์เข้าไปได้และทำงานจนจบ สรุปเป็นหลักการได้ว่า \code{bg}
+        เหมาะกับงานที่คำนวณอย่างเดียว ส่วนงานที่ต้องโต้ตอบกับผู้ใช้ต้องอยู่ใน foreground เสมอ
+
+  \item \textbf{การ \code{kill} job ที่ถูกหยุดอยู่ และการเชื่อมโยงกลับไปข้อ 1}:
+        \code{SIGTERM} เพียงอย่างเดียวจะค้างรออยู่เฉย ๆ เพราะ process ในสถานะ
+        \code{T} ไม่ได้ถูกจัดให้ทำงานจึงยังไม่ประมวลผลสัญญาณ แต่ผลการทดลองแสดงว่า
+        job ตายทันที เพราะ \code{kill} ของ bash ส่ง \code{SIGCONT} ตามไปให้ด้วย
+        เมื่อรู้ว่าเป้าหมายถูกหยุดอยู่ สังเกตได้จาก \code{jobs -l} ครั้งแรกที่รายงาน
+        \code{Terminated} และครั้งที่สองไม่เหลืออะไร เพราะ shell แจ้งสถานะสุดท้าย
+        เพียงครั้งเดียวแล้วลบทิ้ง โดยรวมแล้ว \code{fg} และ \code{bg}
+        คือหน้ากากที่สวยงามของ \code{kill -CONT} ที่ทดลองไว้ในข้อ 1
+        โดย \code{bg \%1} ให้ผลเหมือน \code{kill -CONT <PID>} ทุกประการ
+        ส่วน \code{fg \%1} คือ \code{kill -CONT} บวกกับการยก terminal ให้
+\end{itemize}
+
+% =====================================================================
+\section{ข้อ 5: ฟังก์ชันภาษาซีจำลองการทำงานของ STCF}
+% =====================================================================
+
+\code{STCF} (Shortest Time-to-Completion First) หรือ \code{SRTF} เป็นนโยบาย
+จัดตารางแบบ \emph{preemptive} ที่ทุกหน่วยเวลาจะมอบ CPU ให้ process ซึ่ง
+\textbf{เหลืองานน้อยที่สุด} ต่างจาก \code{SJF} ที่เมื่อเริ่มแล้วต้องปล่อยให้ทำจนจบ
+งานของข้อนี้คือเขียนฟังก์ชัน \code{simulate\_stfc()} เติมลงในไฟล์ \code{PS3.c}
+ที่โจทย์เตรียมไว้ ส่วน \code{main()} ใช้ของเดิมเกือบทั้งหมด แก้เพียงจุดเดียว
+ตามที่อธิบายท้ายหัวข้อย่อย Source code (หัวข้อ 3.1)
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อกำหนดจากโจทย์และการแปลงเป็นเงื่อนไขในโปรแกรม}
+\begin{tabular}{p{6.6cm}p{7.4cm}}
+\toprule
+\textbf{ข้อกำหนด} & \textbf{การนำไปใช้ในโค้ด} \\
+\midrule
+ฟังก์ชันและ context switch เร็วมาก ไม่ต้องนับเป็นการใช้ CPU
+  & ทุกหน่วยเวลาถูกใช้ทำงานจริงเสมอ ไม่มีช่องว่างแทรกระหว่างช่วง \\
+process ที่มาถึงเวลา $T$ หมายถึงมาถึงตอนท้ายของเวลา $T-1$ แต่ก่อนที่ scheduler จะอัปเดต ready queue ของเวลา $T$
+  & ที่เวลา $T$ process นั้นอยู่ใน ready queue แล้ว เงื่อนไขจึงเป็น \code{arrival <= time} (ไม่ใช่ \code{<}) \\
+มาถึงพร้อมกันหลายตัว ให้เรียงตาม \code{process\_id}
+  & เทียบ \code{pid} จากน้อยไปมาก \\
+เวลาที่เหลือเท่ากัน ให้เรียงตาม \code{process\_id}
+  & เทียบ \code{pid} จากน้อยไปมาก \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+เงื่อนไขสองข้อสุดท้ายยุบรวมเป็นกฎเดียวได้ เพราะ process ที่เพิ่งมาถึงพร้อมกัน
+ยังไม่ได้ใช้ CPU เลย เวลาที่เหลือจึงเท่ากับ \code{burst} เต็ม ๆ กรณี
+``มาถึงพร้อมกัน'' จึงเป็นกรณีเฉพาะของ ``เวลาที่เหลือเท่ากัน'' โค้ดจึงเทียบ
+\code{pid} เพียงจุดเดียว ส่วน \textbf{รูปแบบผลลัพธ์} นั้นตัวอย่างในโจทย์
+ถูกจัดรูปมาไม่สมบูรณ์ (บางบรรทัดขึ้นบรรทัดใหม่คั่นระหว่าง \code{[0-3]:}
+กับชื่อ process) แต่สองบรรทัดสุดท้ายที่สมบูรณ์คือ \code{[8-11]: P3}
+แสดงว่ารูปแบบที่ถูกต้องคือหนึ่งบรรทัดต่อหนึ่งช่วงเวลา โปรแกรมนี้จึงพิมพ์ตามนั้น
+โดยรวมหน่วยเวลาที่ติดกันและเป็นของ process เดียวกันเข้าเป็นช่วงเดียว
+และช่วงที่ไม่มี process ใดพร้อมทำงานแสดงเป็น \code{IDLE} ตามตัวอย่างในโจทย์
+
+\subsection{Source code}
+
+\begin{lstlisting}[caption={PS3.c -- ส่วนที่เขียนเพิ่มเข้าไป},label={lst:ps3}]
+/* Print one merged time slot. "idx" is the index of the process that owned
+ * the CPU during [start, end), or -1 when the CPU was idle. */
+static void print_slot(int start, int end, int idx, const Process *procs)
+{
+    if (start >= end)
+        return;                       /* empty slot, before the first decision */
+
+    if (idx < 0)
+        printf("[%d-%d]: IDLE\n", start, end);
+    else
+        printf("[%d-%d]: P%d\n", start, end, procs[idx].pid);
+}
+
+void simulate_stfc(Process *procs, int n)
+{
+    int time = 0;
+    int done = 0;
+
+    int current = -1;    /* index of the process on the CPU, -1 = idle */
+    int slot_start = 0;  /* time at which the current slot began */
+
+    /* A process with no work to do would never reach remaining == 0 by running,
+     * so retire it up front instead of letting it stall the simulation. */
+    for (int i = 0; i < n; i++) {
+        if (procs[i].remaining <= 0 && !procs[i].finished) {
+            procs[i].finished = 1;
+            done++;
+        }
+    }
+
+    while (done < n) {
+        /* choose the ready process with the shortest remaining time */
+        int pick = -1;
+        for (int i = 0; i < n; i++) {
+            if (procs[i].finished || procs[i].arrival > time)
+                continue;
+
+            if (pick == -1 ||
+                procs[i].remaining < procs[pick].remaining ||
+                (procs[i].remaining == procs[pick].remaining &&
+                 procs[i].pid < procs[pick].pid))
+                pick = i;
+        }
+
+        /* the owner of the CPU changed, so the previous slot ends here */
+        if (pick != current) {
+            print_slot(slot_start, time, current, procs);
+            slot_start = time;
+            current = pick;
+        }
+
+        if (pick == -1) {
+            time++;      /* nothing has arrived yet, the CPU stays idle */
+            continue;
+        }
+
+        procs[pick].remaining--;
+        time++;
+
+        if (procs[pick].remaining == 0) {
+            procs[pick].finished = 1;
+            done++;
+        }
+    }
+
+    print_slot(slot_start, time, current, procs);   /* the last slot */
+}
+\end{lstlisting}
+
+\textbf{คำอธิบายการทำงาน} \quad ลูปนอกเดินทีละหนึ่งหน่วยเวลาจนกว่าจะครบทุก process
+ซึ่งตรงกับนิยามของ STCF ที่ตัดสินใจใหม่ทุกครั้งที่สถานการณ์เปลี่ยน
+โดยไม่ต้องแยกกรณีว่าเหตุการณ์ไหนบ้างที่ทำให้ต้องตัดสินใจใหม่
+ลูปในเลือกผู้ชนะโดยข้าม process ที่จบแล้วหรือยังมาไม่ถึง แล้วเทียบ \code{remaining}
+หากเท่ากันจึงเทียบ \code{pid} ถ้าไม่มีใครพร้อมเลยจะได้ \code{-1} ซึ่งหมายถึง IDLE
+การรวมช่วงเวลาใช้ตัวแปร \code{current} กับ \code{slot\_start} เมื่อใดที่ผู้ชนะ
+เปลี่ยนไป แสดงว่าช่วงเดิมจบลงที่เวลาปัจจุบันพอดี จึงพิมพ์ช่วงเดิมแล้วเริ่มนับใหม่
+ส่วนการพิมพ์ช่วงสุดท้ายต้องทำนอกลูป เพราะตอนที่ process ตัวสุดท้ายจบ
+ลูปจะจบทันทีโดยไม่มีการเปลี่ยนผู้ชนะให้ตรวจจับได้อีก
+
+\textbf{จุดเดียวที่แก้ใน \code{main()}} \quad โค้ดเดิมข้ามบรรทัดหัวตารางด้วย
+\code{fgets(line, sizeof(line), fp);} โดยไม่ดูค่าที่คืนมา ซึ่งถ้าไฟล์ว่างเปล่า
+ตัวแปร \code{line} จะไม่ถูกกำหนดค่า และเมื่อคอมไพล์ด้วย \code{-O2} จะได้ warning
+เพราะ \code{fgets()} เป็น \code{warn\_unused\_result} โจทย์เปิดช่องให้แก้ส่วนนี้ได้
+(\code{// you may change this if needed}) จึงเพิ่ม
+\code{if (!fgets(...)) \{ fprintf(stderr, ...); fclose(fp); return 1; \}}
+เข้าไป ผลคือคอมไพล์ผ่านโดยไม่มี warning ทั้งที่ \code{-O0} และ \code{-O2}
+และไฟล์ว่างจะได้ข้อความแจ้งที่อ่านรู้เรื่อง
+
+\subsection{ผลการทดลองและการตรวจสอบความถูกต้อง}
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อมูลเข้าทั้งสามเคส}
+\begin{tabular}{lll}
+\toprule
+\textbf{case1.csv} & \textbf{case2.csv} & \textbf{case3.csv} \\
+\midrule
+\code{pid,arrival,burst} & \code{pid,arrival,burst} & \code{pid,arrival,burst} \\
+\code{1,0,7} & \code{1,0,2} & \code{2,0,5} \\
+\code{2,2,4} & \code{2,5,3} & \code{1,3,2} \\
+\code{3,4,1} & \code{3,5,3} & \code{3,6,1} \\
+             & \code{4,6,1} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.66\textwidth]{q5_result_screenshot.png}
+\caption{screenshot ผลการรันทั้งสามเคสบน terminal จริง (Ubuntu 24.04 บน WSL2)}
+\end{figure}
+
+\begin{lstlisting}[style=terminal,caption={กรณีขอบ: เรียกโปรแกรมผิดวิธีและไฟล์ที่ใช้ไม่ได้}]
+$ ./PS3
+Usage: ./PS3 <csvfile>
+exit status = 1
+
+$ ./PS3 nosuchfile.csv
+Error opening file: No such file or directory
+exit status = 1
+
+$ ./PS3 empty.csv          # a completely empty file
+Error: empty.csv is empty
+exit status = 1
+
+$ ./PS3 header.csv         # header row only, no process at all
+exit status = 0  (no process to schedule, so nothing is printed)
+\end{lstlisting}
+
+เพื่อไม่ให้เป็นการเชื่อผลลัพธ์ของโปรแกรมตัวเอง ได้ไล่ตารางเวลาของทั้งสามเคสด้วยมือ
+ก่อน แล้วเก็บคำตอบไว้เป็นไฟล์เฉลย จากนั้นให้สคริปต์เก็บผลสั่ง \code{diff}
+เทียบกับผลลัพธ์จริงของโปรแกรม ซึ่งได้ผลว่าตรงกันทั้งสามเคส (บรรทัด
+\code{identical, the program agrees with the hand analysis} ใน
+\code{result/q5\_verified.txt}) ตัวอย่างการไล่ด้วยมือของ \code{case1.csv}
+เป็นดังตารางถัดไป
+
+\begin{table}[H]
+\centering\small
+\caption{การไล่ตารางเวลาของ case1.csv ทีละหน่วยเวลา}
+\begin{tabular}{cllp{6.6cm}}
+\toprule
+\textbf{เวลา} & \textbf{process ที่พร้อม (เวลาที่เหลือ)} & \textbf{ผู้ได้ CPU} & \textbf{หมายเหตุ} \\
+\midrule
+0--1  & P1(7), P1(6)        & P1 & มีตัวเดียว \\
+2--3  & P1(5), P2(4)        & P2 & P2 มาถึงและเหลือน้อยกว่า จึงแย่ง CPU ไป \\
+4     & P1(5), P2(2), P3(1) & P3 & P3 มาถึงและเหลือน้อยที่สุด จึงแย่งอีกครั้ง \\
+5--6  & P1(5), P2(2)        & P2 & P3 จบแล้ว \\
+7--11 & P1(5)               & P1 & P2 จบแล้ว เหลือ P1 ตัวเดียว \\
+12    & ---                 & ---& ทุก process จบหมด \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+รวมหน่วยเวลาที่ติดกันเข้าด้วยกันจะได้ \code{[0-2]: P1}, \code{[2-4]: P2},
+\code{[4-5]: P3}, \code{[5-7]: P2} และ \code{[7-12]: P1} ตรงกับผลลัพธ์
+ของโปรแกรมทุกบรรทัด
+
+\subsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบค่าเฉลี่ยของ STCF กับ FIFO บนข้อมูลชุดเดียวกัน}
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{3}{c}{\textbf{STCF}} & \multicolumn{3}{c}{\textbf{FIFO}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{เคส} & \textbf{turnaround} & \textbf{waiting} & \textbf{response}
+             & \textbf{turnaround} & \textbf{waiting} & \textbf{response} \\
+\midrule
+case1 & \textbf{6.00} & \textbf{2.00} & \textbf{0.00} & 8.00 & 4.00 & 4.00 \\
+case2 & \textbf{3.50} & \textbf{1.25} & \textbf{1.00} & 4.25 & 2.00 & 2.00 \\
+case3 & 3.67 & 1.00 & \textbf{0.33} & 3.67 & 1.00 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{STCF ให้ average turnaround ต่ำที่สุดจริงตามทฤษฎี}: case1 ได้ 6.00
+        เทียบกับ 8.00 ของ FIFO และ case2 ได้ 3.50 เทียบกับ 4.25 ส่วน case3
+        ได้เท่ากันที่ 3.67 ซึ่งไม่ขัดกับทฤษฎี เพราะ STCF รับประกันว่า
+        \emph{ไม่แย่กว่า} ไม่ใช่ว่าต้องดีกว่าเสมอ ในกรณีที่งานสั้นบังเอิญมาถึง
+        ตอนที่ CPU ว่างอยู่แล้ว ลำดับที่ได้จากทั้งสองนโยบายก็จะเหมือนกัน
+        อย่างไรก็ตามแม้ในเคสนั้น STCF ก็ยังชนะเรื่อง response time (0.33 เทียบกับ 1.00)
+
+  \item \textbf{ราคาที่ต้องจ่ายคือ starvation และการต้องรู้ \code{burst} ล่วงหน้า}:
+        case1 แสดงชัดว่า P1 มาถึงก่อนใครเพื่อน (เวลา 0) แต่กลับเป็นตัวสุดท้ายที่จบ
+        (เวลา 12) และมีเวลารอสูงสุดคือ 5 หน่วยเวลา เพราะถูกงานที่สั้นกว่าแย่ง CPU
+        ไปสองครั้ง ถ้ามีงานสั้นไหลเข้ามาไม่หยุด process ที่มี burst ยาวก็อาจไม่ได้จบเลย
+        นอกจากนี้การจำลองนี้ทำได้เพราะไฟล์ \code{.csv} บอก \code{burst} มาให้แล้ว
+        แต่ระบบปฏิบัติการจริงไม่มีทางรู้ล่วงหน้า จึงต้องประมาณจากพฤติกรรมในอดีต
+        หรือเปลี่ยนไปใช้นโยบายที่ไม่ต้องรู้ \code{burst} เช่น MLFQ
+        ที่ค่อย ๆ ลดระดับความสำคัญของงานที่ใช้ CPU นาน ซึ่งให้ผลใกล้เคียง STCF
+        โดยไม่ต้องพึ่งข้อมูลอนาคต
+
+  \item \textbf{การแย่ง CPU เกิดเฉพาะตอนที่มี process ใหม่มาถึง}: พิสูจน์ได้ง่าย ๆ
+        คือ process ที่กำลังทำงานอยู่มี \code{remaining} ลดลงเรื่อย ๆ
+        ส่วนตัวที่รออยู่มีค่าคงที่ ตัวที่กำลังทำงานจึงยังเป็นตัวที่เหลือน้อยที่สุดต่อไปเสมอ
+        เว้นแต่มีตัวใหม่ที่เหลือน้อยกว่าโผล่เข้ามา ผลในเชิงการเขียนโปรแกรมคือ
+        การเลือกผู้ชนะใหม่ทุกหน่วยเวลาแม้จะดูเปลืองแต่ให้คำตอบที่ถูกต้องเสมอ
+        และเขียนง่ายกว่าการไล่จับเหตุการณ์เป็นกรณี ๆ มาก
+        อย่างไรก็ตาม \textbf{กฎ tie-break ก็ทำให้เกิดการแย่ง CPU ได้ด้วย}
+        เห็นได้จาก case3 ที่เวลา 3 ตอนนั้น P2 กำลังทำงานอยู่และเหลืออีก 2 หน่วย
+        พอดีกับที่ P1 มาถึงพร้อม \code{burst} 2 หน่วยเท่ากัน ตามกฎของโจทย์
+        P1 จึงได้ CPU ไปทั้งที่ P2 กำลังทำอยู่ ถ้าใช้กฎอีกแบบที่นิยมกันคือ
+        ``เสมอกันให้ตัวที่ทำอยู่ทำต่อ'' เพื่อลด context switch ผลของ case3
+        จะออกมาไม่เหมือนกัน จุดนี้จึงเป็นเหตุผลที่โจทย์ต้องระบุกฎ tie-break ไว้ชัดเจน
+
+  \item \textbf{ช่วง IDLE และประสิทธิภาพ}: case2 มีช่วง \code{[2-5]} ที่ P1 จบแล้ว
+        แต่ P2 กับ P3 ยังมาไม่ถึง ในโค้ดจัดการด้วยการเพิ่ม \code{time} ทีละหนึ่ง
+        แล้ววนต่อ ซึ่งตรงกับพฤติกรรมของระบบจริงที่เคอร์เนลรัน idle task
+        หรือสั่งให้ CPU เข้าสู่สถานะประหยัดพลังงาน โค้ดนี้มีความซับซ้อน
+        $O(T \times n)$ เมื่อ $T$ คือเวลารวมและ $n$ คือจำนวน process
+        ซึ่งเพียงพอสำหรับข้อมูลระดับนี้ ถ้าต้องรับข้อมูลขนาดใหญ่จริง ๆ
+        สามารถเปลี่ยนเป็นแบบ event-driven คือคำนวณเฉพาะตอนที่มี process
+        มาถึงหรือทำงานจบ แล้วใช้ priority queue เก็บ ready queue
+        จะลดลงเหลือ $O(n \log n)$
+\end{itemize}
+
+\end{document}
