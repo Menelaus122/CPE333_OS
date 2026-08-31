@@ -11,7 +11,7 @@ RESULT_DIR = result
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 PROGS = $(patsubst $(SRC_DIR)/%.c,$(SRC_DIR)/%,$(SRCS))
 
-.PHONY: all build pdf result clean
+.PHONY: all build pdf result result-q1 result-q2 clean
 
 all: build pdf
 
@@ -27,9 +27,14 @@ $(SRC_DIR)/%: $(SRC_DIR)/%.c
 pdf:
 	cd $(DOC_DIR) && $(XELATEX) PS03.tex && $(XELATEX) PS03.tex
 
-# เก็บผลการทดลองข้อ 1 ใหม่ (ใช้เวลาประมาณ 1 นาที ต้องรันบน Linux/WSL)
-result:
+# เก็บผลการทดลองใหม่ทั้งหมด (ใช้เวลาประมาณ 3 นาที ต้องรันบน Linux/WSL)
+result: result-q1 result-q2
+
+result-q1:
 	bash $(SRC_DIR)/run_q1.sh > $(RESULT_DIR)/q1_verified.txt 2>&1
+
+result-q2:
+	bash $(SRC_DIR)/run_q2.sh > $(RESULT_DIR)/q2_verified.txt 2>&1
 
 clean:
 	rm -f $(SRC_DIR)/*.o $(PROGS)

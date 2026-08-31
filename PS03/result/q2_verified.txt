@@ -1,0 +1,179 @@
+# ผลการรันจริง - CPE333 PS03 ข้อ 2 (foreground / background / job control)
+# Environment : Ubuntu 24.04.1 LTS, kernel 6.6.87.2-microsoft-standard-WSL2
+# Shell       : GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)
+# Captured at : 2026-08-31 15:23:33 +07
+#
+# transcript ด้านล่างเก็บจาก interactive bash บน pseudo terminal จริง
+# บรรทัด ^Z คือการกด CTRL+Z
+
+====================================================================
+สถานการณ์ที่ 1 : ./ss1_1.sh เทียบกับ ./ss1_1.sh &
+====================================================================
+
+----- 1.1 เนื้อหาของ ss1_1.sh -----
+     1	#!/bin/bash
+     2	# CPE 333 PS03 - Q2, first situation
+     3	# Calls "sleep" for a total of 10 seconds, one second per iteration,
+     4	# so the progress can be watched while the script is running.
+     5	
+     6	echo "[ss1_1] start  pid=$$  at $(date +%T)"
+     7	
+     8	for i in $(seq 1 10); do
+     9	    sleep 1
+    10	    echo "[ss1_1] tick $i/10"
+    11	done
+    12	
+    13	echo "[ss1_1] done   pid=$$  at $(date +%T)"
+
+----- 1.2 transcript ของ terminal -----
+bash-5.2$ export PS1='student@ubuntu:~/PS03$ '
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rw-r--r-- 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+student@ubuntu:~/PS03$ ./ss1_1.sh
+bash: ./ss1_1.sh: Permission denied
+student@ubuntu:~/PS03$ chmod +x ss1_1.sh
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rwxr-xr-x 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+student@ubuntu:~/PS03$ (sleep 4; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg1.txt 2>&1) &
+[1] 6856
+student@ubuntu:~/PS03$ date +%T ; time ./ss1_1.sh ; date +%T
+15:23:40
+[ss1_1] start  pid=6860  at 15:23:40
+[ss1_1] tick 1/10
+[ss1_1] tick 2/10
+[ss1_1] tick 3/10
+[ss1_1] tick 4/10
+[ss1_1] tick 5/10
+[ss1_1] tick 6/10
+[ss1_1] tick 7/10
+[ss1_1] tick 8/10
+[ss1_1] tick 9/10
+[ss1_1] tick 10/10
+[ss1_1] done   pid=6860  at 15:23:50
+[1]+  Done                    ( sleep 4; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg1.txt 2>&1 )
+
+real	0m10.030s
+user	0m0.019s
+sys	0m0.019s
+15:23:50
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg1.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6860 Ss   bash --norc -i
+   6856    6844    6856    6860 S    bash --norc -i
+   6860    6844    6860    6860 S+   /bin/bash ./ss1_1.sh
+   6866    6860    6860    6860 S+   sleep 1
+   6867    6856    6856    6860 R    ps -o pid,ppid,pgid,tpgid,stat,args
+student@ubuntu:~/PS03$ date +%T ; ./ss1_1.sh & date +%T
+15:23:54
+[1] 6880
+15:23:54
+student@ubuntu:~/PS03$ [ss1_1] start  pid=6880  at 15:23:54
+jobs -l
+[1]+  6880 Running                 ./ss1_1.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6887 Ss   bash --norc -i
+   6880    6844    6880    6887 S    /bin/bash ./ss1_1.sh
+   6884    6880    6880    6887 S    sleep 1
+   6887    6844    6887    6887 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+[ss1_1] tick 1/10
+student@ubuntu:~/PS03$ echo "the shell is free while the job runs: 2+2 = $((2+2))"
+the shell is free while the job runs: 2+2 = 4
+student@ubuntu:~/PS03$ wait
+[ss1_1] tick 2/10
+[ss1_1] tick 3/10
+[ss1_1] tick 4/10
+[ss1_1] tick 5/10
+[ss1_1] tick 6/10
+[ss1_1] tick 7/10
+[ss1_1] tick 8/10
+[ss1_1] tick 9/10
+[ss1_1] tick 10/10
+[ss1_1] done   pid=6880  at 15:24:04
+[1]+  Done                    ./ss1_1.sh
+student@ubuntu:~/PS03$ jobs -l
+student@ubuntu:~/PS03$ exit
+exit
+
+====================================================================
+สถานการณ์ที่ 2 : CTRL+Z, jobs, fg และ bg
+====================================================================
+
+----- 2.1 เนื้อหาของ ss1_2.sh -----
+     1	#!/bin/bash
+     2	# CPE 333 PS03 - Q2, second situation
+     3	# Calls "sleep" with 1000 seconds, so the script stays alive long enough
+     4	# to be suspended with CTRL+Z and resumed again with fg / bg.
+     5	
+     6	echo "[ss1_2] start  pid=$$  at $(date +%T)"
+     7	
+     8	sleep 1000
+     9	
+    10	echo "[ss1_2] done   pid=$$  at $(date +%T)"
+
+----- 2.2 transcript ของ terminal -----
+bash-5.2$ export PS1='student@ubuntu:~/PS03$ '
+student@ubuntu:~/PS03$ chmod +x ss1_2.sh
+student@ubuntu:~/PS03$ ./ss1_2.sh
+[ss1_2] start  pid=6914  at 15:24:14
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6920 Ss   bash --norc -i
+   6914    6908    6914    6920 T    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6920 T    sleep 1000
+   6920    6908    6920    6920 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+student@ubuntu:~/PS03$ bg %1
+[1]+ ./ss1_2.sh &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Running                 ./ss1_2.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6924 Ss   bash --norc -i
+   6914    6908    6914    6924 S    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6924 S    sleep 1000
+   6924    6908    6924    6924 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+student@ubuntu:~/PS03$ echo "the shell still answers while %1 runs in the background"
+the shell still answers while %1 runs in the background
+student@ubuntu:~/PS03$ (sleep 2; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg2.txt 2>&1) &
+[2] 6927
+student@ubuntu:~/PS03$ fg %1
+./ss1_2.sh
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+[2]   Done                    ( sleep 2; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg2.txt 2>&1 )
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg2.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6914 Ss   bash --norc -i
+   6914    6908    6914    6914 S+   /bin/bash ./ss1_2.sh
+   6916    6914    6914    6914 S+   sleep 1000
+   6927    6908    6927    6914 S    bash --norc -i
+   6930    6927    6927    6914 R    ps -o pid,ppid,pgid,tpgid,stat,args
+student@ubuntu:~/PS03$ kill %1
+
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Terminated              ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+student@ubuntu:~/PS03$ ( read -p "type your name: " n ; echo "[bgread] you typed: $n" ) &
+[1] 6939
+student@ubuntu:~/PS03$ type your name: jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ bg %1
+[1]+ ( read -p "type your name: " n; echo "[bgread] you typed: $n" ) &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ fg %1
+( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+CPE333
+[bgread] you typed: CPE333
+student@ubuntu:~/PS03$ jobs -l
+student@ubuntu:~/PS03$ exit
+exit
+
+=== จบการเก็บผลข้อ 2 ===

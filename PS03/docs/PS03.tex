@@ -6,7 +6,7 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex PS03.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: เขียนข้อ 1 เสร็จแล้ว (ข้อ 2 และ ข้อ 5 จะเพิ่มในสาขาถัดไป)
+%  สถานะเอกสาร: เขียนข้อ 1 และข้อ 2 เสร็จแล้ว (ข้อ 5 จะเพิ่มในสาขาถัดไป)
 % =====================================================================
 \documentclass[a4paper,12pt]{article}
 
@@ -85,6 +85,26 @@
   xleftmargin=15pt,
   framexleftmargin=15pt,
   morekeywords={pid_t,ssize_t,size_t,rusage,timeval,fork,wait,waitpid,pipe,read,write,close,getpid,getppid,getpriority,getrusage,gettimeofday,signal,pause,sleep,exit,perror,fflush},
+}
+
+\lstdefinestyle{bashstyle}{
+  language=bash,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=8pt,
+  showstringspaces=false,
+  breaklines=true,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=15pt,
+  framexleftmargin=15pt,
 }
 
 \lstdefinestyle{terminal}{
@@ -174,6 +194,7 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 ชุดคำสั่งที่ใช้ & \code{procps-ng 4.0.4} \quad (\code{ps}, \code{top}, \code{kill}, \code{pgrep}, \code{pkill}) \\
  & \code{util-linux} \quad (\code{renice}, \code{taskset}) \\
  & \code{psmisc} \quad (\code{killall}) \\
+Shell & \code{GNU bash, version 5.2.21(1)-release} \\
 คอมไพเลอร์ & \code{gcc} (Ubuntu 13.3.0-6ubuntu2\textasciitilde24.04.1) 13.3.0 \\
 คำสั่งคอมไพล์ & \code{gcc -Wall -Wextra -O0 -o q1\_burn q1\_burn.c} \\
  & \code{gcc -Wall -Wextra -o q1\_sigdemo q1\_sigdemo.c} \\
@@ -199,7 +220,9 @@ Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (ตรวจด้วย \code
 \vspace{0.5em}
 
 \textbf{ไฟล์ผลการทดลองดิบ} \quad ผลลัพธ์ทุกบรรทัดที่ยกมาในรายงานฉบับนี้ถูกเก็บไว้ที่
-\code{PS03/result/q1\_verified.txt} และสร้างซ้ำได้ด้วยสคริปต์ \code{PS03/src/run\_q1.sh}
+\code{PS03/result/q1\_verified.txt} และ \code{PS03/result/q2\_verified.txt}
+สร้างซ้ำได้ด้วยสคริปต์ \code{PS03/src/run\_q1.sh} และ \code{PS03/src/run\_q2.sh}
+(หรือสั่ง \code{make result})
 
 \newpage
 
@@ -1095,6 +1118,434 @@ $ kill -0 5837   -> bash: kill: (5837) - No such process (exit status 1)
         โดยตรงในข้อ 2 เพราะการกด \code{CTRL+Z} คือการส่ง \code{SIGTSTP}
         คำสั่ง \code{bg} คือการส่ง \code{SIGCONT} และคำสั่ง \code{fg} คือการส่ง
         \code{SIGCONT} พร้อมกับคืนการควบคุม terminal ให้ job นั้น
+\end{enumerate}
+
+
+\newpage
+% =====================================================================
+\section{การรัน shell script แบบ foreground / background และการควบคุม job}
+% =====================================================================
+
+ข้อนี้ศึกษาสองสถานการณ์ที่ต่อยอดจากข้อ 1 โดยตรง คือ (1) ความต่างระหว่างการรัน
+script แบบธรรมดากับการเติมเครื่องหมาย \code{\&} ต่อท้าย และ (2) การหยุด script
+กลางคันด้วย \code{CTRL+Z} แล้วปลุกกลับมาด้วย \code{fg} หรือ \code{bg}
+
+\vspace{0.5em}
+
+\textbf{หมายเหตุเรื่องวิธีเก็บผล} \quad การกด \code{CTRL+Z} และคำสั่ง \code{jobs},
+\code{fg}, \code{bg} ทำงานได้ก็ต่อเมื่อ shell เปิดโหมด \emph{job control} ไว้
+ซึ่งเปิดเฉพาะตอนที่ shell เป็นแบบ interactive และมี terminal จริงเท่านั้น
+ถ้าสั่งจากสคริปต์ธรรมดาจะได้ข้อความ \code{no job control in this shell}
+การเก็บผลข้อนี้จึงใช้คำสั่ง \code{script(1)} สร้าง pseudo terminal ขึ้นมาจริง ๆ
+แล้วเปิด \code{bash --norc -i} บนนั้น จากนั้นป้อนคำสั่งเข้าไปทีละบรรทัด
+โดยเว้นจังหวะเหมือนคนพิมพ์ ส่วน \code{CTRL+Z} ส่งเป็นไบต์ \code{0x1A} ตรง ๆ
+เข้าไปที่ terminal ซึ่ง line discipline ของ tty จะแปลงเป็นสัญญาณ
+\code{SIGTSTP} ให้เอง transcript ที่ยกมาทั้งหมดจึงเป็นของ terminal จริง
+ไม่ใช่การจำลอง (ตัวสคริปต์เก็บผลอยู่ที่ \code{PS03/src/run\_q2.sh})
+
+% ---------------------------------------------------------------------
+\subsection{สถานการณ์ที่ 1: \code{./ss1\_1.sh} เทียบกับ \code{./ss1\_1.sh \&}}
+% ---------------------------------------------------------------------
+
+\subsubsection{Source code}
+
+ตามคำแนะนำท้ายโจทย์ ได้เขียนเป็น for loop ที่เรียก \code{sleep 1} รอบละหนึ่งวินาที
+รวมสิบรอบ แทนการเรียก \code{sleep 10} ครั้งเดียว เพื่อให้เห็นความคืบหน้า
+ระหว่างที่สคริปต์กำลังทำงาน
+
+\begin{lstlisting}[style=bashstyle,caption={ss1\_1.sh -- เรียก sleep รวม 10 วินาที},label={lst:ss1_1}]
+#!/bin/bash
+# CPE 333 PS03 - Q2, first situation
+# Calls "sleep" for a total of 10 seconds, one second per iteration,
+# so the progress can be watched while the script is running.
+
+echo "[ss1_1] start  pid=$$  at $(date +%T)"
+
+for i in $(seq 1 10); do
+    sleep 1
+    echo "[ss1_1] tick $i/10"
+done
+
+echo "[ss1_1] done   pid=$$  at $(date +%T)"
+\end{lstlisting}
+
+\subsubsection{เรื่องสิทธิ์ในการรัน (\code{chmod})}
+
+ไฟล์ที่เพิ่งสร้างใหม่จะได้สิทธิ์ \code{rw-r--r--} (\code{644}) ตามค่า
+\code{umask} มาตรฐาน คือไม่มีบิต \code{x} เคอร์เนลจึงปฏิเสธที่จะ \code{exec}
+ไฟล์นั้น ต้องเพิ่มบิต \code{x} ด้วย \code{chmod} ก่อน
+
+\begin{lstlisting}[style=terminal,caption={Permission denied และการแก้ด้วย chmod}]
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rw-r--r-- 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+student@ubuntu:~/PS03$ ./ss1_1.sh
+bash: ./ss1_1.sh: Permission denied
+student@ubuntu:~/PS03$ chmod +x ss1_1.sh
+student@ubuntu:~/PS03$ ls -l ss1_1.sh
+-rwxr-xr-x 1 poomipat poomipat 345 Aug 31 15:23 ss1_1.sh
+\end{lstlisting}
+
+สังเกตว่าสิทธิ์เปลี่ยนจาก \code{-rw-r--r--} เป็น \code{-rwxr-xr-x}
+อีกวิธีที่ใช้ได้โดยไม่ต้อง \code{chmod} เลยคือสั่ง \code{bash ss1\_1.sh}
+เพราะกรณีนั้นเป็นการสั่งให้ \code{bash} \emph{อ่านไฟล์เป็นข้อมูล}
+ไม่ใช่ให้เคอร์เนล \code{exec} ตัวไฟล์ จึงต้องการเพียงสิทธิ์อ่าน (\code{r}) เท่านั้น
+
+\subsubsection{ผลการทดลอง: รันแบบ foreground (\code{./ss1\_1.sh})}
+
+\begin{lstlisting}[style=terminal,caption={รันแบบ foreground -- terminal ถูกยึดไว้จนกว่าจะจบ}]
+student@ubuntu:~/PS03$ date +%T ; time ./ss1_1.sh ; date +%T
+15:23:40
+[ss1_1] start  pid=6860  at 15:23:40
+[ss1_1] tick 1/10
+[ss1_1] tick 2/10
+[ss1_1] tick 3/10
+[ss1_1] tick 4/10
+[ss1_1] tick 5/10
+[ss1_1] tick 6/10
+[ss1_1] tick 7/10
+[ss1_1] tick 8/10
+[ss1_1] tick 9/10
+[ss1_1] tick 10/10
+[ss1_1] done   pid=6860  at 15:23:50
+[1]+  Done                    ( sleep 4; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg1.txt 2>&1 )
+
+real	0m10.030s
+user	0m0.019s
+sys	0m0.019s
+15:23:50
+\end{lstlisting}
+
+ระหว่างที่สคริปต์กำลังทำงาน ได้ให้ \code{ps} ถ่ายภาพไว้ล่วงหน้า (สั่งไว้ก่อน
+ด้วย \code{(sleep 4; ps ...) \&}) เพราะขณะนั้นพิมพ์คำสั่งอะไรไม่ได้เลย
+
+\begin{lstlisting}[style=terminal,caption={ps ขณะที่ ss1\_1.sh อยู่ใน foreground}]
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg1.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6860 Ss   bash --norc -i
+   6856    6844    6856    6860 S    bash --norc -i
+   6860    6844    6860    6860 S+   /bin/bash ./ss1_1.sh
+   6866    6860    6860    6860 S+   sleep 1
+   6867    6856    6856    6860 R    ps -o pid,ppid,pgid,tpgid,stat,args
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: รันแบบ background (\code{./ss1\_1.sh \&})}
+
+\begin{lstlisting}[style=terminal,caption={รันแบบ background -- prompt กลับมาทันที}]
+student@ubuntu:~/PS03$ date +%T ; ./ss1_1.sh & date +%T
+15:23:54
+[1] 6880
+15:23:54
+student@ubuntu:~/PS03$ [ss1_1] start  pid=6880  at 15:23:54
+jobs -l
+[1]+  6880 Running                 ./ss1_1.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6844    6841    6844    6887 Ss   bash --norc -i
+   6880    6844    6880    6887 S    /bin/bash ./ss1_1.sh
+   6884    6880    6880    6887 S    sleep 1
+   6887    6844    6887    6887 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+[ss1_1] tick 1/10
+student@ubuntu:~/PS03$ echo "the shell is free while the job runs: 2+2 = $((2+2))"
+the shell is free while the job runs: 2+2 = 4
+student@ubuntu:~/PS03$ wait
+[ss1_1] tick 2/10
+[ss1_1] tick 3/10   ...   [ss1_1] tick 9/10      (7 lines omitted)
+[ss1_1] tick 10/10
+[ss1_1] done   pid=6880  at 15:24:04
+[1]+  Done                    ./ss1_1.sh
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+\subsubsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering
+\caption{สรุปความแตกต่างของการรันแบบ foreground และ background}
+\begin{tabular}{p{3.4cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{./ss1\_1.sh}} & \textbf{\code{./ss1\_1.sh \&}} \\
+\midrule
+prompt กลับเมื่อใด
+  & หลังสคริปต์จบ วัดได้ \code{real 0m10.030s}
+  & ทันที \code{date} ก่อนและหลังได้ \code{15:23:54} เท่ากัน \\
+\addlinespace
+เจ้าของ terminal
+  & สคริปต์ \code{TPGID} เท่ากับ \code{PGID} ของตัวเอง และ \code{STAT} มี \code{+}
+  & shell ยังเป็นเจ้าของ \code{STAT} ของสคริปต์ไม่มี \code{+} \\
+\addlinespace
+สถานะเป็น job
+  & ไม่ถูกจดเป็น job (\code{jobs} ไม่เห็น)
+  & ถูกจดเป็น \code{[1] 6880} และแจ้ง \code{[1]+ Done} เมื่อจบ \\
+\addlinespace
+พิมพ์คำสั่งอื่นได้ไหม
+  & ไม่ได้ ทุกตัวอักษรจะไปเข้าคิวรอ
+  & ได้ทันที ทดสอบด้วย \code{echo} และ \code{ps} ระหว่างที่ job ยังรันอยู่ \\
+\addlinespace
+สัญญาณจากคีย์บอร์ด
+  & \code{CTRL+C} / \code{CTRL+Z} ส่งถึงสคริปต์
+  & ส่งไม่ถึง เพราะไม่ได้อยู่ใน foreground process group \\
+\addlinespace
+ปลายทางของ stdout
+  & terminal เดียวกัน
+  & terminal เดียวกัน จึงปนกับ prompt (เห็นได้ในผลการทดลอง) \\
+\addlinespace
+การรอให้จบ
+  & shell รออยู่แล้วโดยอัตโนมัติ
+  & ต้องสั่ง \code{wait} เอง หรือดูจาก \code{jobs} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ความต่างที่แท้จริงคือ ``ใครเป็นเจ้าของ terminal''}:
+        ไม่ใช่แค่เรื่องรอหรือไม่รอ ผลจาก \code{ps} ชี้ชัดว่าตอนรันแบบ foreground
+        คอลัมน์ \code{TPGID} ของทุก process มีค่าเป็น \code{6860}
+        ซึ่งคือ \code{PGID} ของ \code{ss1\_1.sh} เอง แปลว่า kernel ยกสิทธิ์
+        ควบคุม terminal ให้ process group ของสคริปต์ไปแล้ว
+        และ \code{STAT} ของสคริปต์กับ \code{sleep} ลูกของมันมีเครื่องหมาย
+        \code{+} ต่อท้าย (\code{S+}) ซึ่งเป็นสัญลักษณ์ที่ \code{ps} ใช้บอกว่า
+        ``process นี้อยู่ใน foreground process group''
+        ในทางกลับกันตอนรันแบบ background \code{TPGID} ไม่ใช่ของสคริปต์
+        และ \code{STAT} เป็น \code{S} เฉย ๆ ไม่มี \code{+}
+
+  \item \textbf{shell ไม่ได้ ``หยุดทำงาน'' ตอน foreground แต่ ``รออยู่''}:
+        บรรทัด \code{6844 ... 6860 Ss} แสดงว่า shell ยังอยู่ในสถานะ \code{S}
+        (sleeping) คือถูกบล็อกอยู่ใน \code{wait()} รอให้ลูกจบ ไม่ได้กิน CPU
+        เป็นกลไกเดียวกับที่ศึกษาไปแล้วใน PS02 ข้อ 1
+
+  \item \textbf{background ไม่ได้แยก output ออกไป}:
+        เป็นจุดที่คนเข้าใจผิดบ่อย ผลการทดลองแสดงชัดว่าข้อความ
+        \code{[ss1\_1] start pid=6880} โผล่ขึ้นมาต่อท้าย prompt
+        และ \code{[ss1\_1] tick 1/10} แทรกกลางผลลัพธ์ของคำสั่ง \code{ps}
+        เพราะ job ที่รันเบื้องหลังยังเขียน stdout ลง terminal เดิม
+        ถ้าไม่อยากให้ปนกันต้อง redirect เอง เช่น
+        \code{./ss1\_1.sh > out.log 2>\&1 \&}
+
+  \item \textbf{\code{\&} ทำให้ shell จดงานนั้นเป็น job}:
+        ทันทีที่สั่ง shell พิมพ์ \code{[1] 6880} ออกมา คือเลข job กับ PID
+        ทำให้อ้างถึงด้วย \code{\%1} ได้ในภายหลัง และเมื่องานจบ shell จะแจ้ง
+        \code{[1]+ Done} ที่ prompt ถัดไป ถ้าต้องการรอให้จบจริง ๆ
+        ต้องสั่ง \code{wait} ดังที่ทดลอง ส่วน exit status ก็ต้องเก็บผ่าน
+        \code{wait \%1} หรือ \code{\$!} เพราะไม่มี \code{\$?} ให้ดูทันทีเหมือน foreground
+
+  \item \textbf{ข้อควรระวังเมื่อปิด terminal}:
+        job ที่รันด้วย \code{\&} ยังผูกอยู่กับ terminal เดิม เมื่อปิด terminal
+        เคอร์เนลจะส่ง \code{SIGHUP} ไปให้ทั้ง session ทำให้งานตายตามไปด้วย
+        ถ้าต้องการให้อยู่รอดต้องใช้ \code{nohup ./ss1\_1.sh \&} หรือสั่ง
+        \code{disown} เพิ่ม
+\end{itemize}
+
+\newpage
+
+% ---------------------------------------------------------------------
+\subsection{สถานการณ์ที่ 2: \code{CTRL+Z}, \code{jobs}, \code{fg} และ \code{bg}}
+% ---------------------------------------------------------------------
+
+\subsubsection{Source code}
+
+\begin{lstlisting}[style=bashstyle,caption={ss1\_2.sh -- เรียก sleep 1000 วินาที},label={lst:ss1_2}]
+#!/bin/bash
+# CPE 333 PS03 - Q2, second situation
+# Calls "sleep" with 1000 seconds, so the script stays alive long enough
+# to be suspended with CTRL+Z and resumed again with fg / bg.
+
+echo "[ss1_2] start  pid=$$  at $(date +%T)"
+
+sleep 1000
+
+echo "[ss1_2] done   pid=$$  at $(date +%T)"
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: กด \code{CTRL+Z} แล้วดูด้วย \code{jobs}}
+
+\begin{lstlisting}[style=terminal,caption={CTRL+Z ทำให้ทั้ง process group หยุด (สถานะ T)}]
+student@ubuntu:~/PS03$ ./ss1_2.sh
+[ss1_2] start  pid=6914  at 15:24:14
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6920 Ss   bash --norc -i
+   6914    6908    6914    6920 T    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6920 T    sleep 1000
+   6920    6908    6920    6920 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: ปลุกด้วย \code{bg}}
+
+\begin{lstlisting}[style=terminal,caption={bg -- ทำงานต่อเบื้องหลัง shell ยังคุม terminal อยู่}]
+student@ubuntu:~/PS03$ bg %1
+[1]+ ./ss1_2.sh &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Running                 ./ss1_2.sh &
+student@ubuntu:~/PS03$ ps -o pid,ppid,pgid,tpgid,stat,args
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6924 Ss   bash --norc -i
+   6914    6908    6914    6924 S    /bin/bash ./ss1_2.sh
+   6916    6914    6914    6924 S    sleep 1000
+   6924    6908    6924    6924 R+   ps -o pid,ppid,pgid,tpgid,stat,args
+student@ubuntu:~/PS03$ echo "the shell still answers while %1 runs in the background"
+the shell still answers while %1 runs in the background
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: ปลุกด้วย \code{fg}}
+
+\begin{lstlisting}[style=terminal,caption={fg -- ดึงกลับมาเป็น foreground และคืนสิทธิ์ terminal ให้ job}]
+student@ubuntu:~/PS03$ (sleep 2; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg2.txt 2>&1) &
+[2] 6927
+student@ubuntu:~/PS03$ fg %1
+./ss1_2.sh
+^Z
+[1]+  Stopped                 ./ss1_2.sh
+[2]   Done                    ( sleep 2; ps -o pid,ppid,pgid,tpgid,stat,args > /tmp/ps03_q2/fg2.txt 2>&1 )
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ cat /tmp/ps03_q2/fg2.txt
+    PID    PPID    PGID   TPGID STAT COMMAND
+   6908    6905    6908    6914 Ss   bash --norc -i
+   6914    6908    6914    6914 S+   /bin/bash ./ss1_2.sh
+   6916    6914    6914    6914 S+   sleep 1000
+   6927    6908    6927    6914 S    bash --norc -i
+   6930    6927    6927    6914 R    ps -o pid,ppid,pgid,tpgid,stat,args
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: ปิดงานด้วย \code{kill \%1}}
+
+\begin{lstlisting}[style=terminal,caption={kill \%1 กับ job ที่ถูกหยุดไว้}]
+student@ubuntu:~/PS03$ kill %1
+
+[1]+  Stopped                 ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6914 Terminated              ./ss1_2.sh
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง: งานที่ต้องรับ input จากคีย์บอร์ด}
+
+การทดลองเพิ่มเติมนี้แสดงกรณีที่ \code{bg} \emph{ใช้ไม่ได้} และต้องใช้ \code{fg}
+เท่านั้น คือ job ที่ต้องอ่านข้อมูลจากคีย์บอร์ด
+
+\begin{lstlisting}[style=terminal,caption={job ที่อ่าน stdin จะถูกหยุดเองด้วย SIGTTIN}]
+student@ubuntu:~/PS03$ ( read -p "type your name: " n ; echo "[bgread] you typed: $n" ) &
+[1] 6939
+student@ubuntu:~/PS03$ type your name: jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ bg %1
+[1]+ ( read -p "type your name: " n; echo "[bgread] you typed: $n" ) &
+student@ubuntu:~/PS03$ jobs -l
+[1]+  6939 Stopped (tty input)     ( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+student@ubuntu:~/PS03$ fg %1
+( read -p "type your name: " n; echo "[bgread] you typed: $n" )
+CPE333
+[bgread] you typed: CPE333
+student@ubuntu:~/PS03$ jobs -l
+\end{lstlisting}
+
+\newpage
+
+\subsubsection{อภิปรายผล}
+
+\begin{table}[H]
+\centering
+\caption{สรุปกลไกเบื้องหลัง CTRL+Z, bg และ fg}
+\begin{tabular}{p{2.2cm}p{3.0cm}p{3.5cm}p{4.6cm}}
+\toprule
+\textbf{การกระทำ} & \textbf{สัญญาณที่ส่ง} & \textbf{สถานะที่เปลี่ยน} & \textbf{ใครคุม terminal ต่อ} \\
+\midrule
+\code{CTRL+Z} & \code{SIGTSTP} (20) & \code{S+} $\rightarrow$ \code{T} ทั้ง process group & shell ทวง terminal คืน prompt กลับมา \\
+\addlinespace
+\code{bg \%1} & \code{SIGCONT} (18) & \code{T} $\rightarrow$ \code{S} (ไม่มี \code{+}) & shell ยังคุมอยู่เหมือนเดิม prompt ใช้ได้ทันที \\
+\addlinespace
+\code{fg \%1} & \code{SIGCONT} (18) & \code{T} $\rightarrow$ \code{S+} & ยกให้ job แล้วรอจน job จบหรือถูกหยุดอีก \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\code{CTRL+Z} คือการ ``พัก'' ไม่ใช่การ ``ฆ่า''}:
+        ผลจาก \code{ps} ยืนยันว่า process ยังอยู่ครบ เพียงแต่เปลี่ยนสถานะ
+        จาก \code{S+} เป็น \code{T} (stopped) ต่างจาก \code{CTRL+C}
+        ซึ่งส่ง \code{SIGINT} แล้วทำให้ process จบไปเลย
+        กลไกนี้คือคู่เดียวกับ \code{kill -STOP} ที่ทดลองไว้ในข้อ 1
+        ต่างกันเพียงว่า \code{SIGTSTP} ที่มาจากคีย์บอร์ดนั้น process
+        ดักจับได้ ส่วน \code{SIGSTOP} ดักจับไม่ได้
+
+  \item \textbf{สัญญาณถูกส่งถึงทั้ง process group ไม่ใช่แค่ process เดียว}:
+        เป็นจุดที่ผลการทดลองแสดงได้ชัดเจนมาก คือทั้ง
+        \code{6914 /bin/bash ./ss1\_2.sh} และลูกของมันคือ
+        \code{6916 sleep 1000} เปลี่ยนเป็นสถานะ \code{T} พร้อมกัน
+        ทั้งที่กด \code{CTRL+Z} เพียงครั้งเดียว เพราะทั้งคู่มี \code{PGID}
+        เดียวกันคือ \code{6914} และ terminal ส่งสัญญาณให้ทั้ง
+        foreground process group หากเคอร์เนลส่งให้เฉพาะตัว \code{bash}
+        ของสคริปต์ ตัว \code{sleep} ก็จะยังนับเวลาต่อไป ซึ่งไม่ใช่สิ่งที่ผู้ใช้คาดหวัง
+
+  \item \textbf{\code{jobs} เป็นตารางของ shell ไม่ใช่ของเคอร์เนล}:
+        เครื่องหมายท้ายเลข job มีความหมายคือ \code{+} หมายถึง current job
+        (ตัวที่ \code{fg} หรือ \code{bg} จะเลือกถ้าไม่ระบุ \code{\%n})
+        และ \code{-} หมายถึง previous job ส่วน \code{jobs -l}
+        จะแสดง PID จริงเพิ่มมาให้ ทำให้เชื่อมโยงกับผลของ \code{ps} ได้
+
+  \item \textbf{ความต่างของ \code{fg} กับ \code{bg} อยู่ที่สิทธิ์ควบคุม terminal
+        ไม่ใช่ที่การปลุก}: ทั้งสองคำสั่งส่ง \code{SIGCONT} เหมือนกันทุกประการ
+        job จึงกลับมาทำงานต่อได้ทั้งคู่ (เห็นได้จากสถานะที่เปลี่ยนจาก \code{T}
+        เป็น \code{S} ทั้งสองกรณี) สิ่งที่ต่างคือ \code{bg} ปล่อยให้ shell
+        ถือ terminal ไว้เหมือนเดิม prompt จึงกลับมาให้ใช้ทันที
+        ส่วน \code{fg} เรียก \code{tcsetpgrp()} ยกสิทธิ์ควบคุม terminal
+        ให้ process group ของ job แล้ว shell ก็เข้าไปรอ
+        หลักฐานคือภาพจาก \code{ps} ตอนที่ job อยู่ใน foreground
+        มี \code{TPGID} เป็น \code{6914} และ \code{STAT} เป็น \code{S+}
+        เทียบกับตอน \code{bg} ที่เป็น \code{S} เฉย ๆ
+
+  \item \textbf{มีงานบางประเภทที่ \code{bg} ใช้ไม่ได้เลย}:
+        การทดลองสุดท้ายแสดงกรณีนี้ชัดที่สุด job ที่เรียก \code{read}
+        เพื่ออ่านคีย์บอร์ดถูกเคอร์เนลหยุดทันทีด้วย \code{SIGTTIN}
+        และ \code{jobs} รายงานเหตุผลไว้ตรง ๆ ว่า
+        \code{Stopped (tty input)} ที่สำคัญคือเมื่อสั่ง \code{bg \%1}
+        job กลับไปหยุดที่เดิมอีกครั้งด้วยเหตุผลเดียวกัน เพราะ \code{bg}
+        ให้แค่ \code{SIGCONT} ไม่ได้ให้สิทธิ์อ่าน terminal
+        ต้องสั่ง \code{fg \%1} เท่านั้น job จึงอ่านข้อความ \code{CPE333}
+        ที่พิมพ์เข้าไปได้และทำงานจนจบ
+        สรุปเป็นหลักการได้ว่า \code{bg} เหมาะกับงานที่คำนวณอย่างเดียว
+        ส่วนงานที่ต้องโต้ตอบกับผู้ใช้ต้องอยู่ใน foreground เสมอ
+
+  \item \textbf{การ \code{kill} job ที่ถูกหยุดอยู่}:
+        \code{SIGTERM} เพียงอย่างเดียวจะไปค้างรออยู่เฉย ๆ เพราะ process
+        ที่อยู่ในสถานะ \code{T} ไม่ได้ถูกจัดให้ทำงานจึงยังไม่ได้ประมวลผลสัญญาณ
+        แต่ผลการทดลองแสดงว่า job ตายทันที เพราะ \code{kill} ของ bash
+        ฉลาดพอที่จะส่ง \code{SIGCONT} ตามไปให้ด้วยเมื่อรู้ว่าเป้าหมายถูกหยุดอยู่
+        สังเกตได้จาก \code{jobs -l} ครั้งแรกหลัง \code{kill \%1}
+        ที่รายงาน \code{Terminated} และครั้งที่สองไม่เหลืออะไรเลย
+        เพราะ shell แจ้งสถานะสุดท้ายของ job เพียงครั้งเดียวแล้วลบทิ้ง
+
+  \item \textbf{เชื่อมโยงกลับไปข้อ 1}: คำสั่ง \code{fg} และ \code{bg}
+        แท้จริงแล้วคือหน้ากากที่สวยงามของ \code{kill -CONT} ที่ทดลองไว้ในข้อ 1
+        โดย \code{bg \%1} ให้ผลเหมือน \code{kill -CONT <PID>} ทุกประการ
+        ส่วน \code{fg \%1} คือ \code{kill -CONT} บวกกับการยก terminal ให้
+        ความรู้เรื่องสัญญาณจากข้อ 1 จึงอธิบายพฤติกรรมของ job control
+        ในข้อนี้ได้ทั้งหมด
+\end{itemize}
+
+\subsection{สรุปข้อ 2}
+
+\begin{enumerate}[leftmargin=*]
+  \item การรันแบบ foreground กับ background ต่างกันที่ \emph{ใครถือสิทธิ์ควบคุม
+        terminal} ซึ่งตรวจสอบได้ตรง ๆ จากเครื่องหมาย \code{+} ในคอลัมน์
+        \code{STAT} และค่าในคอลัมน์ \code{TPGID} ของ \code{ps}
+        ส่วนเรื่อง prompt กลับเร็วหรือช้าเป็นเพียงผลพลอยได้
+
+  \item เครื่องหมาย \code{\&} ไม่ได้แยก output ของงานออกไปไหน
+        stdout ยังลง terminal เดิมและปนกับ prompt ถ้าต้องการความสะอาด
+        ต้อง redirect เอง
+
+  \item \code{CTRL+Z} คือ \code{SIGTSTP} ที่ส่งถึงทั้ง foreground process group
+        ทำให้ทั้งสคริปต์และลูกของมันหยุดพร้อมกัน โดย process ยังไม่ตาย
+
+  \item \code{fg} และ \code{bg} ส่งสัญญาณเดียวกันคือ \code{SIGCONT}
+        ต่างกันที่ \code{fg} ยกสิทธิ์ควบคุม terminal ให้ job ด้วย
+        จึงเป็นทางเลือกเดียวสำหรับงานที่ต้องรับ input จากผู้ใช้
+        ส่วน \code{bg} เหมาะกับงานที่ทำงานเงียบ ๆ ได้เอง
 \end{enumerate}
 
 \end{document}
