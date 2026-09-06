@@ -6,7 +6,7 @@
 %  Overleaf: Menu > Compiler > XeLaTeX
 %  Local   : xelatex PS04.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
 %
-%  สถานะเอกสาร: เขียนข้อ 1 (Static Storage Class) เสร็จแล้ว
+%  สถานะเอกสาร: เขียนข้อ 1 (Static Storage Class) และข้อ 2 (Extern Storage Class) เสร็จแล้ว
 % =====================================================================
 \documentclass[a4paper,11pt]{article}
 
@@ -182,15 +182,16 @@ Shell & \code{GNU bash 5.2.21(1)-release} \\
 \end{tabular}
 
 \textbf{ผลการทดลองดิบ} \quad ทุกบรรทัดที่ยกมาในรายงานนี้ตัดมาจากไฟล์
-\code{result/q1\_verified.txt} ซึ่งสร้างซ้ำได้ด้วย \code{make result}
-(สคริปต์ \code{run\_q1.sh} ในโฟลเดอร์ \code{src}) โจทย์กำหนดว่า
-\emph{ทุกขั้นตอนต้องรันบนเครื่องเดียวกัน} สคริปต์นี้จึงคอมไพล์และรันทั้งสี่กรณี
-(มีหรือไม่มี \code{static} คูณกับ มีหรือไม่มี \code{-no-pie}) รวดเดียวจบในการเรียกครั้งเดียว
+\code{result/q1\_verified.txt} และ \code{result/q2\_verified.txt}
+ซึ่งสร้างซ้ำได้ด้วย \code{make result} (สคริปต์ \code{run\_q1.sh} และ
+\code{run\_q2.sh} ในโฟลเดอร์ \code{src}) โจทย์กำหนดว่า
+\emph{ทุกขั้นตอนต้องรันบนเครื่องเดียวกัน} สคริปต์ของแต่ละข้อจึงคอมไพล์และรัน
+ทั้งสี่กรณีของข้อนั้น (แก้หรือไม่แก้โค้ด คูณกับ มีหรือไม่มี \code{-no-pie})
+รวดเดียวจบในการเรียกครั้งเดียว
 ในรายงานแสดงเฉพาะบรรทัดที่จำเป็นต่อการอภิปราย ส่วนที่ตัดออกจะมีเครื่องหมาย
 \code{...} หรือหมายเหตุ \code{(lines omitted)} กำกับไว้ และเพื่อให้ผลการรัน
-สามครั้งอยู่ในหน้าเดียวกันได้ ได้ย้ายบรรทัด \code{The address of y is ...}
-ขึ้นมาต่อท้ายบรรทัด \code{The value of y is ...} ของรอบเดียวกัน
-โดยไม่แก้ตัวเลขใด ๆ
+สามครั้งอยู่ในหน้าเดียวกันได้ ได้ย้ายบรรทัดที่พิมพ์ \emph{ที่อยู่}
+ขึ้นมาต่อท้ายบรรทัดที่พิมพ์ \emph{ค่า} ของรอบเดียวกัน โดยไม่แก้ตัวเลขใด ๆ
 
 \textbf{หมายเหตุสองเรื่องเกี่ยวกับวิธีทดลอง} \quad
 (1) รายงานนี้คอมไพล์ด้วย \code{-Wall -Wextra} ตลอด จึงมี warning
@@ -658,6 +659,506 @@ printed &y = 0x404018    load base = 0x0
         รายงานนี้คงโค้ดไว้ตามโจทย์และแนบ warning มาแสดงตามจริง แต่ในการใช้งานจริง
         ควรเขียนเป็น \code{int main(void)} และ \code{return 0;} เสมอ
         โดยเฉพาะเมื่อโปรแกรมจะถูกเรียกจากสคริปต์ที่ตรวจ exit status
+\end{itemize}
+
+% =====================================================================
+\section{ข้อ 2: Extern Storage Class}
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\subsection{พื้นฐานที่ต้องเข้าใจก่อน: การประกาศ กับ การนิยาม}
+% ---------------------------------------------------------------------
+
+ข้อ 1 ว่าด้วย \emph{อายุ} ของตัวแปร ส่วนข้อนี้ว่าด้วย \emph{การเชื่อมโยง (linkage)}
+คือเรื่องที่ว่าชื่อตัวแปรหนึ่งชื่อ ไฟล์อื่นเห็นด้วยหรือไม่ และหัวใจของมันคือ
+การแยกให้ออกระหว่างสองคำที่คนมักใช้ปนกัน
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การนิยาม (definition)} คือการสั่งให้ \emph{จองเนื้อที่จริง}
+        ในหน่วยความจำ เช่น \code{int x = 20;} ที่เขียนนอกฟังก์ชัน
+        ตัวแปรหนึ่งตัวมี definition ได้เพียงที่เดียวในทั้งโปรแกรม
+  \item \textbf{การประกาศ (declaration)} คือการบอกคอมไพเลอร์เพียงว่า
+        ``มีตัวแปรชื่อนี้ ชนิดนี้ อยู่ที่ไหนสักแห่ง เดี๋ยว linker ไปหามาให้''
+        เช่น \code{extern int x;} ซึ่ง \emph{ไม่จองเนื้อที่ใด ๆ ทั้งสิ้น}
+        และเขียนซ้ำกี่ที่ก็ได้
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{การนิยามกับการประกาศ ต่างกันตรงไหน}
+\begin{tabular}{p{3.3cm}p{4.6cm}p{5.4cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{int x = 20;} (นอกฟังก์ชัน)} & \textbf{\code{extern int x;}} \\
+\midrule
+เรียกว่าอะไร & definition (นิยาม) & declaration (ประกาศ) \\
+จองเนื้อที่ไหม & จอง 4 ไบต์ในส่วน \code{.data} & ไม่จองเลย \\
+เขียนซ้ำได้ไหม & ได้ที่เดียวในทั้งโปรแกรม & กี่ที่ก็ได้ \\
+ใครเป็นคนจัดการ & คอมไพเลอร์ & linker เป็นคนหาให้ตอนเชื่อมไฟล์ \\
+ถ้าไม่มีเลยจะเกิดอะไร & \code{undefined reference} ตอน link & คอมไพล์ผ่าน แต่อาจหา definition ไม่เจอ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+จุดที่ต้องสังเกตในโค้ดของโจทย์คือ \code{extern int x;} ที่เขียนอยู่ \emph{ข้างใน}
+\code{main()} และ \code{display()} นั้น อยู่ในไฟล์เดียวกันกับ \code{int x = 20;}
+ที่เป็น definition อยู่แล้ว ทั้งสองบรรทัดจึงเป็นการเขียนซ้ำซ้อนที่
+\textbf{ไม่มีผลอะไรเลย} เพราะตัวแปร global มองเห็นได้จากทุกฟังก์ชันในไฟล์อยู่แล้ว
+ตั้งแต่บรรทัดที่นิยามมันลงไป ข้อนี้จึงน่าสนใจตรงที่ผลของการ \emph{ลบ} คำว่า
+\code{extern} ออก ไม่ได้เป็นอย่างที่หลายคนคาดว่า ``main จะมองไม่เห็น \code{x}''
+แต่กลับกลายเป็นอย่างอื่นไปเลย ซึ่งจะเห็นใน Step 2
+
+% ---------------------------------------------------------------------
+\subsection{Step 1: โปรแกรมที่มี \code{extern} ทั้งสองฟังก์ชัน}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_extern.c} คัดลอกจากโจทย์ทุกตัวอักษร}]
+#include <stdio.h>
+#include <stdlib.h>
+
+int x = 20;
+
+void display()
+{
+    extern int x;
+    printf(" Display value of x: %d\n", x);
+    printf(" Address of x (in display function): %p\n\n", &x);
+}
+
+void main()
+{
+    extern int x;
+    printf(" Print value of x: %d\n", x);
+    printf(" Address of x (in main function): %p\n\n", &x);
+
+    display();
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={คอมไพล์แบบปกติแล้วรัน 3 ครั้ง}]
+$ gcc -Wall -Wextra -o q2_extern q2_extern.c
+q2_extern.c:19:6: warning: return type of 'main' is not 'int' [-Wmain]
+(exit status = 0)
+
+$ ./q2_extern                              # run 1
+ Print value of x: 20        Address of x (in main function):    0x574a1053e010
+ Display value of x: 20      Address of x (in display function): 0x574a1053e010
+
+$ ./q2_extern                              # run 2
+ Print value of x: 20        Address of x (in main function):    0x650dd456f010
+ Display value of x: 20      Address of x (in display function): 0x650dd456f010
+
+$ ./q2_extern                              # run 3
+ Print value of x: 20        Address of x (in main function):    0x59201f88d010
+ Display value of x: 20      Address of x (in display function): 0x59201f88d010
+\end{lstlisting}
+
+\subsubsection{อธิบายผล}
+
+\textbf{ค่าเป็น 20 ทั้งสองที่} \quad เพราะทั้ง \code{main()} และ \code{display()}
+กำลังพูดถึงตัวแปร \textbf{ตัวเดียวกัน} คือ \code{x} ที่นิยามไว้นอกฟังก์ชัน
+คำว่า \code{extern} ในทั้งสองฟังก์ชันเป็นเพียงการยืนยันว่า ``ชื่อ \code{x} ที่ใช้ตรงนี้
+หมายถึงตัวที่นิยามไว้ข้างนอก'' ซึ่งเป็นสิ่งที่คอมไพเลอร์เข้าใจอยู่แล้วโดยไม่ต้องบอก
+
+\textbf{ที่อยู่ในสองฟังก์ชันตรงกันเป๊ะ} \quad นี่คือหลักฐานที่เข้มที่สุดว่ามีตัวแปร
+เพียงตัวเดียวจริง ๆ ถ้าเป็นคนละตัวย่อมเป็นไปไม่ได้ที่ที่อยู่จะตรงกันทุกบิต
+และตรงกันซ้ำแบบนี้ทั้งสามรอบ ข้อสังเกตนี้จะกลายเป็นเครื่องมือหลักในการอ่านผล
+ของ Step 2 คือใช้ \emph{ที่อยู่} เป็นตัวบอกว่ากำลังดูตัวแปรตัวเดียวกันอยู่หรือเปล่า
+
+\textbf{ที่อยู่เปลี่ยนทุกครั้งที่รันใหม่} \quad ด้วยเหตุผลเดียวกับข้อ 1 ทุกประการ
+คือไฟล์เป็น PIE และเคอร์เนลสุ่มฐานที่โหลดใหม่ทุกครั้งตามกลไก ASLR
+สังเกตว่าเลขลงท้าย \code{010} เหมือนกันทั้งสามรอบ เพราะระยะห่างของ \code{x}
+จากฐานเป็นค่าคงที่ ส่วนที่เปลี่ยนคือฐานเท่านั้น
+
+% ---------------------------------------------------------------------
+\subsection{Step 2--3: ลบคำว่า \code{extern} ในฟังก์ชัน \code{main()}}
+% ---------------------------------------------------------------------
+
+แก้ไขตามโจทย์คือลบคำว่า \code{extern} ในบรรทัดที่ 15 ซึ่งอยู่ใน \code{main()}
+ออกเพียงคำเดียว (ไฟล์ \code{src/q2\_noextern.c}) ส่วนใน \code{display()}
+คงไว้เหมือนเดิม
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_noextern.c} เฉพาะส่วนที่เปลี่ยน}]
+void main()
+{
+    int x;                  /* the word "extern" is gone: this is now a NEW variable */
+    printf(" Print value of x: %d\n", x);
+    ...
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ลบ \code{extern} ใน \code{main()} แล้วคอมไพล์ คอมไพเลอร์เตือนเพิ่มมาหนึ่งข้อ}]
+$ gcc -Wall -Wextra -o q2_noextern q2_noextern.c
+q2_noextern.c:19:6: warning: return type of 'main' is not 'int' [-Wmain]
+q2_noextern.c: In function 'main':
+q2_noextern.c:22:5: warning: 'x' is used uninitialized [-Wuninitialized]
+   22 |     printf(" Print value of x: %d\n", x);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+q2_noextern.c:21:9: note: 'x' declared here
+   21 |     int x;
+      |         ^
+(exit status = 0)
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ผลการรัน 3 ครั้ง}]
+$ ./q2_noextern                            # run 1
+ Print value of x: 32767     Address of x (in main function):    0x7fffbd75e6e4
+ Display value of x: 20      Address of x (in display function): 0x64d04c4a1010
+
+$ ./q2_noextern                            # run 2
+ Print value of x: 32767     Address of x (in main function):    0x7fff6f1a5714
+ Display value of x: 20      Address of x (in display function): 0x5595b064f010
+
+$ ./q2_noextern                            # run 3
+ Print value of x: 32766     Address of x (in main function):    0x7ffe04a25a14
+ Display value of x: 20      Address of x (in display function): 0x579c5bb0f010
+\end{lstlisting}
+
+\subsubsection{อธิบายผลและเปรียบเทียบกับ Step 1}
+
+\textbf{สิ่งที่เกิดขึ้นไม่ใช่ ``main มองไม่เห็น \code{x}'' แต่คือ ``main สร้าง
+\code{x} ตัวใหม่''} \quad นี่คือหัวใจของข้อนี้ พอลบคำว่า \code{extern} ออก
+บรรทัดนั้นเปลี่ยนจาก \emph{การประกาศ} ว่าจะใช้ตัวแปรข้างนอก กลายเป็น
+\emph{การนิยาม} ตัวแปรอัตโนมัติตัวใหม่ชื่อ \code{x} ขึ้นมาใน \code{main()}
+ผลคือชื่อ \code{x} ในขอบเขตของ \code{main} ถูกจับจองโดยตัวใหม่นี้
+และ \textbf{บดบัง (shadow)} ตัวแปร global เดิมจนมองไม่เห็น
+โปรแกรมยังคอมไพล์ผ่านและรันได้ตามปกติ เพราะในทางไวยากรณ์ไม่มีอะไรผิดเลย
+
+\textbf{ค่าที่พิมพ์ออกมาเป็นค่าขยะ} \quad ตัวแปรใหม่นี้เป็นตัวแปรอัตโนมัติที่
+ไม่ได้ใส่ค่าเริ่มต้น จึงได้ค่าที่ค้างอยู่ในสล็อตของ stack ตรงนั้น
+ซึ่งตามมาตรฐาน C ถือเป็น \emph{undefined behavior} คอมไพเลอร์จับได้และเตือนไว้
+ด้วย \code{-Wuninitialized} ตรงตำแหน่งบรรทัดที่ใช้งานพอดี ซึ่งเป็นเหตุผลที่ควร
+คอมไพล์ด้วย \code{-Wall} เสมอ
+
+\textbf{ค่าขยะที่ได้ไม่ได้สุ่มมั่ว แต่อธิบายได้} \quad สังเกตว่าค่าที่ออกมาวนอยู่
+แถว 32765--32767 ซึ่งใกล้ค่าสูงสุดของ \code{short} พอดี เมื่อเทียบกับที่อยู่ของ
+ตัวมันเองจะเห็นความสัมพันธ์ที่ตรงกันทุกรอบ
+
+\begin{table}[H]
+\centering\small
+\caption{ค่าขยะที่พิมพ์ออกมา เท่ากับ 16 บิตบนของที่อยู่บน stack พอดีทุกรอบ}
+\begin{tabular}{llll}
+\toprule
+\textbf{การรัน} & \textbf{ค่าที่พิมพ์} & \textbf{ที่อยู่ของ \code{x} ใน \code{main}} & \textbf{16 บิตบนของที่อยู่} \\
+\midrule
+PIE รอบ 1 & \code{32767} & \code{0x7fff}\,\code{bd75e6e4} & \code{0x7fff} = 32767 \\
+PIE รอบ 2 & \code{32767} & \code{0x7fff}\,\code{6f1a5714} & \code{0x7fff} = 32767 \\
+PIE รอบ 3 & \code{32766} & \code{0x7ffe}\,\code{04a25a14} & \code{0x7ffe} = 32766 \\
+\code{-no-pie} รอบ 1 & \code{32767} & \code{0x7fff}\,\code{29c5a044} & \code{0x7fff} = 32767 \\
+\code{-no-pie} รอบ 2 & \code{32766} & \code{0x7ffe}\,\code{ad28b514} & \code{0x7ffe} = 32766 \\
+\code{-no-pie} รอบ 3 & \code{32765} & \code{0x7ffd}\,\code{1d346e74} & \code{0x7ffd} = 32765 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ตรงกันทั้ง 6 รอบไม่ใช่ความบังเอิญ อธิบายได้ว่าสล็อตบน stack ที่ \code{x}
+ไปตกลงนั้น เคยถูกใช้เก็บ \emph{ครึ่งบนของพอยน์เตอร์ 8 ไบต์ที่ชี้ไปบน stack}
+มาก่อน (โค้ดเริ่มต้นโปรแกรมและ dynamic loader ทำงานผ่านบริเวณนี้ก่อนถึง \code{main})
+พอยน์เตอร์บน stack ของเครื่อง 64 บิตหน้าตาเป็น \code{0x00007ffX\_XXXXXXXX}
+เมื่ออ่านเฉพาะ 4 ไบต์บนของมันเป็น \code{int} จึงได้ \code{0x00007fff}
+ซึ่งก็คือ 32767 และเนื่องจากตัวแปร \code{x} เองก็อยู่บน stack เหมือนกัน
+16 บิตบนของทั้งสองค่าจึงตรงกันเสมอ ย้ำว่าเลขนี้ \emph{ไม่ได้รับประกัน}
+เป็นเพียงสิ่งที่บังเอิญค้างอยู่ ถ้าเปลี่ยนเครื่อง เปลี่ยนคอมไพเลอร์
+หรือแม้แต่เปลี่ยนความยาวของตัวแปรสภาพแวดล้อม ก็อาจได้เลขอื่น
+
+\textbf{\code{display()} ยังทำงานถูกต้องเหมือนเดิม} \quad เพราะไม่ได้ถูกแก้
+มันยังเห็นตัวแปร global ตัวเดิม จึงยังพิมพ์ \code{20} และพิมพ์ที่อยู่ในย่าน
+\code{0x5...} เหมือน Step 1 ทุกประการ จุดนี้คือการยืนยันว่าปัญหาเกิดเฉพาะ
+ในขอบเขตของ \code{main} ไม่ได้ลามไปทั้งโปรแกรม
+
+\textbf{ที่อยู่คนละย่านคือหลักฐานว่าเป็นคนละตัวแปร} \quad
+เทียบกับ Step 1 ที่ที่อยู่ในสองฟังก์ชันตรงกันเป๊ะ พอมาถึง Step 2
+ที่อยู่ใน \code{main} เป็น \code{0x7ff...} (stack) ส่วนใน \code{display}
+เป็น \code{0x5...} (ส่วน \code{.data} ของโปรแกรม) ห่างกันคนละย่านของ
+address space ไปเลย
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปความต่างระหว่างมีและไม่มี \code{extern} ใน \code{main()}}
+\begin{tabular}{p{3.0cm}p{5.5cm}p{5.5cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{extern int x;} ใน main} & \textbf{\code{int x;} ใน main} \\
+\midrule
+บรรทัดนั้นคืออะไร & การประกาศ อ้างถึงตัวแปรข้างนอก & การนิยามตัวแปรใหม่ในบล็อก \\
+มีตัวแปรกี่ตัว & 1 ตัว ใช้ร่วมกันทั้งโปรแกรม & 2 ตัว คือ global กับตัวใหม่ใน main \\
+\code{main} พิมพ์ค่าอะไร & \code{20} & ค่าขยะ (\code{32765}--\code{32767}) \\
+\code{display} พิมพ์ค่าอะไร & \code{20} & \code{20} (ไม่กระทบ) \\
+ที่อยู่ในสองฟังก์ชัน & ตรงกันเป๊ะ & คนละย่านโดยสิ้นเชิง \\
+warning จาก \code{gcc} & ไม่มีเพิ่ม & \code{'x' is used uninitialized} \\
+เก็บที่ไหน & \code{.data} ทั้งคู่ & main อยู่ stack, display อยู่ \code{.data} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4: คอมไพล์ใหม่ด้วย \code{-no-pie}}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่มี \code{extern} ครบ}]
+$ gcc -no-pie -Wall -Wextra -o q2_extern_nopie q2_extern.c
+$ ./q2_extern_nopie                        # run 1, 2 and 3 are all identical
+ Print value of x: 20        Address of x (in main function):    0x404018
+ Display value of x: 20      Address of x (in display function): 0x404018
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่ลบ \code{extern} ใน \code{main()}}]
+$ gcc -no-pie -Wall -Wextra -o q2_noextern_nopie q2_noextern.c
+$ ./q2_noextern_nopie                      # run 1
+ Print value of x: 32767     Address of x (in main function):    0x7fff29c5a044
+ Display value of x: 20      Address of x (in display function): 0x404020
+
+$ ./q2_noextern_nopie                      # run 2
+ Print value of x: 32766     Address of x (in main function):    0x7ffead28b514
+ Display value of x: 20      Address of x (in display function): 0x404020
+
+$ ./q2_noextern_nopie                      # run 3
+ Print value of x: 32765     Address of x (in main function):    0x7ffd1d346e74
+ Display value of x: 20      Address of x (in display function): 0x404020
+\end{lstlisting}
+
+\subsubsection{ต่างจากเดิมหรือไม่ เพราะอะไร}
+
+คำตอบเหมือนข้อ 1 คือ \textbf{ต่างเฉพาะส่วนที่อยู่ในไฟล์โปรแกรม}
+แต่ข้อนี้ให้ภาพที่คมกว่า เพราะเห็นผลทั้งสองแบบ \emph{ในโปรแกรมเดียวกัน}
+คือ \code{q2\_noextern\_nopie} ตัวเดียว มีตัวแปรสองตัวที่ตอบสนองต่อ
+\code{-no-pie} ไม่เหมือนกันเลย
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปผลทั้งสี่กรณีของข้อ 2}
+\begin{tabular}{p{2.6cm}p{3.6cm}p{3.3cm}p{3.9cm}}
+\toprule
+\textbf{ตัวแปรที่ดู} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ \code{-no-pie}} & \textbf{สรุป} \\
+\midrule
+\code{x} global (มี \code{extern}) & \code{0x574a...}, \code{0x650d...}, \code{0x5920...} เปลี่ยนทุกครั้ง
+  & \code{0x404018} ทั้งสามครั้ง & \textbf{ต่างกัน} ตรึงที่อยู่ได้ \\
+\code{x} local ใน main (ลบ \code{extern}) & \code{0x7fff...}, \code{0x7fff...}, \code{0x7ffe...} เปลี่ยนทุกครั้ง
+  & \code{0x7fff...}, \code{0x7ffe...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง & \textbf{ไม่ต่าง} ตรึงไม่ได้ \\
+\code{x} global ใน display (ไฟล์เดียวกัน) & เปลี่ยนทุกครั้ง & \code{0x404020} ทั้งสามครั้ง & \textbf{ต่างกัน} ตรึงที่อยู่ได้ \\
+\midrule
+ค่าที่พิมพ์ & \code{20} และค่าขยะ & \code{20} และค่าขยะ & \textbf{ไม่ต่าง} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{(1) ตัวแปร global ถูกตรึงที่อยู่ได้} \quad ด้วยเหตุผลเดียวกับตัวแปร
+\code{static} ในข้อ 1 คือมันอยู่ในส่วน \code{.data} ซึ่งเป็นส่วนหนึ่งของไฟล์
+เมื่อ linker ผูกที่อยู่จริงไว้ตั้งแต่ตอน link (ไฟล์ชนิด \code{EXEC})
+เคอร์เนลก็ต้องโหลดลงที่เดิมเสมอ ที่น่าสนใจคือข้อนี้ให้ผลเหมือนข้อ 1 ทั้งที่
+\code{static} กับ global เป็นคนละ storage class กัน ซึ่งยืนยันว่าสิ่งที่กำหนดว่า
+ที่อยู่จะคงที่หรือไม่ ไม่ใช่ \emph{คีย์เวิร์ด} แต่คือ \emph{ตัวแปรไปอยู่ส่วนไหน
+ของหน่วยความจำ}
+
+\textbf{(2) ตัวแปรอัตโนมัติใน \code{main} ยังสุ่มเหมือนเดิม} \quad เพราะอยู่บน
+stack ซึ่งเคอร์เนลเป็นคนสร้างและสุ่มตำแหน่งให้ตอนสร้าง process ไม่ได้อยู่ในไฟล์
+\code{-no-pie} จึงไม่มีอำนาจอะไรกับมัน
+
+\textbf{(3) ข้อควรระวังในการอ่านตัวเลข} \quad ที่อยู่ของ global ในไฟล์
+\code{q2\_extern\_nopie} คือ \code{0x404018} แต่ในไฟล์
+\code{q2\_noextern\_nopie} คือ \code{0x404020} ต่างกัน 8 ไบต์
+ตัวเลขที่ไม่เท่ากันนี้ \emph{ไม่ได้} ขัดกับข้อสรุป เพราะเป็นคนละไฟล์ไบนารีกัน
+(โค้ดต่างกัน linker จึงจัดวางต่างกันเล็กน้อย) สิ่งที่ข้อสรุปพูดถึงคือ
+ที่อยู่ต้องคงที่เมื่อ \emph{รันไฟล์เดิมซ้ำ} ซึ่งเป็นจริงทั้งสองไฟล์
+
+\textbf{(4) ค่าที่พิมพ์ไม่เปลี่ยน} \quad \code{-no-pie} เป็นเรื่องการจัดวาง
+หน่วยความจำล้วน ๆ ไม่ได้แก้บั๊กการบดบังตัวแปรให้ และไม่ได้ทำให้ตัวแปร
+ที่ไม่ได้กำหนดค่าเริ่มต้นกลายเป็นศูนย์
+
+% ---------------------------------------------------------------------
+\subsection{หลักฐานยืนยันคำอธิบาย}
+\label{sec:evidence2}
+% ---------------------------------------------------------------------
+
+\textbf{หลักฐานที่ 1: \code{x} เป็น symbol แบบ global จริง}
+
+\begin{lstlisting}[style=terminal,caption={ตาราง symbol ของไฟล์ \code{-no-pie} ทั้งสอง}]
+$ nm q2_extern_nopie   | grep -w x           # 'D' upper case = external linkage
+0000000000404018 D x                         <- exactly what the program printed
+
+$ nm q2_noextern_nopie | grep -w x           # the global x is still there, untouched
+0000000000404020 D x                         <- the local x in main() has no symbol
+
+$ readelf -s q2_extern_nopie | grep -w x
+    21: 0000000000404018     4 OBJECT  GLOBAL DEFAULT   25 x
+\end{lstlisting}
+
+ตัวอักษร \code{D} \emph{ตัวใหญ่} คือจุดที่ต้องเทียบกับข้อ 1 ซึ่งได้
+\code{d} \emph{ตัวเล็ก} สำหรับตัวแปร \code{static} ตัวใหญ่แปลว่า global
+คือไฟล์อื่นเห็นและใช้ร่วมได้ ส่วนตัวเล็กแปลว่า local คือมีอยู่ในไฟล์นี้เท่านั้น
+นี่คือ \emph{linkage} ที่จับต้องได้จริงในไฟล์ไบนารี ส่วน \code{readelf}
+ยืนยันเพิ่มว่าเป็น \code{OBJECT} ขนาด 4 ไบต์ binding เป็น \code{GLOBAL}
+และอยู่ใน section ที่ 25 ซึ่งก็คือ \code{.data} และที่สำคัญคือ
+ไม่มี symbol ใดเลยสำหรับตัวแปร \code{x} ตัวใหม่ใน \code{main}
+เพราะตัวแปรอัตโนมัติไม่ได้อยู่ในไฟล์
+
+\textbf{หลักฐานที่ 2: คำว่า \code{extern} ในฟังก์ชันไม่สร้างโค้ดเครื่องเลยแม้แต่บิตเดียว}
+
+ถ้าคำกล่าวที่ว่า ``\code{extern} ในฟังก์ชันเป็นการเขียนซ้ำซ้อน'' เป็นจริง
+การลบ \emph{ทั้งบรรทัด} นั้นทิ้งไปเลยต้องได้โค้ดเครื่องที่เหมือนกันทุกไบต์
+สคริปต์จึงสร้างไฟล์ \code{q2\_nodecl.c} ที่ไม่มีบรรทัดประกาศใน \code{main}
+เลย แล้วเทียบ disassembly ของฟังก์ชัน \code{main} ระหว่างสองไฟล์
+
+\begin{lstlisting}[style=terminal,caption={เทียบโค้ดเครื่องของ \code{main()} ระหว่างไฟล์ที่มีและไม่มีบรรทัด \code{extern int x;}}]
+$ diff q2_extern.c q2_nodecl.c
+21d20
+<     extern int x;
+
+$ diff dis_extern.txt dis_nodecl.txt
+identical, the extern declaration inside main() generates no code at all
+
+$ cat dis_extern.txt                   # the machine code of main() in both files
+  40117b: endbr64
+  40117f: push   %rbp
+  401180: mov    %rsp,%rbp
+  401183: mov    0x2e8f(%rip),%eax        # 404018 <x>      <- reads the global directly
+  401189: mov    %eax,%esi
+  40118b: lea    0xec0(%rip),%rax         # 402052 <_IO_stdin_used+0x52>
+  401192: mov    %rax,%rdi
+  401195: mov    $0x0,%eax
+  40119a: call   401040 <printf@plt>
+  40119f: lea    0x2e72(%rip),%rax        # 404018 <x>      <- takes its address
+  ...
+  4011c2: call   401136 <display>
+  4011c9: ret
+\end{lstlisting}
+
+นอกจากจะเหมือนกันทุกบรรทัดแล้ว โค้ดยังบอกด้วยว่า \code{main} อ่านค่าจากที่อยู่
+\code{404018} ซึ่งเป็นตัวแปร global โดยตรง ไม่มีการจองเนื้อที่บน stack ให้ \code{x}
+เลยแม้แต่ไบต์เดียว (ไม่มีคำสั่ง \code{sub \$N,\%rsp} สำหรับตัวแปร)
+
+\textbf{หลักฐานที่ 3: การประกาศไม่ใช่การนิยาม ถ้าไม่มีใครนิยาม linker จะฟ้อง}
+
+\begin{lstlisting}[style=terminal,caption={ลบบรรทัด \code{int x = 20;} ทิ้ง เหลือแต่ \code{extern int x;} ในสองฟังก์ชัน}]
+$ diff q2_extern.c q2_nodef.c
+10d9
+< int x = 20;
+
+$ gcc -w -o q2_nodef q2_nodef.c
+ld: q2_nodef.c:(.text+0xa):  undefined reference to `x'
+ld: q2_nodef.c:(.text+0x27): undefined reference to `x'
+ld: q2_nodef.c:(.text+0x4f): undefined reference to `x'
+ld: q2_nodef.c:(.text+0x6c): undefined reference to `x'
+collect2: error: ld returned 1 exit status
+(exit status of gcc = 1   -> the compiler was happy, the linker was not)
+\end{lstlisting}
+
+จุดสำคัญคือ \textbf{คอมไพเลอร์ผ่านฉลุย} ข้อผิดพลาดมาจาก \code{ld} ซึ่งเป็น
+\emph{linker} ทั้งหมด เพราะ \code{extern int x;} เป็นการสัญญากับคอมไพเลอร์ว่า
+``เดี๋ยวมีคนนิยามให้'' คอมไพเลอร์จึงปล่อยผ่านและทิ้งช่องว่างไว้ให้ linker เติม
+พอถึงเวลาเชื่อมไฟล์แล้วหาไม่เจอจึงฟ้องครบทั้ง 4 จุดที่มีการอ้างถึง \code{x}
+(สองจุดใน \code{display} และสองจุดใน \code{main})
+
+\textbf{หลักฐานที่ 4: ปิด ASLR แล้วที่อยู่หยุดเปลี่ยน (กรณีควบคุม)}
+
+\begin{lstlisting}[style=terminal,caption={รันไฟล์ PIE ชุดเดิมด้วย \code{setarch -R}}]
+$ setarch -R ./q2_extern   | grep Address      # run 1, 2, 3
+ Address of x (in main function): 0x555555558010
+ Address of x (in main function): 0x555555558010
+ Address of x (in main function): 0x555555558010
+
+$ setarch -R ./q2_noextern | grep Address      # run 1, 2, 3 (the local x in main)
+ Address of x (in main function): 0x7fffffffe294
+ Address of x (in main function): 0x7fffffffe294
+ Address of x (in main function): 0x7fffffffe294
+
+$ setarch -R bash -c 'grep "\[stack\]" /proc/self/maps'
+7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
+\end{lstlisting}
+
+ผลเหมือนข้อ 1 ทุกประการ คือทั้งสองโปรแกรมหยุดสุ่มเมื่อปิด ASLR
+และที่อยู่ \code{0x7fffffffe294} ของตัวแปรใน \code{main} ตกอยู่ในช่วง
+\code{[stack]} พอดี ยืนยันว่ามันเป็นตัวแปรบน stack จริง
+
+\textbf{หลักฐานที่ 5: สิ่งที่ \code{extern} มีไว้ใช้จริง ๆ}
+
+โจทย์ใช้ \code{extern} ในไฟล์เดียว ซึ่งไม่ใช่สถานการณ์ที่มันถูกออกแบบมาเพื่อแก้
+การใช้งานจริงคือให้ไฟล์ \code{.c} หลายไฟล์ใช้ตัวแปรตัวเดียวกัน
+จึงเขียนตัวอย่างสั้น ๆ สองไฟล์เพิ่มไว้เพื่อให้เห็นภาพ
+
+\begin{lstlisting}[style=cstyle,caption={\code{q2\_shared\_def.c} นิยามตัวแปร ส่วน \code{q2\_shared\_main.c} แค่ประกาศ}]
+/* ---------- q2_shared_def.c : the DEFINITION lives here ---------- */
+int shared_counter = 100;
+void bump_from_other_file(void) { shared_counter++; ... }
+
+/* ---------- q2_shared_main.c : only a DECLARATION ---------- */
+extern int shared_counter;
+void bump_from_other_file(void);
+int main(void) { ...  bump_from_other_file();  ... }
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={ตัวแปรเดียวกันจริง ที่อยู่ตรงกันข้ามไฟล์ และแก้จากอีกไฟล์ได้}]
+$ gcc -Wall -Wextra -o q2_shared q2_shared_main.c q2_shared_def.c
+$ ./q2_shared
+ q2_shared_main.c: value = 100, address = 0x5f9fe0256010
+ q2_shared_def.c : value = 101, address = 0x5f9fe0256010
+ q2_shared_main.c: value = 101, address = 0x5f9fe0256010   (changed by the other file)
+
+$ nm q2_shared_main.o | grep -w shared_counter    # 'U' = Undefined, only a declaration
+                 U shared_counter
+$ nm q2_shared_def.o  | grep -w shared_counter    # 'D' = Defined, this is where it lives
+0000000000000000 D shared_counter
+\end{lstlisting}
+
+ตาราง symbol ของไฟล์ \code{.o} ทั้งสองอธิบายกลไกได้ครบในสองบรรทัด
+ฝั่งที่มีแต่ \code{extern} ได้สถานะ \code{U} (Undefined) คือ ``ขอใช้ชื่อนี้
+แต่ไม่รู้ว่าอยู่ไหน'' ส่วนฝั่งที่นิยามได้สถานะ \code{D} พร้อมที่อยู่
+หน้าที่ของ linker คือจับคู่สองอันนี้เข้าด้วยกัน ผลคือทั้งสองไฟล์พิมพ์ที่อยู่
+เดียวกันเป๊ะ และการแก้ค่าจากไฟล์หนึ่งเห็นผลในอีกไฟล์ทันที
+
+% ---------------------------------------------------------------------
+\subsection{อภิปรายผล}
+% ---------------------------------------------------------------------
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\code{extern} เป็นคำสั่งที่พูดกับ linker ไม่ใช่กับ CPU}:
+        ต่างจาก \code{static} ในข้อ 1 ที่มีผลจริงต่อการจัดวางหน่วยความจำ
+        คำว่า \code{extern} ในโค้ดของโจทย์ไม่ได้ทำให้เกิดคำสั่งเครื่องเพิ่มขึ้น
+        แม้แต่บิตเดียว (หลักฐานที่ 2) มันเป็นเพียงข้อมูลที่คอมไพเลอร์ใช้ตัดสินว่า
+        ชื่อนี้หมายถึงอะไร แล้วฝากงานที่เหลือให้ linker ไปหา definition มาให้
+
+  \item \textbf{บทเรียนที่แท้จริงของข้อนี้คือการบดบังตัวแปร (shadowing)}:
+        โจทย์บอกให้ ``ลบคำว่า extern'' ซึ่งฟังดูเหมือนแค่เอาคำที่ไม่จำเป็นออก
+        แต่ผลที่ได้กลับเป็นการสร้างตัวแปรใหม่ที่บังตัวเดิมทั้งดุ้น
+        นี่เป็นบั๊กที่เจอบ่อยมากในโปรแกรมจริง เพราะคอมไพล์ผ่าน ไม่มี error
+        และโปรแกรมยังรันได้ตามปกติ วิธีป้องกันคือเปิด \code{-Wshadow}
+        เพิ่มจาก \code{-Wall -Wextra} ซึ่งจะเตือนทันทีที่ชื่อในบล็อกไปบังชื่อข้างนอก
+        ในกรณีนี้ \code{-Wall} ช่วยจับได้อยู่แล้วโดยบังเอิญ ผ่านทาง
+        \code{-Wuninitialized} แต่ถ้าโค้ดเขียนว่า \code{int x = 5;} แทน
+        คำเตือนนั้นจะหายไปและบั๊กจะเงียบสนิท
+
+  \item \textbf{ค่าขยะที่อธิบายได้ ไม่ได้แปลว่าพึ่งพาได้}: ตารางเทียบค่ากับที่อยู่
+        แสดงว่าเลข 32765--32767 มีที่มาชัดเจน คือเศษของพอยน์เตอร์ที่ค้างอยู่ใน
+        สล็อตนั้น แต่มาตรฐาน C ระบุว่าการอ่านตัวแปรอัตโนมัติที่ยังไม่กำหนดค่าเป็น
+        undefined behavior ซึ่งแปลว่าคอมไพเลอร์มีสิทธิ์ทำอะไรก็ได้ รวมถึงตัดโค้ดทิ้ง
+        หรือให้ผลต่างกันในแต่ละครั้งที่คอมไพล์ การอธิบายได้จึงมีค่าในแง่การเรียนรู้
+        ว่าหน่วยความจำถูกใช้ซ้ำอย่างไร ไม่ใช่ในแง่การเขียนโปรแกรมจริง
+
+  \item \textbf{ข้อ 1 กับข้อ 2 เป็นสองแกนที่ตั้งฉากกัน}: \code{static}
+        ในข้อ 1 ทำให้ตัวแปร \emph{อายุยืนขึ้น} แต่ \emph{ปิด} การมองเห็นจากไฟล์อื่น
+        ส่วน global กับ \code{extern} ในข้อ 2 \emph{เปิด} การมองเห็นให้กว้างที่สุด
+        เห็นได้ชัดที่สุดจากตาราง symbol คือ \code{d y.0} ตัวเล็ก เทียบกับ
+        \code{D x} ตัวใหญ่ ทั้งสองตัวอยู่ใน \code{.data} เหมือนกัน มีที่อยู่คงที่
+        เมื่อคอมไพล์ด้วย \code{-no-pie} เหมือนกัน ต่างกันแค่ว่าใครเห็นชื่อมันได้บ้าง
+
+  \item \textbf{ในโปรแกรมจริงไม่ควรเขียน \code{extern} ไว้ในไฟล์ \code{.c}}:
+        วิธีที่ถูกต้องคือประกาศ \code{extern int x;} ไว้ในไฟล์ \code{.h}
+        แล้วให้ทุกไฟล์ที่ต้องใช้ \code{\#include} เข้าไป ส่วน definition
+        \code{int x = 20;} เขียนไว้ในไฟล์ \code{.c} เพียงไฟล์เดียว
+        เหตุผลคือถ้าเขียนประกาศซ้ำ ๆ ในหลายไฟล์เอง วันที่ชนิดของตัวแปรเปลี่ยน
+        จะต้องไล่แก้ทุกไฟล์ และถ้าแก้ไม่ครบ linker จะไม่ฟ้องด้วย เพราะมันจับคู่
+        ด้วย \emph{ชื่อ} ไม่ได้ตรวจชนิด ซึ่งจะกลายเป็นบั๊กที่หายาก
+
+  \item \textbf{ตัวแปร global ควรใช้เท่าที่จำเป็น}: ข้อนี้แสดงให้เห็นว่า
+        ตัวแปร global ตัวเดียวถูกอ่านและแก้ได้จากทุกฟังก์ชันในโปรแกรม
+        (ตัวอย่างสองไฟล์ในหลักฐานที่ 5 คือภาพชัด ๆ ที่ฟังก์ชันในอีกไฟล์
+        แก้ค่าแล้วเห็นผลทันที) ซึ่งสะดวกแต่ทำให้ไล่หาสาเหตุของบั๊กยาก
+        เพราะไม่มีทางรู้ว่าใครแก้ค่าไปบ้าง และเมื่อมีหลาย thread ก็เกิด
+        race condition ได้เช่นเดียวกับตัวแปร \code{static} ในข้อ 1
+        แนวทางที่ปลอดภัยกว่าคือส่งค่าผ่านพารามิเตอร์ของฟังก์ชัน
+        หรือถ้าจำเป็นต้องมี global จริง ๆ ก็ประกาศเป็น \code{static}
+        ที่ระดับไฟล์เพื่อจำกัดขอบเขตให้แคบที่สุดเท่าที่ทำได้
 \end{itemize}
 
 \end{document}
