@@ -1,12 +1,8 @@
 % =====================================================================
-%  CPE 333 Operating Systems 1/2026 - Problem Session 4
+%  CPE 333 Operating Systems 1/2569 - Problem Session 4
 %  Memory class and API in C programming
 %  ---------------------------------------------------------------
-%  คอมไพล์ด้วย XeLaTeX หรือ LuaLaTeX เท่านั้น (pdfLaTeX ใช้ไม่ได้ เพราะใช้ fontspec)
-%  Overleaf: Menu > Compiler > XeLaTeX
-%  Local   : xelatex PS04.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
-%
-%  สถานะเอกสาร: เขียนครบทั้งสามข้อ (Static, Extern และ Memory Allocation)
+%  คอมไพล์ด้วย XeLaTeX
 % =====================================================================
 \documentclass[a4paper,11pt]{article}
 
@@ -31,16 +27,10 @@
 \usepackage{fontspec}
 \usepackage{xltxtra}
 
-% --- เลือกอย่างใดอย่างหนึ่ง ---
-% (A) เครื่องตัวเอง / มีฟอนต์ TH Sarabun New ติดตั้งอยู่แล้ว
 \setmainfont{TH Sarabun New}[Scale=1.45]
-
-% (B) Overleaf หรือเครื่องที่มี Noto  <-- ปลอดภัยที่สุดถ้าคอมไพล์บน Overleaf
-% \setmainfont{Noto Serif Thai}[Scale=1.0, UprightFont = * Regular, BoldFont = * Bold]
-
 \setmonofont{Consolas}[Scale=0.78]
 
-% การตัดคำภาษาไทย (สำคัญมาก ไม่งั้นบรรทัดจะทะลุขอบกระดาษ)
+% การตัดคำภาษาไทย
 \XeTeXlinebreaklocale "th"
 \XeTeXlinebreakskip = 0pt plus 0.3pt
 \emergencystretch=3em
@@ -77,28 +67,6 @@
   morekeywords={size_t,malloc,calloc,realloc,free,printf,exit,auto,static,extern,register},
 }
 
-\lstdefinestyle{bashstyle}{
-  language=bash,
-  backgroundcolor=\color{codebg},
-  frame=single,
-  rulecolor=\color{codeframe},
-  basicstyle=\ttfamily\scriptsize,
-  keywordstyle=\color{kw}\bfseries,
-  commentstyle=\color{cmt}\itshape,
-  stringstyle=\color{str},
-  numbers=left,
-  numberstyle=\tiny\color{numgray},
-  numbersep=6pt,
-  showstringspaces=false,
-  breaklines=true,
-  tabsize=4,
-  captionpos=b,
-  aboveskip=6pt,
-  belowskip=2pt,
-  xleftmargin=12pt,
-  framexleftmargin=12pt,
-}
-
 \lstdefinestyle{terminal}{
   language={},
   keywordstyle=\relax,
@@ -119,13 +87,12 @@
 
 \lstset{style=cstyle}
 \renewcommand{\lstlistingname}{Code}
-
 \newcommand{\code}[1]{\texttt{#1}}
 
 % ------------------------- Header / Footer -------------------------
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{\small CPE 333 Operating Systems 1/2026}
+\lhead{\small CPE 333 Operating Systems 1/2569}
 \rhead{\small Problem Session 4}
 \cfoot{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -138,7 +105,7 @@
 \centering
 \vspace*{0.3cm}
 \includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
-{\Large\bfseries รายงาน}\\[0.4cm]
+{\Large\bfseries รายงานปฏิบัติการ}\\[0.4cm]
 {\Large\bfseries PS04: Memory class and API in C programming}\\[0.4cm]
 \vfill
 {\large\bfseries เสนอ}\\[0.3cm]
@@ -169,89 +136,61 @@
 \addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
 % =====================================================================
 
+การทดลองทั้งหมดดำเนินการบนระบบปฏิบัติการตามข้อกำหนดของปฏิบัติการ โดยมีรายละเอียดสภาพแวดล้อมดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อมูลสภาพแวดล้อมของระบบที่ใช้ในการทดลอง}
 \begin{tabular}{@{}lp{12.4cm}@{}}
 \toprule
-ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11), kernel \code{6.6.87.2-microsoft-standard-WSL2} \\
-สถาปัตยกรรม & x86-64 (64 บิต) \\
-คอมไพเลอร์ & \code{gcc 13.3.0} (Ubuntu 13.3.0-6ubuntu2\textasciitilde 24.04.1) ตั้งค่ามาพร้อม \code{-{}-enable-default-pie} \\
-เครื่องมือตรวจสอบ & \code{binutils} (\code{nm}, \code{readelf}), \code{file}, \code{util-linux} (\code{setarch}) \\
-ค่า ASLR & \code{/proc/sys/kernel/randomize\_va\_space} = \code{2} (สุ่มเต็มรูปแบบ) \\
+\textbf{รายการ} & \textbf{รายละเอียด} \\
+\midrule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11), Kernel \code{6.6.87.2-microsoft-standard-WSL2} \\
+สถาปัตยกรรม & x86-64 (64-bit) \\
+คอมไพเลอร์ & \code{gcc 13.3.0} (ตั้งค่าเริ่มต้นเป็น \code{--enable-default-pie}) \\
+ค่า ASLR & \code{/proc/sys/kernel/randomize\_va\_space = 2} (เปิดการสุ่มอย่างสมบูรณ์) \\
 Shell & \code{GNU bash 5.2.21(1)-release} \\
-วันที่เก็บผล & 6 กันยายน 2569 \\
 \bottomrule
 \end{tabular}
+\end{table}
 
-\textbf{ผลการทดลองดิบ} \quad ทุกบรรทัดที่ยกมาในรายงานนี้ตัดมาจากไฟล์
-\code{result/q1\_verified.txt}, \code{result/q2\_verified.txt} และ
-\code{result/q3\_verified.txt} ซึ่งสร้างซ้ำได้ด้วย \code{make result}
-(สคริปต์ \code{run\_q1.sh}, \code{run\_q2.sh} และ
-\code{run\_q3.sh} ในโฟลเดอร์ \code{src}) โจทย์กำหนดว่า
-\emph{ทุกขั้นตอนต้องรันบนเครื่องเดียวกัน} สคริปต์ของแต่ละข้อจึงคอมไพล์และรัน
-ทั้งสี่กรณีของข้อนั้น (แก้หรือไม่แก้โค้ด คูณกับ มีหรือไม่มี \code{-no-pie})
-รวดเดียวจบในการเรียกครั้งเดียว
-ในรายงานแสดงเฉพาะบรรทัดที่จำเป็นต่อการอภิปราย ส่วนที่ตัดออกจะมีเครื่องหมาย
-\code{...} หรือหมายเหตุ \code{(lines omitted)} กำกับไว้ และเพื่อให้ผลการรัน
-สามครั้งอยู่ในหน้าเดียวกันได้ ได้ย้ายบรรทัดที่พิมพ์ \emph{ที่อยู่}
-ขึ้นมาต่อท้ายบรรทัดที่พิมพ์ \emph{ค่า} ของรอบเดียวกัน โดยไม่แก้ตัวเลขใด ๆ
-
-\textbf{หมายเหตุสองเรื่องเกี่ยวกับวิธีทดลอง} \quad
-(1) รายงานนี้คอมไพล์ด้วย \code{-Wall -Wextra} ตลอด จึงมี warning
-\code{return type of main is not int [-Wmain]} ติดมาทุกครั้ง เพราะโค้ดที่โจทย์ให้มา
-ประกาศ \code{void main()} ซึ่งไม่ตรงมาตรฐาน C (มาตรฐานกำหนดให้ \code{main}
-คืนค่า \code{int}) รายงานคงโค้ดไว้ตามโจทย์ทุกตัวอักษร เพราะเป็นเพียง warning
-ไม่ใช่ error และไม่กระทบผลการทดลองเรื่องที่อยู่ของตัวแปรเลย
-(2) การอธิบายว่า ``ที่อยู่เปลี่ยนเพราะ ASLR'' จะเชื่อถือได้ก็ต่อเมื่อ \emph{ปิด} ASLR
-แล้วที่อยู่ต้องหยุดเปลี่ยน สคริปต์จึงรันโปรแกรมชุดเดิมซ้ำด้วย \code{setarch -R}
-(ปิดการสุ่ม address space เฉพาะ process ลูก) ไว้เป็นกรณีควบคุมในหัวข้อ 4 ของไฟล์ผล
+\textbf{หมายเหตุ:} การคอมไพล์โปรแกรมด้วยแฟล็ก \code{-Wall -Wextra} ตามมาตรฐานจะพบ Warning \code{return type of 'main' is not 'int' [-Wmain]} เนื่องจากโค้ดต้นฉบับจากใบงานใช้ \code{void main()} ซึ่งในรายงานนี้ได้คงโค้ดไว้ตามข้อกำหนดเดิมของใบงานทุกประการ
 
 % =====================================================================
 \section{ข้อ 1: Static Storage Class}
 % =====================================================================
 
-% ---------------------------------------------------------------------
-\subsection{พื้นฐานที่ต้องเข้าใจก่อน: storage class คืออะไร}
-% ---------------------------------------------------------------------
+\subsection{หลักการพื้นฐานของ Storage Class}
 
-คำว่า \emph{storage class} ในภาษา C ไม่ได้บอกว่าตัวแปร ``เป็นชนิดอะไร''
-แต่บอกว่าตัวแปรนั้น \textbf{ถูกเก็บไว้ที่ไหนในหน่วยความจำ} และ
-\textbf{มีชีวิตอยู่นานแค่ไหน} คุณสมบัติที่ต้องแยกให้ออกมีสามเรื่อง
-
+Storage Class ในภาษา C กำหนดคุณสมบัติสำคัญ 3 ประการของตัวแปร ได้แก่
 \begin{itemize}[leftmargin=*]
-  \item \textbf{ขอบเขตการมองเห็น (scope)} คือบริเวณในโค้ดที่เรียกชื่อตัวแปรนี้ได้
-  \item \textbf{อายุ (lifetime)} คือช่วงเวลาที่เนื้อที่ในหน่วยความจำของตัวแปรยังถูกจองไว้
-  \item \textbf{การเชื่อมโยง (linkage)} คือไฟล์อื่นเห็นชื่อนี้ด้วยหรือไม่
+  \item \textbf{ขอบเขต (Scope):} บริเวณในโปรแกรมที่สามารถเข้าถึงชื่อตัวแปรนั้นได้
+  \item \textbf{อายุการใช้งาน (Lifetime):} ช่วงเวลาที่ตัวแปรคงอยู่ในหน่วยความจำระหว่างการทำงาน
+  \item \textbf{ตำแหน่งในหน่วยความจำ (Memory Segment):} บริเวณที่ระบบจัดสรรพื้นที่ให้ เช่น Stack หรือ Data Segment
 \end{itemize}
-
-หัวใจของข้อนี้คือ \textbf{scope กับ lifetime เป็นคนละเรื่องกัน} ตัวแปรหนึ่งตัว
-มีขอบเขตแคบมาก (เห็นได้เฉพาะในบล็อกเดียว) แต่มีอายุยืนตลอดโปรแกรมได้
-และนั่นคือสิ่งที่คำว่า \code{static} ทำ
 
 \begin{table}[H]
 \centering\small
-\caption{เปรียบเทียบ storage class ของตัวแปรในภาษา C}
-\begin{tabular}{p{2.9cm}p{2.4cm}p{3.0cm}p{2.2cm}p{2.9cm}}
+\caption{เปรียบเทียบ Storage Class รูปแบบต่าง ๆ ในภาษา C}
+\begin{tabular}{p{3.2cm}p{2.2cm}p{2.8cm}p{2.2cm}p{2.8cm}}
 \toprule
-\textbf{ประกาศแบบ} & \textbf{ขอบเขต} & \textbf{อายุ} & \textbf{เก็บที่} & \textbf{ค่าเริ่มต้นถ้าไม่ใส่} \\
+\textbf{การประกาศ} & \textbf{ขอบเขต} & \textbf{อายุการใช้งาน} & \textbf{ตำแหน่งจัดเก็บ} & \textbf{ค่าเริ่มต้นโดยปริยาย} \\
 \midrule
-\code{int y;} ในบล็อก (คือ \code{auto}) & เฉพาะบล็อกนั้น & เกิดตอนเข้าบล็อก ตายตอนออกจากบล็อก & stack & ค่าขยะที่ค้างอยู่ \\
-\code{static int y;} ในบล็อก & เฉพาะบล็อกนั้น & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
-\code{static int y;} นอกฟังก์ชัน & ทั้งไฟล์ & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
-\code{int y;} นอกฟังก์ชัน & ทั้งโปรแกรม & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
+\code{int y;} ในบล็อก (\code{auto}) & ภายในบล็อก & ชั่วคราว (เข้า/ออกบล็อก) & Stack & ค่าขยะ (Indeterminate) \\
+\code{static int y;} ในบล็อก & ภายในบล็อก & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
+\code{static int y;} นอกฟังก์ชัน & ภายในไฟล์ & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
+\code{int y;} นอกฟังก์ชัน (Global) & ทั้งโปรแกรม & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-อีกจุดที่ควรรู้คือคำว่า \code{auto} ในบรรทัด \code{auto int x = 3;} ของโจทย์
-\textbf{ไม่ได้ทำอะไรเลย} เพราะตัวแปรที่ประกาศในบล็อกเป็น \code{auto}
-อยู่แล้วโดยปริยาย เขียนหรือไม่เขียนผลลัพธ์เหมือนกันทุกประการ
-(ในมาตรฐาน C23 คำนี้ถูกนำกลับมาใช้ในความหมายใหม่ คือให้คอมไพเลอร์เดาชนิดตัวแปรเอง
-แต่ \code{gcc 13} ที่ใช้ในการทดลองนี้ตั้งต้นเป็น \code{-std=gnu17} จึงยังเป็นความหมายเดิม)
+ทั้งนี้ คำว่า \code{auto} ใน \code{auto int x = 3;} เป็นเพียงการระบุคลาสอัตโนมัติอย่างชัดแจ้ง ซึ่งเป็นค่าเริ่มต้นของตัวแปรภายในฟังก์ชันอยู่แล้ว
 
 % ---------------------------------------------------------------------
-\subsection{Step 1: โปรแกรมที่มี \code{static} คอมไพล์แบบปกติ}
+\subsection{Step 1: โค้ดโปรแกรมที่มี \code{static} (คอมไพล์แบบปกติ)}
 % ---------------------------------------------------------------------
 
-\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_static.c} คัดลอกจากโจทย์ทุกตัวอักษร}]
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_static.c} โค้ดเริ่มต้นตามใบงาน}]
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -274,445 +213,190 @@ void main()
 
 \subsubsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={คอมไพล์แบบปกติแล้วรัน 3 ครั้ง}]
-$ gcc -Wall -Wextra -o q1_static q1_static.c
-q1_static.c:10:6: warning: return type of 'main' is not 'int' [-Wmain]
-   10 | void main()
-      |      ^~~~
-(exit status = 0)
+ผลการคอมไพล์และรันโปรแกรม 3 ครั้ง:
 
-$ ./q1_static                              # run 1
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q1_static q1_static.c
+q1_static.c: In function 'main':
+q1_static.c:10:6: warning: return type of 'main' is not 'int' [-Wmain]
+
+$ ./q1_static                              # Run 1
 The value of y is 6      The address of y is 0x5c5469622010
 The value of y is 7      The address of y is 0x5c5469622010
 The value of y is 8      The address of y is 0x5c5469622010
 
-$ ./q1_static                              # run 2
+$ ./q1_static                              # Run 2
 The value of y is 6      The address of y is 0x60a5f69ee010
 The value of y is 7      The address of y is 0x60a5f69ee010
 The value of y is 8      The address of y is 0x60a5f69ee010
 
-$ ./q1_static                              # run 3
+$ ./q1_static                              # Run 3
 The value of y is 6      The address of y is 0x5faa56b46010
 The value of y is 7      The address of y is 0x5faa56b46010
 The value of y is 8      The address of y is 0x5faa56b46010
 \end{lstlisting}
 
-\subsubsection{อธิบายผล}
-
-ผลที่ได้มีสองส่วนที่ต้องอธิบายแยกกัน คือ \emph{ค่า} กับ \emph{ที่อยู่}
-
-\textbf{ค่าเป็น 6, 7, 8 ไม่ใช่ 6, 6, 6} \quad เพราะบรรทัด \code{static int y = 5;}
-\textbf{ไม่ใช่คำสั่งที่ทำงานตอนวนลูป} แต่เป็นการบอกคอมไพเลอร์ให้จองเนื้อที่
-ไว้ในส่วน \code{.data} ของไฟล์โปรแกรม พร้อมเขียนเลข \code{5} ลงไปในไฟล์ตั้งแต่
-ตอนคอมไพล์ เมื่อโปรแกรมถูกโหลดขึ้นหน่วยความจำ ค่า \code{5} ก็ติดมากับส่วนนั้นเลย
-การ ``กำหนดค่าเริ่มต้น'' จึงเกิดขึ้น \textbf{ครั้งเดียวก่อนโปรแกรมเริ่มทำงาน}
-ไม่ได้เกิดซ้ำทุกรอบที่ผ่านบรรทัดนั้น พอวนลูปรอบที่สอง โปรแกรมข้ามบรรทัดประกาศ
-ไปทำ \code{y++} ต่อจากค่าเดิมทันที ค่าจึงสะสมเป็น $5 \to 6 \to 7 \to 8$
-
-\textbf{ที่อยู่เท่ากันทั้ง 3 รอบภายในการรันเดียว} \quad เป็นผลโดยตรงจากข้อแรก
-คือมีตัวแปร \code{y} อยู่ \emph{ตัวเดียว} ตลอดโปรแกรม ไม่ได้ถูกสร้างใหม่ทุกรอบ
-เมื่อมีตัวเดียวก็ย่อมมีที่อยู่เดียว
-
-\textbf{แต่ที่อยู่เปลี่ยนทุกครั้งที่รันใหม่} \quad ทั้งที่เป็นไฟล์โปรแกรมเดียวกัน
-สาเหตุคือ Ubuntu ตั้งค่า \code{gcc} ให้สร้าง \textbf{PIE (Position-Independent
-Executable)} เป็นค่าตั้งต้น (ยืนยันได้จาก \code{gcc -v} ที่มี
-\code{-{}-enable-default-pie}) ไฟล์แบบนี้ไม่ได้ผูกที่อยู่จริงไว้ในตัวไฟล์
-แต่เก็บเป็น \emph{ระยะห่างจากจุดเริ่มของโปรแกรม} เอาไว้ เคอร์เนลจึงเลือก
-\emph{ฐานที่โหลด} ใหม่แบบสุ่มได้ทุกครั้งที่รัน ซึ่งเป็นกลไก \textbf{ASLR}
-(Address Space Layout Randomization) ที่เปิดอยู่ในเครื่องนี้
-(\code{randomize\_va\_space} มีค่า 2) ที่อยู่ที่พิมพ์ออกมาจึงเป็น
-``ฐานที่สุ่มได้ บวกกับ ระยะห่างคงที่'' หลักฐานอยู่ในหัวข้อ~\ref{sec:evidence}
-
-% ---------------------------------------------------------------------
-\subsection{Step 2--3: ลบคำว่า \code{static} ออก}
-% ---------------------------------------------------------------------
-
-แก้ไขบรรทัดเดียวคือลบคำว่า \code{static} ออก (ไฟล์ \code{src/q1\_auto.c})
-ส่วนอื่นเหมือนเดิมทุกตัวอักษร
-
-\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_auto.c} เฉพาะส่วนที่เปลี่ยน}]
-    while (x > 0)
-    {
-        int y = 5;          /* the word "static" is gone */
-        y++;
-        ...
-\end{lstlisting}
-
-\subsubsection{ผลการทดลอง}
-
-\begin{lstlisting}[style=terminal,caption={ลบ \code{static} ออกแล้วรัน 3 ครั้ง}]
-$ gcc -Wall -Wextra -o q1_auto q1_auto.c
-$ ./q1_auto                                # run 1
-The value of y is 6      The address of y is 0x7fff16657ab0
-The value of y is 6      The address of y is 0x7fff16657ab0
-The value of y is 6      The address of y is 0x7fff16657ab0
-
-$ ./q1_auto                                # run 2
-The value of y is 6      The address of y is 0x7ffde6d8b730
-The value of y is 6      The address of y is 0x7ffde6d8b730
-The value of y is 6      The address of y is 0x7ffde6d8b730
-
-$ ./q1_auto                                # run 3
-The value of y is 6      The address of y is 0x7ffd35c62ec0
-The value of y is 6      The address of y is 0x7ffd35c62ec0
-The value of y is 6      The address of y is 0x7ffd35c62ec0
-\end{lstlisting}
-
-\subsubsection{อธิบายผลและเปรียบเทียบกับ Step 1}
-
-\textbf{ค่ากลายเป็น 6, 6, 6} \quad เพราะตอนนี้ \code{y} เป็นตัวแปรอัตโนมัติ
-อายุของมันผูกกับ \emph{บล็อก} ไม่ใช่โปรแกรม ทุกครั้งที่วนเข้าบล็อกใหม่
-ตัวแปรจะถูกสร้างใหม่และคำสั่ง \code{= 5} \emph{ทำงานจริงทุกรอบ}
-(ต่างจาก \code{static} ที่เป็นการเขียนค่าลงไฟล์ตั้งแต่ตอนคอมไพล์)
-พอบวกหนึ่งจึงได้ 6 เท่ากันทุกรอบ ค่าที่สะสมไว้รอบก่อนหายไปหมดตอนออกจากบล็อก
-
-\textbf{ที่อยู่ยังเท่ากันทั้ง 3 รอบ แต่เป็นคนละเหตุผลกับ Step 1} \quad
-จุดนี้เป็นจุดที่เข้าใจผิดกันบ่อยที่สุด ที่อยู่เท่ากันไม่ได้แปลว่าเป็นตัวแปรตัวเดิม
-ความจริงคือคอมไพเลอร์จองสล็อตให้ \code{y} ไว้ใน \emph{stack frame ของ \code{main}}
-ตั้งแต่ตอนเข้าฟังก์ชัน (เช่น ``ถอยจากยอด frame ไป 20 ไบต์'') และ frame ของ
-\code{main} ไม่ได้ถูกทำลายระหว่างวนลูป การวนเข้าออกบล็อกจึงกลับมาใช้
-\textbf{สล็อตเดิมซ้ำ} ทุกรอบ ที่อยู่จึงบังเอิญเท่ากัน แต่ \emph{เนื้อหา} ในสล็อตนั้น
-ถูกเขียนทับด้วยเลข 5 ใหม่ทุกรอบ ซึ่งเห็นได้จากค่าที่ไม่สะสม
-ถ้าย้ายบล็อกนั้นไปอยู่ในฟังก์ชันที่เรียกตัวเองซ้อนกัน (recursive)
-ที่อยู่ก็จะต่างกันไปทุกครั้งทันที เพราะแต่ละครั้งได้ frame คนละอันบน stack
-
-\textbf{ที่อยู่ยังเปลี่ยนทุกครั้งที่รันใหม่ และอยู่คนละย่านกับ Step 1} \quad
-สังเกตว่าเลขของ Step 1 ขึ้นต้นด้วย \code{0x5...} แต่ของ Step 2 ขึ้นต้นด้วย
-\code{0x7ff...} ซึ่งไม่ใช่ความบังเอิญ เลข \code{0x7ff...} คือย่านบนสุดของ
-address space ที่ระบบปฏิบัติการวาง \emph{stack} ไว้ ส่วน \code{0x5...} คือย่านที่
-เคอร์เนลใช้โหลดตัวโปรแกรมแบบ PIE หลักฐานว่าเลขนี้เป็น stack จริง
-อยู่ในหัวข้อ~\ref{sec:evidence} ส่วนสาเหตุที่เปลี่ยนทุกครั้งก็คือ ASLR เช่นกัน
-เพียงแต่เป็น \emph{การสุ่มตำแหน่ง stack} ซึ่งเป็นคนละกลไกกับการสุ่มฐานของ PIE
-ประเด็นนี้จะสำคัญมากใน Step 4
-
-\begin{table}[H]
-\centering\small
-\caption{สรุปความต่างระหว่างมีและไม่มี \code{static}}
-\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
-\toprule
-\textbf{ประเด็น} & \textbf{\code{static int y = 5;}} & \textbf{\code{int y = 5;}} \\
-\midrule
-ค่าที่พิมพ์ออกมา & \code{6, 7, 8} & \code{6, 6, 6} \\
-กำหนดค่าเริ่มต้นเมื่อไร & ครั้งเดียว ตอนคอมไพล์และโหลดโปรแกรม & ทุกครั้งที่วนเข้าบล็อก \\
-จำนวนตัวแปรจริง ๆ & 1 ตัวตลอดโปรแกรม & สร้างใหม่ทุกรอบ แต่ใช้ที่เดิมซ้ำ \\
-อยู่ส่วนไหนของหน่วยความจำ & \code{.data} (ย่าน \code{0x5...} เมื่อเป็น PIE) & stack (ย่าน \code{0x7ff...}) \\
-อายุ & ตลอดโปรแกรม & เฉพาะช่วงที่อยู่ในบล็อก \\
-ขอบเขตการมองเห็น & เฉพาะในบล็อก (เหมือนกันทั้งคู่) & เฉพาะในบล็อก (เหมือนกันทั้งคู่) \\
-มีชื่อในตาราง symbol ไหม & มี ชื่อ \code{y.0} & ไม่มี เป็นแค่ระยะห่างใน frame \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% ---------------------------------------------------------------------
-\subsection{Step 4: คอมไพล์ใหม่ด้วย \code{-no-pie}}
-% ---------------------------------------------------------------------
-
-ทำซ้ำ Step 1--3 ทั้งหมด โดยเปลี่ยนเฉพาะคำสั่งคอมไพล์เป็น
-\code{gcc -no-pie -o <output> <source>} ใช้ซอร์สโค้ดไฟล์เดิมทั้งสองไฟล์
-ไม่แก้อะไรเลยแม้แต่ตัวอักษรเดียว
-
-\subsubsection{ผลการทดลอง}
-
-\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่มี \code{static}}]
-$ gcc -no-pie -Wall -Wextra -o q1_static_nopie q1_static.c
-$ ./q1_static_nopie                        # run 1
-The value of y is 6      The address of y is 0x404018
-The value of y is 7      The address of y is 0x404018
-The value of y is 8      The address of y is 0x404018
-
-$ ./q1_static_nopie                        # run 2
-The value of y is 6      The address of y is 0x404018
-The value of y is 7      The address of y is 0x404018
-The value of y is 8      The address of y is 0x404018
-
-$ ./q1_static_nopie                        # run 3
-The value of y is 6      The address of y is 0x404018
-The value of y is 7      The address of y is 0x404018
-The value of y is 8      The address of y is 0x404018
-\end{lstlisting}
-
-\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่ไม่มี \code{static}}]
-$ gcc -no-pie -Wall -Wextra -o q1_auto_nopie q1_auto.c
-$ ./q1_auto_nopie                          # run 1
-The value of y is 6      The address of y is 0x7ffe931c00e0
-The value of y is 6      The address of y is 0x7ffe931c00e0
-The value of y is 6      The address of y is 0x7ffe931c00e0
-
-$ ./q1_auto_nopie                          # run 2
-The value of y is 6      The address of y is 0x7fff0bc434d0
-The value of y is 6      The address of y is 0x7fff0bc434d0
-The value of y is 6      The address of y is 0x7fff0bc434d0
-
-$ ./q1_auto_nopie                          # run 3
-The value of y is 6      The address of y is 0x7ffdbc93c020
-The value of y is 6      The address of y is 0x7ffdbc93c020
-The value of y is 6      The address of y is 0x7ffdbc93c020
-\end{lstlisting}
-
-\subsubsection{ต่างจากเดิมหรือไม่ เพราะอะไร}
-
-คำตอบคือ \textbf{ต่างเฉพาะครึ่งเดียว} และครึ่งที่ต่างกับครึ่งที่ไม่ต่างนี่เอง
-ที่ทำให้เห็นว่า \code{-no-pie} ทำงานกับหน่วยความจำส่วนไหนกันแน่
-
-\begin{table}[H]
-\centering\small
-\caption{สรุปผลทั้งสี่กรณี: ที่อยู่ของ \code{y} คงที่ข้ามการรันหรือไม่}
-\begin{tabular}{p{2.2cm}p{3.4cm}p{3.6cm}p{4.2cm}}
-\toprule
-\textbf{กรณี} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ \code{-no-pie}} & \textbf{สรุป} \\
-\midrule
-มี \code{static} & \code{0x5c54...}, \code{0x60a5...}, \code{0x5faa...} เปลี่ยนทุกครั้ง
-                 & \code{0x404018} เท่ากันทั้งสามครั้ง
-                 & \textbf{ต่างกัน} \code{-no-pie} ตรึงที่อยู่ได้ \\
-ไม่มี \code{static} & \code{0x7fff...}, \code{0x7ffd...}, \code{0x7ffd...} เปลี่ยนทุกครั้ง
-                 & \code{0x7ffe...}, \code{0x7fff...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง
-                 & \textbf{ไม่ต่าง} \code{-no-pie} ไม่ช่วยอะไร \\
-\midrule
-ค่าที่พิมพ์ & \code{6,7,8} และ \code{6,6,6} & \code{6,7,8} และ \code{6,6,6} & \textbf{ไม่ต่าง} เหมือนเดิมทุกกรณี \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{(1) ค่าของ \code{y} ไม่เปลี่ยนเลยไม่ว่าจะคอมไพล์แบบไหน} \quad เพราะ
-\code{-no-pie} เป็นเรื่องของ \emph{การจัดวางในหน่วยความจำ} ล้วน ๆ ไม่ได้เปลี่ยน
-ความหมายของภาษา C แม้แต่นิดเดียว \code{static} ก็ยังคงเป็น \code{static}
-ตัวแปรอัตโนมัติก็ยังเกิดใหม่ทุกรอบเหมือนเดิม
-
-\textbf{(2) กรณี \code{static} ต่างชัดเจน} \quad ที่อยู่กลายเป็น \code{0x404018}
-เท่ากันเป๊ะทั้งสามครั้ง เพราะ \code{-no-pie} สั่งให้ linker สร้างไฟล์ชนิด
-\code{EXEC} ที่ \textbf{ผูกที่อยู่จริงไว้ตายตัวตั้งแต่ตอน link}
-เคอร์เนลไม่มีทางเลือก ต้องโหลดโปรแกรมลงที่อยู่นั้นเป๊ะ ๆ เสมอ ตัวแปร \code{y}
-ที่อยู่ในส่วน \code{.data} จึงมีที่อยู่เดิมทุกครั้ง ตรวจสอบได้ด้วย \code{nm}
-ว่าเลข \code{0x404018} ที่โปรแกรมพิมพ์ออกมา คือเลขเดียวกับที่อยู่ในตาราง symbol
-ของไฟล์ ไม่ได้ถูกกำหนดขึ้นตอนรันเลย
-
-\textbf{(3) กรณีไม่มี \code{static} ไม่ต่างเลย} \quad ที่อยู่ยังเป็น \code{0x7ff...}
-และยังสุ่มทุกครั้งเหมือนเดิม เพราะ \code{y} ตัวนี้อยู่บน \textbf{stack}
-ซึ่ง \emph{ไม่ได้อยู่ในไฟล์โปรแกรม} เลย stack เป็นสิ่งที่เคอร์เนลสร้างให้
-ตอนสร้าง process และตำแหน่งของมันถูกสุ่มโดยกลไก ASLR ของเคอร์เนล
-ซึ่งเป็นคนละกลไกกับการสุ่มฐานของ PIE โดยสิ้นเชิง \code{-no-pie} จึงปิดได้
-เฉพาะการสุ่มฐานของตัวโปรแกรม แต่ปิดการสุ่ม stack ไม่ได้
-ถ้าอยากปิดการสุ่ม stack ด้วยต้องสั่งที่ระบบปฏิบัติการ เช่น \code{setarch -R}
-หรือแก้ค่า \code{/proc/sys/kernel/randomize\_va\_space} ซึ่งได้ทดลองไว้แล้วในหัวข้อถัดไป
-
-\textbf{ข้อสรุปของ Step 4} \quad \code{-no-pie} ไม่ได้ ``ปิด ASLR''
-อย่างที่มักเข้าใจกัน มันแค่ทำให้ \emph{ตัวโปรแกรมและข้อมูลของโปรแกรม}
-(\code{.text}, \code{.data}, \code{.bss}) มีที่อยู่ตายตัว ส่วน stack, heap
-และไลบรารีที่โหลดตอนรัน ยังถูกสุ่มอยู่เหมือนเดิม
-
-% ---------------------------------------------------------------------
-\subsection{หลักฐานยืนยันคำอธิบาย}
-\label{sec:evidence}
-% ---------------------------------------------------------------------
-
-คำอธิบายทั้งหมดข้างต้นจะเป็นแค่การอ้างลอย ๆ ถ้าไม่มีการตรวจสอบจากอีกทาง
-สคริปต์เก็บผลจึงมีหัวข้อ 4 ที่ไล่ตรวจสามเรื่อง คือ ตัวไฟล์เป็นชนิดอะไร
-ตัวแปรอยู่ตรงไหนในไฟล์ และถ้าปิด ASLR แล้วผลจะเปลี่ยนไปอย่างไร
-
-\textbf{หลักฐานที่ 1: ไฟล์ที่ได้เป็นคนละชนิดกันจริง}
-
-\begin{lstlisting}[style=terminal,caption={ชนิดของไฟล์ ELF ทั้งสี่ (ตัด BuildID ออก)}]
-$ file q1_static q1_auto q1_static_nopie q1_auto_nopie
-q1_static:       ELF 64-bit LSB pie executable, x86-64, dynamically linked, ...
-q1_auto:         ELF 64-bit LSB pie executable, x86-64, dynamically linked, ...
-q1_static_nopie: ELF 64-bit LSB executable,     x86-64, dynamically linked, ...
-q1_auto_nopie:   ELF 64-bit LSB executable,     x86-64, dynamically linked, ...
-
-$ readelf -h q1_static       | grep -E 'Type|Entry'
-  Type:                              DYN (Position-Independent Executable file)
-  Entry point address:               0x1060          <- an offset, not a real address
-$ readelf -h q1_static_nopie | grep -E 'Type|Entry'
-  Type:                              EXEC (Executable file)
-  Entry point address:               0x401050        <- a real, fixed address
-\end{lstlisting}
-
-\textbf{หลักฐานที่ 2: ตัวแปร \code{static} มีชื่อและที่อยู่อยู่ในไฟล์ ส่วนตัวแปรอัตโนมัติไม่มี}
-
-\begin{lstlisting}[style=terminal,caption={ตาราง symbol และส่วน \code{.data}}]
-$ nm q1_static_nopie | grep -i ' y'          # 'd' = a local symbol in .data
-0000000000404018 d y.0                       <- exactly what the program printed
-
-$ nm q1_static       | grep -i ' y'          # PIE: the same symbol, but as an offset
-0000000000004010 d y.0
-
-$ nm q1_auto_nopie   | grep -i ' y'          # nothing at all
-(exit status = 1   -> 1 means grep found no symbol named y)
-
-$ readelf -S q1_static_nopie | grep -A1 ' .data '
-  [25] .data             PROGBITS         0000000000404008  00003008
-       0000000000000014  0000000000000000  WA       0     0     8
-\end{lstlisting}
-
-บรรทัดแรกคือหลักฐานที่ตรงที่สุดของทั้งข้อ เลข \code{0x404018} ที่โปรแกรมพิมพ์
-ออกมาตอนรัน คือเลขเดียวกับที่ \code{nm} อ่านได้จาก \emph{ตัวไฟล์} โดยไม่ต้องรันเลย
-และมันตกอยู่ในช่วงของส่วน \code{.data} ที่เริ่มที่ \code{0x404008} พอดี
-ส่วนชื่อ \code{y.0} ที่มีเลขต่อท้าย เป็นเพราะคอมไพเลอร์ต้องตั้งชื่อไม่ให้ชนกับ
-\code{static} ตัวอื่นที่อาจชื่อ \code{y} เหมือนกันในฟังก์ชันอื่น
-ในทางกลับกัน \code{q1\_auto\_nopie} ไม่มี symbol ชื่อ \code{y} เลย
-เพราะตัวแปรอัตโนมัติไม่ใช่ ``ของ'' ที่อยู่ในไฟล์ แต่เป็นเพียงระยะห่างในโค้ด
-ที่นำไปคำนวณกับ stack pointer ตอนรัน
-
-\textbf{หลักฐานที่ 3: ปิด ASLR แล้วที่อยู่หยุดสุ่มจริง (กรณีควบคุม)}
-
-\begin{lstlisting}[style=terminal,caption={รันไฟล์ PIE ชุดเดิมด้วย \code{setarch -R} ซึ่งปิดการสุ่ม address space}]
-$ setarch -R ./q1_static | grep address        # run 1, 2, 3
-The address of y is 0x555555558010
-The address of y is 0x555555558010
-The address of y is 0x555555558010
-
-$ setarch -R ./q1_auto   | grep address        # run 1, 2, 3
-The address of y is 0x7fffffffe290
-The address of y is 0x7fffffffe290
-The address of y is 0x7fffffffe290
-\end{lstlisting}
-
-ไฟล์เดียวกันกับที่เพิ่งให้ผลสุ่มไปเมื่อครู่ พอปิด ASLR กลับให้เลขเดิมทุกครั้ง
-นี่คือหลักฐานว่าตัวการที่ทำให้ที่อยู่เปลี่ยนคือ ASLR ไม่ใช่ตัวภาษา C
-และไม่ใช่ \code{static} ที่สำคัญคือ \code{q1\_auto} ที่คอมไพล์แบบ PIE
-ก็หยุดสุ่มด้วย ทั้งที่ \code{-no-pie} ทำให้มันหยุดสุ่มไม่ได้
-ยืนยันข้อสรุปของ Step 4 ว่าที่อยู่ของ stack ถูกคุมด้วย ASLR ของเคอร์เนล
-ไม่ใช่ด้วยชนิดของไฟล์ ELF
-
-\textbf{หลักฐานที่ 4: เลข \code{0x7ff...} เป็นที่อยู่บน stack จริง}
-
-\begin{lstlisting}[style=terminal,caption={เทียบกับแผนที่หน่วยความจำจริง (ปิด ASLR ทั้งคู่เพื่อให้เทียบตัวเลขกันได้)}]
-$ setarch -R ./q1_auto | grep address | head -1
-The address of y is 0x7fffffffe290                     <- inside the range below
-
-$ setarch -R bash -c 'grep "\[stack\]" /proc/self/maps'
-7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
-
-$ setarch -R ./q1_static | grep address | head -1
-The address of y is 0x555555558010                     <- NOT inside that range
-\end{lstlisting}
-
-ที่อยู่ \code{0x7fffffffe290} ที่โปรแกรมพิมพ์ออกมา ตกอยู่ในช่วง
-\code{0x7ffffffde000} ถึง \code{0x7ffffffff000} ที่เคอร์เนลระบุว่าเป็น
-\code{[stack]} พอดี ในขณะที่ที่อยู่ของตัวแปร \code{static} อยู่คนละย่านโดยสิ้นเชิง
-
-\textbf{หลักฐานที่ 5: ที่อยู่ของ PIE เท่ากับ ฐานที่สุ่มได้ บวก ระยะห่างคงที่}
-
-\begin{lstlisting}[style=terminal,caption={แยกส่วนที่สุ่มออกจากส่วนที่คงที่ (ระยะห่างของ \code{y} คือ \code{0x4010} จาก \code{nm})}]
-$ ./q1_static | head -2        # run 1, 2, 3  ->  base = printed address - 0x4010
-printed &y = 0x59dfb0606010    load base = 0x59dfb0602000
-printed &y = 0x6234ef9d2010    load base = 0x6234ef9ce000
-printed &y = 0x64fd3cae1010    load base = 0x64fd3cadd000
-
-$ ./q1_static_nopie | head -2  # run 1, 2, 3  ->  base = printed address - 0x404018
-printed &y = 0x404018    load base = 0x0
-printed &y = 0x404018    load base = 0x0
-printed &y = 0x404018    load base = 0x0
-\end{lstlisting}
-
-ข้อสังเกตสองอย่าง หนึ่งคือฐานที่คำนวณได้ลงท้ายด้วย \code{000} ทุกครั้ง
-เพราะเคอร์เนลสุ่มได้ทีละหน้า (page ละ 4096 ไบต์) ไม่ได้สุ่มทีละไบต์
-สองคือไฟล์แบบ \code{-no-pie} มีฐานเป็นศูนย์ นั่นคือที่อยู่ที่พิมพ์ออกมา
-เท่ากับที่อยู่ที่ระบุไว้ในไฟล์เป๊ะ ๆ ซึ่งเป็นนิยามของคำว่า ``ไม่ position-independent''
-
-% ---------------------------------------------------------------------
-\subsection{อภิปรายผล}
-% ---------------------------------------------------------------------
+\subsubsection{การวิเคราะห์ผลการทดลอง}
 
 \begin{itemize}[leftmargin=*]
-  \item \textbf{\code{static} เปลี่ยน ``อายุ'' ไม่ได้เปลี่ยน ``ขอบเขต''}:
-        เป็นบทเรียนหลักของข้อนี้ ตัวแปร \code{y} ในทั้งสองเวอร์ชันมีขอบเขต
-        เท่ากันเป๊ะ คือเรียกใช้ได้เฉพาะในบล็อกของ \code{while} เท่านั้น
-        โค้ดนอกบล็อกยังคอมไพล์ไม่ผ่านเหมือนกัน สิ่งที่ \code{static} เปลี่ยน
-        คือย้ายตัวแปรจาก stack ไปอยู่ \code{.data} ทำให้อายุยืนตลอดโปรแกรม
-        ผลคือได้ตัวแปรที่ ``จำค่าได้ระหว่างการเรียกแต่ละครั้ง แต่ไม่มีใครนอกบล็อก
-        ไปยุ่งกับมันได้'' ซึ่งเป็นเหตุผลที่นิยมใช้ทำตัวนับหรือ cache ในฟังก์ชัน
-
-  \item \textbf{การกำหนดค่าเริ่มต้นของ \code{static} เกิดตอนคอมไพล์ ไม่ใช่ตอนรัน}:
-        เป็นสาเหตุที่ค่าออกมาเป็น 6, 7, 8 และเป็นเหตุผลที่มาตรฐาน C บังคับว่า
-        ค่าเริ่มต้นของตัวแปร \code{static} ต้องเป็นค่าคงที่ที่รู้ตั้งแต่ตอนคอมไพล์
-        (เขียน \code{static int y = rand();} ไม่ได้ แต่ \code{int y = rand();} ได้)
-        ผลข้างเคียงอีกอย่างคือถ้าไม่ใส่ค่าเริ่มต้น ตัวแปร \code{static}
-        จะได้ค่า \code{0} เสมอโดยไม่ต้องเสียเนื้อที่ในไฟล์ เพราะไปอยู่ในส่วน
-        \code{.bss} ที่เคอร์เนลล้างเป็นศูนย์ให้ตอนโหลด ต่างจากตัวแปรอัตโนมัติ
-        ที่ถ้าไม่ใส่ค่าเริ่มต้นจะได้ค่าขยะที่ค้างอยู่ใน stack
-
-  \item \textbf{ที่อยู่ที่พิมพ์ออกมาเป็น virtual address ไม่ใช่ที่อยู่จริงบน RAM}:
-        เห็นได้ชัดจากกรณี \code{-no-pie} ที่ทุก process ได้เลข \code{0x404018}
-        เหมือนกันหมด ถ้ารันพร้อมกันสิบตัวก็ยังเป็นเลขนี้ทั้งสิบตัวและไม่ชนกัน
-        เพราะแต่ละ process มี address space ของตัวเอง โดยมีหน่วย MMU
-        กับตาราง page ของเคอร์เนลแปลงเลขนี้ไปเป็นที่อยู่จริงคนละที่กัน
-        นี่คือภาพรูปธรรมของเรื่อง virtual memory ที่เรียนในทฤษฎี
-
-  \item \textbf{เหตุผลที่ Linux รุ่นใหม่ทำ PIE เป็นค่าตั้งต้น คือความปลอดภัย}:
-        การโจมตีแบบ buffer overflow ยุคใหม่ (เช่น return-to-libc หรือ ROP)
-        ต้องรู้ที่อยู่ของโค้ดหรือข้อมูลที่จะกระโดดไปให้แม่นยำ การสุ่มฐานทุกครั้ง
-        ที่รันทำให้ผู้โจมตีต้องเดา ซึ่งมักทำให้โปรแกรมพังไปเสียก่อน
-        แลกมาด้วยราคาเล็กน้อยคือโค้ดต้องอ้างอิงแบบ relative
-        จึงเป็นเหตุผลที่ \code{-no-pie} ยังมีอยู่ คือใช้ตอน debug
-        ที่อยากให้ที่อยู่คงที่เพื่อเทียบผลได้ หรือใช้กับโค้ดเก่า
-        ที่เขียนแบบผูกที่อยู่ตายตัว ไม่ใช่ตัวเลือกที่ควรใช้กับโปรแกรมจริง
-
-  \item \textbf{ข้อควรระวังของ \code{static} ในโปรแกรมจริง}: เมื่อฟังก์ชันมี
-        \code{static} อยู่ข้างใน ฟังก์ชันนั้นจะ ``จำอดีต'' ได้ ผลคือเรียกด้วย
-        อาร์กิวเมนต์เดิมสองครั้งอาจได้ผลไม่เหมือนกัน ทำให้ทดสอบยากขึ้นมาก
-        และที่ร้ายกว่านั้นคือถ้ามีหลาย thread เรียกฟังก์ชันเดียวกันพร้อมกัน
-        ทุก thread จะใช้ตัวแปรตัวเดียวกัน เกิด race condition ทันที
-        (ฟังก์ชันเก่าในไลบรารีมาตรฐานอย่าง \code{strtok} หรือ \code{ctime}
-        มีปัญหานี้ จึงมีรุ่นลงท้ายด้วย \code{\_r} ที่ให้ผู้เรียกส่งที่เก็บสถานะมาเองแทน)
-
-  \item \textbf{\code{void main()} ไม่ถูกต้องตามมาตรฐาน}: มาตรฐาน C กำหนดให้
-        \code{main} คืนค่า \code{int} เพื่อส่ง exit status ให้ระบบปฏิบัติการ
-        รายงานนี้คงโค้ดไว้ตามโจทย์และแนบ warning มาแสดงตามจริง แต่ในการใช้งานจริง
-        ควรเขียนเป็น \code{int main(void)} และ \code{return 0;} เสมอ
-        โดยเฉพาะเมื่อโปรแกรมจะถูกเรียกจากสคริปต์ที่ตรวจ exit status
+  \item \textbf{ค่าของตัวแปร ($y = 6 \to 7 \to 8$):} ตัวแปร \code{static} ถูกจัดสรรไว้ใน Data Segment (\code{.data}) และได้รับการกำหนดค่าเริ่มต้น ($5$) เพียงครั้งเดียวตั้งแต่ขั้นตอนคอมไพล์และโหลดโปรแกรม เมื่อวนลูปคำสั่งประกาศจะไม่ถูกทำงานซ้ำ คำสั่ง \code{y++} จึงบวกค่าสะสมต่อเนื่องจากรอบก่อนหน้า
+  \item \textbf{ที่อยู่ของตัวแปรภายในการรันเดียวกัน:} มีตำแหน่งคงที่เดิมทั้ง 3 รอบของการวนลูป เนื่องจากระบบใช้พื้นที่ใน Data Segment ตำแหน่งเดิมตลอดอายุของโปรแกรม
+  \item \textbf{ที่อยู่ของตัวแปรข้ามการรัน:} มีการเปลี่ยนแปลงทุกครั้งที่สั่งรันใหม่ เนื่องจาก Ubuntu ตั้งค่าให้ \code{gcc} สร้างไบนารีแบบ PIE (Position-Independent Executable) เป็นค่าเริ่มต้น ทำงานร่วมกับกลไก ASLR (Address Space Layout Randomization) ของระบบปฏิบัติการ ซึ่งจะสุ่มฐานตำแหน่งของโปรแกรมใหม่ทุกครั้งที่ถูกโหลดขึ้นหน่วยความจำ
 \end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{Step 2--3: โค้ดโปรแกรมที่ลบคำว่า \code{static} ออก}
+% ---------------------------------------------------------------------
+
+ทำการแก้ไขโค้ดโดยลบคำว่า \code{static} ออก ทำให้ตัวแปร \code{y} กลายเป็นตัวแปรอัตโนมัติ (\code{int y = 5;})
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_auto.c} ส่วนที่มีการปรับปรุง}]
+    while (x > 0)
+    {
+        int y = 5;          /* deleted 'static' keyword */
+        y++;
+        printf("The value of y is %d\n", y);
+        printf("The address of y is %p\n\n", &y);
+        x--;
+    }
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+ผลการคอมไพล์และรันโปรแกรม 3 ครั้ง:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 2--3 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q1_auto q1_auto.c
+$ ./q1_auto                                # Run 1
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+
+$ ./q1_auto                                # Run 2
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+
+$ ./q1_auto                                # Run 3
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ผลและเปรียบเทียบกับ Step 1}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ค่าของตัวแปร ($y = 6, 6, 6$):} ตัวแปร \code{y} เป็น Automatic variable บน Stack ซึ่งมีอายุจำกัดเฉพาะในบล็อกของลูป \code{while} ในแต่ละรอบคำสั่ง \code{int y = 5;} จะทำงานเพื่อกำหนดค่าเริ่มต้นใหม่เสมอ ส่งผลให้ \code{y++} ได้ค่า $6$ เท่ากันทุกรอบ
+  \item \textbf{ที่อยู่ของตัวแปรภายในการรันเดียวกัน:} เท่ากันทั้ง 3 รอบ เนื่องจากการทำงานในลูปยังคงอยู่ใน Stack Frame ของฟังก์ชัน \code{main()} คอมไพเลอร์จึงนำสล็อตหน่วยความจำเดิมบน Stack มาใช้ซ้ำ (Stack slot reuse)
+  \item \textbf{ที่อยู่ของตัวแปรข้ามการรัน:} อยู่ในย่าน Stack (\code{0x7ff...}) ซึ่งต่างจากตัวแปร \code{static} ที่อยู่ในย่าน Data Segment (\code{0x5...}) โดยตำแหน่งจะถูกสุ่มใหม่ทุกครั้งตามกลไก ASLR ของ Stack
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ระหว่างการใช้และไม่ใช้ \code{static}}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{มี \code{static} (Step 1)} & \textbf{ไม่มี \code{static} (Step 2)} \\
+\midrule
+ค่าที่พิมพ์ออก & \code{6, 7, 8} (สะสมค่าต่อเนื่อง) & \code{6, 6, 6} (เริ่มต้นใหม่ทุกรอบ) \\
+การกำหนดค่าเริ่มต้น & ทำครั้งเดียวตอนโหลดโปรแกรม & ทำซ้ำทุกครั้งเมื่อเข้าบล็อก \\
+ตำแหน่งจัดเก็บ & Data Segment (\code{.data}) & Stack Segment \\
+ขอบเขตการมองเห็น & เฉพาะในบล็อก \code{while} & เฉพาะในบล็อก \code{while} \\
+อายุการใช้งาน & ตลอดระยะเวลาการทำงานของโปรแกรม & ชั่วคราวเฉพาะช่วงที่อยู่ในบล็อก \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4: การคอมไพล์ด้วยแฟล็ก \code{-no-pie} และการเปรียบเทียบ}
+% ---------------------------------------------------------------------
+
+คอมไพล์โปรแกรมทั้งสองเวอร์ชันใหม่โดยระบุแฟล็ก \code{-no-pie}:
+\begin{lstlisting}[style=terminal]
+$ gcc -no-pie -Wall -Wextra -o q1_static_nopie q1_static.c
+$ gcc -no-pie -Wall -Wextra -o q1_auto_nopie   q1_auto.c
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4 เมื่อใช้แฟล็ก \code{-no-pie}}]
+----- 3.1 With static (-no-pie) -----
+$ ./q1_static_nopie                        # Run 1, 2, 3: identical across all runs
+The value of y is 6      The address of y is 0x404018
+The value of y is 7      The address of y is 0x404018
+The value of y is 8      The address of y is 0x404018
+
+----- 3.2 Without static (-no-pie) -----
+$ ./q1_auto_nopie                          # Run 1
+The value of y is 6      The address of y is 0x7ffe931c00e0
+$ ./q1_auto_nopie                          # Run 2
+The value of y is 6      The address of y is 0x7fff0bc434d0
+$ ./q1_auto_nopie                          # Run 3
+The value of y is 6      The address of y is 0x7ffdbc93c020
+\end{lstlisting}
+
+\subsubsection{วิเคราะห์ความแตกต่างจากเดิมและสาเหตุ}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ระหว่างการคอมไพล์แบบปกติ (PIE) กับ \code{-no-pie}}
+\begin{tabular}{p{2.4cm}p{4.2cm}p{4.2cm}p{3.2cm}}
+\toprule
+\textbf{กรณี} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ด้วย \code{-no-pie}} & \textbf{ข้อสรุป} \\
+\midrule
+มี \code{static} & \code{0x5c54...}, \code{0x60a5...}, \code{0x5faa...} เปลี่ยนทุกครั้ง & \code{0x404018} เท่ากันทุกครั้ง & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+ไม่มี \code{static} & \code{0x7fff...}, \code{0x7ffd...}, \code{0x7ffd...} เปลี่ยนทุกครั้ง & \code{0x7ffe...}, \code{0x7fff...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง & \textbf{ไม่แตกต่าง} ที่อยู่ยังสุ่ม \\
+ค่าของตัวแปร & $6,7,8$ และ $6,6,6$ & $6,7,8$ และ $6,6,6$ & \textbf{ไม่แตกต่าง} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{กรณีมี \code{static} (แตกต่าง):} ที่อยู่ของตัวแปรคงที่เป็น \code{0x404018} เท่ากันทุกครั้งที่รันใหม่ เนื่องจากแฟล็ก \code{-no-pie} สั่งให้ Linker สร้างไฟล์ Executable แบบตำแหน่งคงที่ (ELF EXEC) ซึ่งระบุ Virtual Address ที่แน่นอนตั้งแต่ขั้นตอนเชื่อมโยง เคอร์เนลจึงโหลด Data Segment ลงที่เดิมเสมอ
+  \item \textbf{กรณีไม่มี \code{static} (ไม่แตกต่าง):} ที่อยู่ของตัวแปรยังคงสุ่มเปลี่ยนในย่าน \code{0x7ff...} เพราะตัวแปรอัตโนมัติอยู่บน Stack ซึ่งถูกจัดสรรและสุ่มตำแหน่งโดยตรงจากกลไก ASLR ของเคอร์เนล โดยแฟล็ก \code{-no-pie} มีผลเฉพาะการจัดวางตัวโปรแกรมและข้อมูลใน Data Segment เท่านั้น ไม่ได้ปิดการสุ่มตำแหน่งของ Stack
+  \item \textbf{ค่าของตัวแปร:} คงเดิมทั้งสองกรณี เนื่องจากแฟล็ก \code{-no-pie} ควบคุมเฉพาะการจัดวางหน่วยความจำในระดับระบบปฏิบัติการ ไม่ส่งผลต่อตรรกะการประมวลผลของภาษา C
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สรุปผลการทดลองข้อ 1}
+% ---------------------------------------------------------------------
+
+\begin{enumerate}[leftmargin=*]
+  \item คีย์เวิร์ด \code{static} ในบล็อกทำหน้าที่เปลี่ยนอายุการใช้งานของตัวแปรให้คงอยู่ตลอดการทำงานของโปรแกรม โดยย้ายตำแหน่งจัดเก็บจาก Stack ไปยัง Data Segment ทำให้สามารถเก็บค่าสะสมข้ามการทำงานของลูปได้
+  \item ตัวแปรอัตโนมัติถูกจัดสรรบน Stack และสร้างใหม่ทุกครั้งที่เข้าสู่บล็อกคำสั่ง แม้ที่อยู่ภายในการรันเดียวกันจะดูเหมือนเดิม แต่เกิดจากการใช้พื้นที่สล็อตเดิมบน Stack Frame ซ้ำ
+  \item แฟล็ก \code{-no-pie} ปิดการสุ่มตำแหน่งเฉพาะส่วนของตัวโปรแกรมและ Data Segment เท่านั้น ไม่สามารถปิดการสุ่มตำแหน่งของ Stack ได้
+\end{enumerate}
 
 % =====================================================================
 \section{ข้อ 2: Extern Storage Class}
 % =====================================================================
 
-% ---------------------------------------------------------------------
-\subsection{พื้นฐานที่ต้องเข้าใจก่อน: การประกาศ กับ การนิยาม}
-% ---------------------------------------------------------------------
-
-ข้อ 1 ว่าด้วย \emph{อายุ} ของตัวแปร ส่วนข้อนี้ว่าด้วย \emph{การเชื่อมโยง (linkage)}
-คือเรื่องที่ว่าชื่อตัวแปรหนึ่งชื่อ ไฟล์อื่นเห็นด้วยหรือไม่ และหัวใจของมันคือ
-การแยกให้ออกระหว่างสองคำที่คนมักใช้ปนกัน
+\subsection{หลักการพื้นฐาน: การนิยาม (Definition) และการประกาศ (Declaration)}
 
 \begin{itemize}[leftmargin=*]
-  \item \textbf{การนิยาม (definition)} คือการสั่งให้ \emph{จองเนื้อที่จริง}
-        ในหน่วยความจำ เช่น \code{int x = 20;} ที่เขียนนอกฟังก์ชัน
-        ตัวแปรหนึ่งตัวมี definition ได้เพียงที่เดียวในทั้งโปรแกรม
-  \item \textbf{การประกาศ (declaration)} คือการบอกคอมไพเลอร์เพียงว่า
-        ``มีตัวแปรชื่อนี้ ชนิดนี้ อยู่ที่ไหนสักแห่ง เดี๋ยว linker ไปหามาให้''
-        เช่น \code{extern int x;} ซึ่ง \emph{ไม่จองเนื้อที่ใด ๆ ทั้งสิ้น}
-        และเขียนซ้ำกี่ที่ก็ได้
+  \item \textbf{การนิยาม (Definition):} เช่น \code{int x = 20;} ที่อยู่นอกฟังก์ชัน เป็นการสั่งให้ระบบจองพื้นที่หน่วยความจำขนาด 4 ไบต์จริงใน Data Segment โดยในโปรแกรมหนึ่งจะมีนิยามของตัวแปรโกลบอลชื่อเดียวกันได้เพียงแห่งเดียว
+  \item \textbf{การประกาศ (Declaration):} เช่น \code{extern int x;} เป็นการแจ้งคอมไพเลอร์ว่ามีตัวแปรชื่อนี้และชนิดนี้อยู่ เพื่อให้สามารถอ้างอิงได้ โดยไม่มีการจองพื้นที่หน่วยความจำใหม่
 \end{itemize}
 
 \begin{table}[H]
 \centering\small
-\caption{การนิยามกับการประกาศ ต่างกันตรงไหน}
-\begin{tabular}{p{3.3cm}p{4.6cm}p{5.4cm}}
+\caption{เปรียบเทียบการนิยามกับการประกาศตัวแปร}
+\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
 \toprule
-\textbf{ประเด็น} & \textbf{\code{int x = 20;} (นอกฟังก์ชัน)} & \textbf{\code{extern int x;}} \\
+\textbf{ประเด็น} & \textbf{การนิยาม (\code{int x = 20;} นอกฟังก์ชัน)} & \textbf{การประกาศ (\code{extern int x;})} \\
 \midrule
-เรียกว่าอะไร & definition (นิยาม) & declaration (ประกาศ) \\
-จองเนื้อที่ไหม & จอง 4 ไบต์ในส่วน \code{.data} & ไม่จองเลย \\
-เขียนซ้ำได้ไหม & ได้ที่เดียวในทั้งโปรแกรม & กี่ที่ก็ได้ \\
-ใครเป็นคนจัดการ & คอมไพเลอร์ & linker เป็นคนหาให้ตอนเชื่อมไฟล์ \\
-ถ้าไม่มีเลยจะเกิดอะไร & \code{undefined reference} ตอน link & คอมไพล์ผ่าน แต่อาจหา definition ไม่เจอ \\
+การทำงาน & จองเนื้อที่จริง 4 ไบต์ใน \code{.data} & ไม่มีการจองเนื้อที่หน่วยความจำ \\
+จำนวนครั้งที่เขียนได้ & 1 ครั้งในทั้งโปรแกรม & ซ้ำได้หลายจุดตามที่ต้องการอ้างอิง \\
+ขั้นตอนที่จัดการ & คอมไพเลอร์จัดสรรพื้นที่ & Linker ทำการเชื่อมโยงสัญลักษณ์ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-จุดที่ต้องสังเกตในโค้ดของโจทย์คือ \code{extern int x;} ที่เขียนอยู่ \emph{ข้างใน}
-\code{main()} และ \code{display()} นั้น อยู่ในไฟล์เดียวกันกับ \code{int x = 20;}
-ที่เป็น definition อยู่แล้ว ทั้งสองบรรทัดจึงเป็นการเขียนซ้ำซ้อนที่
-\textbf{ไม่มีผลอะไรเลย} เพราะตัวแปร global มองเห็นได้จากทุกฟังก์ชันในไฟล์อยู่แล้ว
-ตั้งแต่บรรทัดที่นิยามมันลงไป ข้อนี้จึงน่าสนใจตรงที่ผลของการ \emph{ลบ} คำว่า
-\code{extern} ออก ไม่ได้เป็นอย่างที่หลายคนคาดว่า ``main จะมองไม่เห็น \code{x}''
-แต่กลับกลายเป็นอย่างอื่นไปเลย ซึ่งจะเห็นใน Step 2
-
 % ---------------------------------------------------------------------
-\subsection{Step 1: โปรแกรมที่มี \code{extern} ทั้งสองฟังก์ชัน}
+\subsection{Step 1: โค้ดโปรแกรมที่มี \code{extern} ทั้งสองฟังก์ชัน}
 % ---------------------------------------------------------------------
 
-\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_extern.c} คัดลอกจากโจทย์ทุกตัวอักษร}]
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_extern.c} โค้ดเริ่มต้นตามใบงาน}]
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -737,483 +421,187 @@ void main()
 
 \subsubsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={คอมไพล์แบบปกติแล้วรัน 3 ครั้ง}]
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1 (รัน 3 ครั้ง)}]
 $ gcc -Wall -Wextra -o q2_extern q2_extern.c
-q2_extern.c:19:6: warning: return type of 'main' is not 'int' [-Wmain]
-(exit status = 0)
-
-$ ./q2_extern                              # run 1
+$ ./q2_extern                              # Run 1
  Print value of x: 20        Address of x (in main function):    0x574a1053e010
  Display value of x: 20      Address of x (in display function): 0x574a1053e010
 
-$ ./q2_extern                              # run 2
+$ ./q2_extern                              # Run 2
  Print value of x: 20        Address of x (in main function):    0x650dd456f010
  Display value of x: 20      Address of x (in display function): 0x650dd456f010
 
-$ ./q2_extern                              # run 3
+$ ./q2_extern                              # Run 3
  Print value of x: 20        Address of x (in main function):    0x59201f88d010
  Display value of x: 20      Address of x (in display function): 0x59201f88d010
 \end{lstlisting}
 
-\subsubsection{อธิบายผล}
+\subsubsection{การวิเคราะห์ผลการทดลอง}
 
-\textbf{ค่าเป็น 20 ทั้งสองที่} \quad เพราะทั้ง \code{main()} และ \code{display()}
-กำลังพูดถึงตัวแปร \textbf{ตัวเดียวกัน} คือ \code{x} ที่นิยามไว้นอกฟังก์ชัน
-คำว่า \code{extern} ในทั้งสองฟังก์ชันเป็นเพียงการยืนยันว่า ``ชื่อ \code{x} ที่ใช้ตรงนี้
-หมายถึงตัวที่นิยามไว้ข้างนอก'' ซึ่งเป็นสิ่งที่คอมไพเลอร์เข้าใจอยู่แล้วโดยไม่ต้องบอก
-
-\textbf{ที่อยู่ในสองฟังก์ชันตรงกันเป๊ะ} \quad นี่คือหลักฐานที่เข้มที่สุดว่ามีตัวแปร
-เพียงตัวเดียวจริง ๆ ถ้าเป็นคนละตัวย่อมเป็นไปไม่ได้ที่ที่อยู่จะตรงกันทุกบิต
-และตรงกันซ้ำแบบนี้ทั้งสามรอบ ข้อสังเกตนี้จะกลายเป็นเครื่องมือหลักในการอ่านผล
-ของ Step 2 คือใช้ \emph{ที่อยู่} เป็นตัวบอกว่ากำลังดูตัวแปรตัวเดียวกันอยู่หรือเปล่า
-
-\textbf{ที่อยู่เปลี่ยนทุกครั้งที่รันใหม่} \quad ด้วยเหตุผลเดียวกับข้อ 1 ทุกประการ
-คือไฟล์เป็น PIE และเคอร์เนลสุ่มฐานที่โหลดใหม่ทุกครั้งตามกลไก ASLR
-สังเกตว่าเลขลงท้าย \code{010} เหมือนกันทั้งสามรอบ เพราะระยะห่างของ \code{x}
-จากฐานเป็นค่าคงที่ ส่วนที่เปลี่ยนคือฐานเท่านั้น
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ค่าของตัวแปร ($x = 20$):} แสดงค่า $20$ ทั้งใน \code{main()} และ \code{display()} เนื่องจากทั้งสองฟังก์ชันอ้างอิงถึงตัวแปรโกลบอล \code{x} ตัวเดียวกันที่นิยามไว้นอกฟังก์ชัน
+  \item \textbf{ตำแหน่งที่อยู่ของตัวแปร:} มีค่าตรงกันทั้งใน \code{main()} และ \code{display()} ทุกรอบการรัน ยืนยันว่าเป็นการเข้าถึงพื้นที่หน่วยความจำเดียวกันใน Data Segment
+  \item \textbf{ตำแหน่งที่อยู่ข้ามการรัน:} เปลี่ยนแปลงไปทุกครั้งที่รันใหม่ เนื่องจากโปรแกรมคอมไพล์แบบ PIE และทำงานภายใต้ ASLR ของระบบปฏิบัติการ
+\end{itemize}
 
 % ---------------------------------------------------------------------
-\subsection{Step 2--3: ลบคำว่า \code{extern} ในฟังก์ชัน \code{main()}}
+\subsection{Step 2--3: โค้ดโปรแกรมที่ลบคำว่า \code{extern} ในฟังก์ชัน \code{main()}}
 % ---------------------------------------------------------------------
 
-แก้ไขตามโจทย์คือลบคำว่า \code{extern} ในบรรทัดที่ 15 ซึ่งอยู่ใน \code{main()}
-ออกเพียงคำเดียว (ไฟล์ \code{src/q2\_noextern.c}) ส่วนใน \code{display()}
-คงไว้เหมือนเดิม
+ทำการแก้ไขตามข้อกำหนดโดยลบคำว่า \code{extern} ใน \code{main()} ออก (กลายเป็น \code{int x;}) ขณะที่ใน \code{display()} ยังคงมี \code{extern} ตามเดิม
 
-\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_noextern.c} เฉพาะส่วนที่เปลี่ยน}]
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_noextern.c} ส่วนที่มีการปรับปรุง}]
 void main()
 {
-    int x;                  /* the word "extern" is gone: this is now a NEW variable */
+    int x;                  /* deleted 'extern' keyword: local variable */
     printf(" Print value of x: %d\n", x);
-    ...
+    printf(" Address of x (in main function): %p\n\n", &x);
+
+    display();
+}
 \end{lstlisting}
 
 \subsubsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={ลบ \code{extern} ใน \code{main()} แล้วคอมไพล์ คอมไพเลอร์เตือนเพิ่มมาหนึ่งข้อ}]
+การคอมไพล์และการรันโปรแกรม 3 ครั้ง:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 2--3 (รัน 3 ครั้ง)}]
 $ gcc -Wall -Wextra -o q2_noextern q2_noextern.c
-q2_noextern.c:19:6: warning: return type of 'main' is not 'int' [-Wmain]
 q2_noextern.c: In function 'main':
 q2_noextern.c:22:5: warning: 'x' is used uninitialized [-Wuninitialized]
    22 |     printf(" Print value of x: %d\n", x);
-      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-q2_noextern.c:21:9: note: 'x' declared here
-   21 |     int x;
-      |         ^
-(exit status = 0)
-\end{lstlisting}
 
-\begin{lstlisting}[style=terminal,caption={ผลการรัน 3 ครั้ง}]
-$ ./q2_noextern                            # run 1
+$ ./q2_noextern                            # Run 1
  Print value of x: 32767     Address of x (in main function):    0x7fffbd75e6e4
  Display value of x: 20      Address of x (in display function): 0x64d04c4a1010
 
-$ ./q2_noextern                            # run 2
+$ ./q2_noextern                            # Run 2
  Print value of x: 32767     Address of x (in main function):    0x7fff6f1a5714
  Display value of x: 20      Address of x (in display function): 0x5595b064f010
 
-$ ./q2_noextern                            # run 3
+$ ./q2_noextern                            # Run 3
  Print value of x: 32766     Address of x (in main function):    0x7ffe04a25a14
  Display value of x: 20      Address of x (in display function): 0x579c5bb0f010
 \end{lstlisting}
 
-\subsubsection{อธิบายผลและเปรียบเทียบกับ Step 1}
+\subsubsection{การวิเคราะห์ผลและเปรียบเทียบกับ Step 1}
 
-\textbf{สิ่งที่เกิดขึ้นไม่ใช่ ``main มองไม่เห็น \code{x}'' แต่คือ ``main สร้าง
-\code{x} ตัวใหม่''} \quad นี่คือหัวใจของข้อนี้ พอลบคำว่า \code{extern} ออก
-บรรทัดนั้นเปลี่ยนจาก \emph{การประกาศ} ว่าจะใช้ตัวแปรข้างนอก กลายเป็น
-\emph{การนิยาม} ตัวแปรอัตโนมัติตัวใหม่ชื่อ \code{x} ขึ้นมาใน \code{main()}
-ผลคือชื่อ \code{x} ในขอบเขตของ \code{main} ถูกจับจองโดยตัวใหม่นี้
-และ \textbf{บดบัง (shadow)} ตัวแปร global เดิมจนมองไม่เห็น
-โปรแกรมยังคอมไพล์ผ่านและรันได้ตามปกติ เพราะในทางไวยากรณ์ไม่มีอะไรผิดเลย
-
-\textbf{ค่าที่พิมพ์ออกมาเป็นค่าขยะ} \quad ตัวแปรใหม่นี้เป็นตัวแปรอัตโนมัติที่
-ไม่ได้ใส่ค่าเริ่มต้น จึงได้ค่าที่ค้างอยู่ในสล็อตของ stack ตรงนั้น
-ซึ่งตามมาตรฐาน C ถือเป็น \emph{undefined behavior} คอมไพเลอร์จับได้และเตือนไว้
-ด้วย \code{-Wuninitialized} ตรงตำแหน่งบรรทัดที่ใช้งานพอดี ซึ่งเป็นเหตุผลที่ควร
-คอมไพล์ด้วย \code{-Wall} เสมอ
-
-\textbf{ค่าขยะที่ได้ไม่ได้สุ่มมั่ว แต่อธิบายได้} \quad สังเกตว่าค่าที่ออกมาวนอยู่
-แถว 32765--32767 ซึ่งใกล้ค่าสูงสุดของ \code{short} พอดี เมื่อเทียบกับที่อยู่ของ
-ตัวมันเองจะเห็นความสัมพันธ์ที่ตรงกันทุกรอบ
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การเกิด Variable Shadowing:} เมื่อลบคำว่า \code{extern} ออก บรรทัด \code{int x;} ใน \code{main()} จะเปลี่ยนสถานะจากการประกาศเป็นการนิยามตัวแปรอัตโนมัติตัวใหม่บน Stack ทำให้ชื่อตัวแปร \code{x} ระดับโลคอลเข้าไปบดบังตัวแปรโกลบอล \code{x} ภายในขอบเขตของ \code{main()}
+  \item \textbf{ค่าของ \code{x} ใน \code{main()}:} แสดงค่าขยะ (Garbage value เช่น 32767) เนื่องจากเป็นตัวแปรอัตโนมัติบน Stack ที่ไม่ได้กำหนดค่าเริ่มต้น คอมไพเลอร์จึงแจ้งเตือน \code{-Wuninitialized}
+  \item \textbf{ค่าของ \code{x} ใน \code{display()}:} ยังคงแสดงค่า $20$ ถูกต้องตามเดิม เนื่องจากในฟังก์ชัน \code{display()} ไม่ได้ถูกแก้ไข จึงยังคงอ้างอิงและเข้าถึงตัวแปรโกลบอลใน Data Segment ตามปกติ
+  \item \textbf{ตำแหน่งที่อยู่:} ที่อยู่ใน \code{main()} เป็นย่าน Stack (\code{0x7ff...}) ในขณะที่ที่อยู่ใน \code{display()} เป็นย่าน Data Segment (\code{0x5...} / \code{0x6...}) แสดงให้เห็นอย่างชัดเจนว่าเป็นตัวแปรคนละตัวกัน
+\end{itemize}
 
 \begin{table}[H]
 \centering\small
-\caption{ค่าขยะที่พิมพ์ออกมา เท่ากับ 16 บิตบนของที่อยู่บน stack พอดีทุกรอบ}
-\begin{tabular}{llll}
+\caption{เปรียบเทียบผลลัพธ์ระหว่างมีและไม่มี \code{extern} ใน \code{main()}}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
 \toprule
-\textbf{การรัน} & \textbf{ค่าที่พิมพ์} & \textbf{ที่อยู่ของ \code{x} ใน \code{main}} & \textbf{16 บิตบนของที่อยู่} \\
+\textbf{ประเด็น} & \textbf{มี \code{extern int x;} ใน main} & \textbf{ลบออกเป็น \code{int x;} ใน main} \\
 \midrule
-PIE รอบ 1 & \code{32767} & \code{0x7fff}\,\code{bd75e6e4} & \code{0x7fff} = 32767 \\
-PIE รอบ 2 & \code{32767} & \code{0x7fff}\,\code{6f1a5714} & \code{0x7fff} = 32767 \\
-PIE รอบ 3 & \code{32766} & \code{0x7ffe}\,\code{04a25a14} & \code{0x7ffe} = 32766 \\
-\code{-no-pie} รอบ 1 & \code{32767} & \code{0x7fff}\,\code{29c5a044} & \code{0x7fff} = 32767 \\
-\code{-no-pie} รอบ 2 & \code{32766} & \code{0x7ffe}\,\code{ad28b514} & \code{0x7ffe} = 32766 \\
-\code{-no-pie} รอบ 3 & \code{32765} & \code{0x7ffd}\,\code{1d346e74} & \code{0x7ffd} = 32765 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-ตรงกันทั้ง 6 รอบไม่ใช่ความบังเอิญ อธิบายได้ว่าสล็อตบน stack ที่ \code{x}
-ไปตกลงนั้น เคยถูกใช้เก็บ \emph{ครึ่งบนของพอยน์เตอร์ 8 ไบต์ที่ชี้ไปบน stack}
-มาก่อน (โค้ดเริ่มต้นโปรแกรมและ dynamic loader ทำงานผ่านบริเวณนี้ก่อนถึง \code{main})
-พอยน์เตอร์บน stack ของเครื่อง 64 บิตหน้าตาเป็น \code{0x00007ffX\_XXXXXXXX}
-เมื่ออ่านเฉพาะ 4 ไบต์บนของมันเป็น \code{int} จึงได้ \code{0x00007fff}
-ซึ่งก็คือ 32767 และเนื่องจากตัวแปร \code{x} เองก็อยู่บน stack เหมือนกัน
-16 บิตบนของทั้งสองค่าจึงตรงกันเสมอ ย้ำว่าเลขนี้ \emph{ไม่ได้รับประกัน}
-เป็นเพียงสิ่งที่บังเอิญค้างอยู่ ถ้าเปลี่ยนเครื่อง เปลี่ยนคอมไพเลอร์
-หรือแม้แต่เปลี่ยนความยาวของตัวแปรสภาพแวดล้อม ก็อาจได้เลขอื่น
-
-\textbf{\code{display()} ยังทำงานถูกต้องเหมือนเดิม} \quad เพราะไม่ได้ถูกแก้
-มันยังเห็นตัวแปร global ตัวเดิม จึงยังพิมพ์ \code{20} และพิมพ์ที่อยู่ในย่าน
-\code{0x5...} เหมือน Step 1 ทุกประการ จุดนี้คือการยืนยันว่าปัญหาเกิดเฉพาะ
-ในขอบเขตของ \code{main} ไม่ได้ลามไปทั้งโปรแกรม
-
-\textbf{ที่อยู่คนละย่านคือหลักฐานว่าเป็นคนละตัวแปร} \quad
-เทียบกับ Step 1 ที่ที่อยู่ในสองฟังก์ชันตรงกันเป๊ะ พอมาถึง Step 2
-ที่อยู่ใน \code{main} เป็น \code{0x7ff...} (stack) ส่วนใน \code{display}
-เป็น \code{0x5...} (ส่วน \code{.data} ของโปรแกรม) ห่างกันคนละย่านของ
-address space ไปเลย
-
-\begin{table}[H]
-\centering\small
-\caption{สรุปความต่างระหว่างมีและไม่มี \code{extern} ใน \code{main()}}
-\begin{tabular}{p{3.0cm}p{5.5cm}p{5.5cm}}
-\toprule
-\textbf{ประเด็น} & \textbf{\code{extern int x;} ใน main} & \textbf{\code{int x;} ใน main} \\
-\midrule
-บรรทัดนั้นคืออะไร & การประกาศ อ้างถึงตัวแปรข้างนอก & การนิยามตัวแปรใหม่ในบล็อก \\
-มีตัวแปรกี่ตัว & 1 ตัว ใช้ร่วมกันทั้งโปรแกรม & 2 ตัว คือ global กับตัวใหม่ใน main \\
-\code{main} พิมพ์ค่าอะไร & \code{20} & ค่าขยะ (\code{32765}--\code{32767}) \\
-\code{display} พิมพ์ค่าอะไร & \code{20} & \code{20} (ไม่กระทบ) \\
-ที่อยู่ในสองฟังก์ชัน & ตรงกันเป๊ะ & คนละย่านโดยสิ้นเชิง \\
-warning จาก \code{gcc} & ไม่มีเพิ่ม & \code{'x' is used uninitialized} \\
-เก็บที่ไหน & \code{.data} ทั้งคู่ & main อยู่ stack, display อยู่ \code{.data} \\
+ความหมายของบรรทัด & การประกาศ (อ้างอิงตัวแปรโกลบอล) & การนิยาม (สร้างตัวแปรโลคอลใหม่บน Stack) \\
+ค่าที่พิมพ์ใน \code{main()} & \code{20} & ค่าขยะ (เช่น \code{32767}) \\
+ค่าที่พิมพ์ใน \code{display()} & \code{20} & \code{20} (ไม่ได้รับผลกระทบ) \\
+ที่อยู่ของตัวแปร & ตรงกันทั้งสองฟังก์ชัน (\code{.data}) & คนละตำแหน่ง (\code{main} อยู่บน Stack) \\
+การแจ้งเตือนคอมไพเลอร์ & ไม่มี & \code{'x' is used uninitialized} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 % ---------------------------------------------------------------------
-\subsection{Step 4: คอมไพล์ใหม่ด้วย \code{-no-pie}}
+\subsection{Step 4: การคอมไพล์ด้วยแฟล็ก \code{-no-pie} และการเปรียบเทียบ}
 % ---------------------------------------------------------------------
 
-\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่มี \code{extern} ครบ}]
-$ gcc -no-pie -Wall -Wextra -o q2_extern_nopie q2_extern.c
-$ ./q2_extern_nopie                        # run 1, 2 and 3 are all identical
+คอมไพล์โปรแกรมทั้งสองเวอร์ชันด้วยแฟล็ก \code{-no-pie}:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4 เมื่อใช้แฟล็ก \code{-no-pie}}]
+----- 3.1 With extern in both functions (-no-pie) -----
+$ ./q2_extern_nopie                        # Run 1, 2, 3: identical across all runs
  Print value of x: 20        Address of x (in main function):    0x404018
  Display value of x: 20      Address of x (in display function): 0x404018
-\end{lstlisting}
 
-\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่ลบ \code{extern} ใน \code{main()}}]
-$ gcc -no-pie -Wall -Wextra -o q2_noextern_nopie q2_noextern.c
-$ ./q2_noextern_nopie                      # run 1
+----- 3.2 Without extern in main() (-no-pie) -----
+$ ./q2_noextern_nopie                      # Run 1
  Print value of x: 32767     Address of x (in main function):    0x7fff29c5a044
  Display value of x: 20      Address of x (in display function): 0x404020
-
-$ ./q2_noextern_nopie                      # run 2
+$ ./q2_noextern_nopie                      # Run 2
  Print value of x: 32766     Address of x (in main function):    0x7ffead28b514
  Display value of x: 20      Address of x (in display function): 0x404020
-
-$ ./q2_noextern_nopie                      # run 3
+$ ./q2_noextern_nopie                      # Run 3
  Print value of x: 32765     Address of x (in main function):    0x7ffd1d346e74
  Display value of x: 20      Address of x (in display function): 0x404020
 \end{lstlisting}
 
-\subsubsection{ต่างจากเดิมหรือไม่ เพราะอะไร}
-
-คำตอบเหมือนข้อ 1 คือ \textbf{ต่างเฉพาะส่วนที่อยู่ในไฟล์โปรแกรม}
-แต่ข้อนี้ให้ภาพที่คมกว่า เพราะเห็นผลทั้งสองแบบ \emph{ในโปรแกรมเดียวกัน}
-คือ \code{q2\_noextern\_nopie} ตัวเดียว มีตัวแปรสองตัวที่ตอบสนองต่อ
-\code{-no-pie} ไม่เหมือนกันเลย
+\subsubsection{วิเคราะห์ความแตกต่างจากเดิมและสาเหตุ}
 
 \begin{table}[H]
 \centering\small
-\caption{สรุปผลทั้งสี่กรณีของข้อ 2}
-\begin{tabular}{p{2.6cm}p{3.6cm}p{3.3cm}p{3.9cm}}
+\caption{เปรียบเทียบผลลัพธ์ของข้อ 2 ระหว่างการคอมไพล์ปกติกับ \code{-no-pie}}
+\begin{tabular}{p{3.2cm}p{4.0cm}p{3.8cm}p{3.0cm}}
 \toprule
-\textbf{ตัวแปรที่ดู} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ \code{-no-pie}} & \textbf{สรุป} \\
+\textbf{ตัวแปรที่พิจารณา} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ด้วย \code{-no-pie}} & \textbf{ข้อสรุป} \\
 \midrule
-\code{x} global (มี \code{extern}) & \code{0x574a...}, \code{0x650d...}, \code{0x5920...} เปลี่ยนทุกครั้ง
-  & \code{0x404018} ทั้งสามครั้ง & \textbf{ต่างกัน} ตรึงที่อยู่ได้ \\
-\code{x} local ใน main (ลบ \code{extern}) & \code{0x7fff...}, \code{0x7fff...}, \code{0x7ffe...} เปลี่ยนทุกครั้ง
-  & \code{0x7fff...}, \code{0x7ffe...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง & \textbf{ไม่ต่าง} ตรึงไม่ได้ \\
-\code{x} global ใน display (ไฟล์เดียวกัน) & เปลี่ยนทุกครั้ง & \code{0x404020} ทั้งสามครั้ง & \textbf{ต่างกัน} ตรึงที่อยู่ได้ \\
-\midrule
-ค่าที่พิมพ์ & \code{20} และค่าขยะ & \code{20} และค่าขยะ & \textbf{ไม่ต่าง} \\
+Global \code{x} (มี extern) & เปลี่ยนตำแหน่งทุกครั้งที่รัน & \code{0x404018} คงที่ทุกรอบ & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+Global \code{x} ใน display & เปลี่ยนตำแหน่งทุกครั้งที่รัน & \code{0x404020} คงที่ทุกรอบ & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+Local \code{x} ใน main & \code{0x7fff...} เปลี่ยนทุกครั้ง & \code{0x7fff...} เปลี่ยนทุกครั้ง & \textbf{ไม่แตกต่าง} ที่อยู่ยังสุ่ม \\
+ค่าของตัวแปร & $20$ และค่าขยะ & $20$ และค่าขยะ & \textbf{ไม่แตกต่าง} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textbf{(1) ตัวแปร global ถูกตรึงที่อยู่ได้} \quad ด้วยเหตุผลเดียวกับตัวแปร
-\code{static} ในข้อ 1 คือมันอยู่ในส่วน \code{.data} ซึ่งเป็นส่วนหนึ่งของไฟล์
-เมื่อ linker ผูกที่อยู่จริงไว้ตั้งแต่ตอน link (ไฟล์ชนิด \code{EXEC})
-เคอร์เนลก็ต้องโหลดลงที่เดิมเสมอ ที่น่าสนใจคือข้อนี้ให้ผลเหมือนข้อ 1 ทั้งที่
-\code{static} กับ global เป็นคนละ storage class กัน ซึ่งยืนยันว่าสิ่งที่กำหนดว่า
-ที่อยู่จะคงที่หรือไม่ ไม่ใช่ \emph{คีย์เวิร์ด} แต่คือ \emph{ตัวแปรไปอยู่ส่วนไหน
-ของหน่วยความจำ}
-
-\textbf{(2) ตัวแปรอัตโนมัติใน \code{main} ยังสุ่มเหมือนเดิม} \quad เพราะอยู่บน
-stack ซึ่งเคอร์เนลเป็นคนสร้างและสุ่มตำแหน่งให้ตอนสร้าง process ไม่ได้อยู่ในไฟล์
-\code{-no-pie} จึงไม่มีอำนาจอะไรกับมัน
-
-\textbf{(3) ข้อควรระวังในการอ่านตัวเลข} \quad ที่อยู่ของ global ในไฟล์
-\code{q2\_extern\_nopie} คือ \code{0x404018} แต่ในไฟล์
-\code{q2\_noextern\_nopie} คือ \code{0x404020} ต่างกัน 8 ไบต์
-ตัวเลขที่ไม่เท่ากันนี้ \emph{ไม่ได้} ขัดกับข้อสรุป เพราะเป็นคนละไฟล์ไบนารีกัน
-(โค้ดต่างกัน linker จึงจัดวางต่างกันเล็กน้อย) สิ่งที่ข้อสรุปพูดถึงคือ
-ที่อยู่ต้องคงที่เมื่อ \emph{รันไฟล์เดิมซ้ำ} ซึ่งเป็นจริงทั้งสองไฟล์
-
-\textbf{(4) ค่าที่พิมพ์ไม่เปลี่ยน} \quad \code{-no-pie} เป็นเรื่องการจัดวาง
-หน่วยความจำล้วน ๆ ไม่ได้แก้บั๊กการบดบังตัวแปรให้ และไม่ได้ทำให้ตัวแปร
-ที่ไม่ได้กำหนดค่าเริ่มต้นกลายเป็นศูนย์
-
-% ---------------------------------------------------------------------
-\subsection{หลักฐานยืนยันคำอธิบาย}
-\label{sec:evidence2}
-% ---------------------------------------------------------------------
-
-\textbf{หลักฐานที่ 1: \code{x} เป็น symbol แบบ global จริง}
-
-\begin{lstlisting}[style=terminal,caption={ตาราง symbol ของไฟล์ \code{-no-pie} ทั้งสอง}]
-$ nm q2_extern_nopie   | grep -w x           # 'D' upper case = external linkage
-0000000000404018 D x                         <- exactly what the program printed
-
-$ nm q2_noextern_nopie | grep -w x           # the global x is still there, untouched
-0000000000404020 D x                         <- the local x in main() has no symbol
-
-$ readelf -s q2_extern_nopie | grep -w x
-    21: 0000000000404018     4 OBJECT  GLOBAL DEFAULT   25 x
-\end{lstlisting}
-
-ตัวอักษร \code{D} \emph{ตัวใหญ่} คือจุดที่ต้องเทียบกับข้อ 1 ซึ่งได้
-\code{d} \emph{ตัวเล็ก} สำหรับตัวแปร \code{static} ตัวใหญ่แปลว่า global
-คือไฟล์อื่นเห็นและใช้ร่วมได้ ส่วนตัวเล็กแปลว่า local คือมีอยู่ในไฟล์นี้เท่านั้น
-นี่คือ \emph{linkage} ที่จับต้องได้จริงในไฟล์ไบนารี ส่วน \code{readelf}
-ยืนยันเพิ่มว่าเป็น \code{OBJECT} ขนาด 4 ไบต์ binding เป็น \code{GLOBAL}
-และอยู่ใน section ที่ 25 ซึ่งก็คือ \code{.data} และที่สำคัญคือ
-ไม่มี symbol ใดเลยสำหรับตัวแปร \code{x} ตัวใหม่ใน \code{main}
-เพราะตัวแปรอัตโนมัติไม่ได้อยู่ในไฟล์
-
-\textbf{หลักฐานที่ 2: คำว่า \code{extern} ในฟังก์ชันไม่สร้างโค้ดเครื่องเลยแม้แต่บิตเดียว}
-
-ถ้าคำกล่าวที่ว่า ``\code{extern} ในฟังก์ชันเป็นการเขียนซ้ำซ้อน'' เป็นจริง
-การลบ \emph{ทั้งบรรทัด} นั้นทิ้งไปเลยต้องได้โค้ดเครื่องที่เหมือนกันทุกไบต์
-สคริปต์จึงสร้างไฟล์ \code{q2\_nodecl.c} ที่ไม่มีบรรทัดประกาศใน \code{main}
-เลย แล้วเทียบ disassembly ของฟังก์ชัน \code{main} ระหว่างสองไฟล์
-
-\begin{lstlisting}[style=terminal,caption={เทียบโค้ดเครื่องของ \code{main()} ระหว่างไฟล์ที่มีและไม่มีบรรทัด \code{extern int x;}}]
-$ diff q2_extern.c q2_nodecl.c
-21d20
-<     extern int x;
-
-$ diff dis_extern.txt dis_nodecl.txt
-identical, the extern declaration inside main() generates no code at all
-
-$ cat dis_extern.txt                   # the machine code of main() in both files
-  40117b: endbr64
-  40117f: push   %rbp
-  401180: mov    %rsp,%rbp
-  401183: mov    0x2e8f(%rip),%eax        # 404018 <x>      <- reads the global directly
-  401189: mov    %eax,%esi
-  40118b: lea    0xec0(%rip),%rax         # 402052 <_IO_stdin_used+0x52>
-  401192: mov    %rax,%rdi
-  401195: mov    $0x0,%eax
-  40119a: call   401040 <printf@plt>
-  40119f: lea    0x2e72(%rip),%rax        # 404018 <x>      <- takes its address
-  ...
-  4011c2: call   401136 <display>
-  4011c9: ret
-\end{lstlisting}
-
-นอกจากจะเหมือนกันทุกบรรทัดแล้ว โค้ดยังบอกด้วยว่า \code{main} อ่านค่าจากที่อยู่
-\code{404018} ซึ่งเป็นตัวแปร global โดยตรง ไม่มีการจองเนื้อที่บน stack ให้ \code{x}
-เลยแม้แต่ไบต์เดียว (ไม่มีคำสั่ง \code{sub \$N,\%rsp} สำหรับตัวแปร)
-
-\textbf{หลักฐานที่ 3: การประกาศไม่ใช่การนิยาม ถ้าไม่มีใครนิยาม linker จะฟ้อง}
-
-\begin{lstlisting}[style=terminal,caption={ลบบรรทัด \code{int x = 20;} ทิ้ง เหลือแต่ \code{extern int x;} ในสองฟังก์ชัน}]
-$ diff q2_extern.c q2_nodef.c
-10d9
-< int x = 20;
-
-$ gcc -w -o q2_nodef q2_nodef.c
-ld: q2_nodef.c:(.text+0xa):  undefined reference to `x'
-ld: q2_nodef.c:(.text+0x27): undefined reference to `x'
-ld: q2_nodef.c:(.text+0x4f): undefined reference to `x'
-ld: q2_nodef.c:(.text+0x6c): undefined reference to `x'
-collect2: error: ld returned 1 exit status
-(exit status of gcc = 1   -> the compiler was happy, the linker was not)
-\end{lstlisting}
-
-จุดสำคัญคือ \textbf{คอมไพเลอร์ผ่านฉลุย} ข้อผิดพลาดมาจาก \code{ld} ซึ่งเป็น
-\emph{linker} ทั้งหมด เพราะ \code{extern int x;} เป็นการสัญญากับคอมไพเลอร์ว่า
-``เดี๋ยวมีคนนิยามให้'' คอมไพเลอร์จึงปล่อยผ่านและทิ้งช่องว่างไว้ให้ linker เติม
-พอถึงเวลาเชื่อมไฟล์แล้วหาไม่เจอจึงฟ้องครบทั้ง 4 จุดที่มีการอ้างถึง \code{x}
-(สองจุดใน \code{display} และสองจุดใน \code{main})
-
-\textbf{หลักฐานที่ 4: ปิด ASLR แล้วที่อยู่หยุดเปลี่ยน (กรณีควบคุม)}
-
-\begin{lstlisting}[style=terminal,caption={รันไฟล์ PIE ชุดเดิมด้วย \code{setarch -R}}]
-$ setarch -R ./q2_extern   | grep Address      # run 1, 2, 3
- Address of x (in main function): 0x555555558010
- Address of x (in main function): 0x555555558010
- Address of x (in main function): 0x555555558010
-
-$ setarch -R ./q2_noextern | grep Address      # run 1, 2, 3 (the local x in main)
- Address of x (in main function): 0x7fffffffe294
- Address of x (in main function): 0x7fffffffe294
- Address of x (in main function): 0x7fffffffe294
-
-$ setarch -R bash -c 'grep "\[stack\]" /proc/self/maps'
-7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
-\end{lstlisting}
-
-ผลเหมือนข้อ 1 ทุกประการ คือทั้งสองโปรแกรมหยุดสุ่มเมื่อปิด ASLR
-และที่อยู่ \code{0x7fffffffe294} ของตัวแปรใน \code{main} ตกอยู่ในช่วง
-\code{[stack]} พอดี ยืนยันว่ามันเป็นตัวแปรบน stack จริง
-
-\textbf{หลักฐานที่ 5: สิ่งที่ \code{extern} มีไว้ใช้จริง ๆ}
-
-โจทย์ใช้ \code{extern} ในไฟล์เดียว ซึ่งไม่ใช่สถานการณ์ที่มันถูกออกแบบมาเพื่อแก้
-การใช้งานจริงคือให้ไฟล์ \code{.c} หลายไฟล์ใช้ตัวแปรตัวเดียวกัน
-จึงเขียนตัวอย่างสั้น ๆ สองไฟล์เพิ่มไว้เพื่อให้เห็นภาพ
-
-\begin{lstlisting}[style=cstyle,caption={\code{q2\_shared\_def.c} นิยามตัวแปร ส่วน \code{q2\_shared\_main.c} แค่ประกาศ}]
-/* ---------- q2_shared_def.c : the DEFINITION lives here ---------- */
-int shared_counter = 100;
-void bump_from_other_file(void) { shared_counter++; ... }
-
-/* ---------- q2_shared_main.c : only a DECLARATION ---------- */
-extern int shared_counter;
-void bump_from_other_file(void);
-int main(void) { ...  bump_from_other_file();  ... }
-\end{lstlisting}
-
-\begin{lstlisting}[style=terminal,caption={ตัวแปรเดียวกันจริง ที่อยู่ตรงกันข้ามไฟล์ และแก้จากอีกไฟล์ได้}]
-$ gcc -Wall -Wextra -o q2_shared q2_shared_main.c q2_shared_def.c
-$ ./q2_shared
- q2_shared_main.c: value = 100, address = 0x5f9fe0256010
- q2_shared_def.c : value = 101, address = 0x5f9fe0256010
- q2_shared_main.c: value = 101, address = 0x5f9fe0256010   (changed by the other file)
-
-$ nm q2_shared_main.o | grep -w shared_counter    # 'U' = Undefined, only a declaration
-                 U shared_counter
-$ nm q2_shared_def.o  | grep -w shared_counter    # 'D' = Defined, this is where it lives
-0000000000000000 D shared_counter
-\end{lstlisting}
-
-ตาราง symbol ของไฟล์ \code{.o} ทั้งสองอธิบายกลไกได้ครบในสองบรรทัด
-ฝั่งที่มีแต่ \code{extern} ได้สถานะ \code{U} (Undefined) คือ ``ขอใช้ชื่อนี้
-แต่ไม่รู้ว่าอยู่ไหน'' ส่วนฝั่งที่นิยามได้สถานะ \code{D} พร้อมที่อยู่
-หน้าที่ของ linker คือจับคู่สองอันนี้เข้าด้วยกัน ผลคือทั้งสองไฟล์พิมพ์ที่อยู่
-เดียวกันเป๊ะ และการแก้ค่าจากไฟล์หนึ่งเห็นผลในอีกไฟล์ทันที
-
-% ---------------------------------------------------------------------
-\subsection{อภิปรายผล}
-% ---------------------------------------------------------------------
-
 \begin{itemize}[leftmargin=*]
-  \item \textbf{\code{extern} เป็นคำสั่งที่พูดกับ linker ไม่ใช่กับ CPU}:
-        ต่างจาก \code{static} ในข้อ 1 ที่มีผลจริงต่อการจัดวางหน่วยความจำ
-        คำว่า \code{extern} ในโค้ดของโจทย์ไม่ได้ทำให้เกิดคำสั่งเครื่องเพิ่มขึ้น
-        แม้แต่บิตเดียว (หลักฐานที่ 2) มันเป็นเพียงข้อมูลที่คอมไพเลอร์ใช้ตัดสินว่า
-        ชื่อนี้หมายถึงอะไร แล้วฝากงานที่เหลือให้ linker ไปหา definition มาให้
-
-  \item \textbf{บทเรียนที่แท้จริงของข้อนี้คือการบดบังตัวแปร (shadowing)}:
-        โจทย์บอกให้ ``ลบคำว่า extern'' ซึ่งฟังดูเหมือนแค่เอาคำที่ไม่จำเป็นออก
-        แต่ผลที่ได้กลับเป็นการสร้างตัวแปรใหม่ที่บังตัวเดิมทั้งดุ้น
-        นี่เป็นบั๊กที่เจอบ่อยมากในโปรแกรมจริง เพราะคอมไพล์ผ่าน ไม่มี error
-        และโปรแกรมยังรันได้ตามปกติ วิธีป้องกันคือเปิด \code{-Wshadow}
-        เพิ่มจาก \code{-Wall -Wextra} ซึ่งจะเตือนทันทีที่ชื่อในบล็อกไปบังชื่อข้างนอก
-        ในกรณีนี้ \code{-Wall} ช่วยจับได้อยู่แล้วโดยบังเอิญ ผ่านทาง
-        \code{-Wuninitialized} แต่ถ้าโค้ดเขียนว่า \code{int x = 5;} แทน
-        คำเตือนนั้นจะหายไปและบั๊กจะเงียบสนิท
-
-  \item \textbf{ค่าขยะที่อธิบายได้ ไม่ได้แปลว่าพึ่งพาได้}: ตารางเทียบค่ากับที่อยู่
-        แสดงว่าเลข 32765--32767 มีที่มาชัดเจน คือเศษของพอยน์เตอร์ที่ค้างอยู่ใน
-        สล็อตนั้น แต่มาตรฐาน C ระบุว่าการอ่านตัวแปรอัตโนมัติที่ยังไม่กำหนดค่าเป็น
-        undefined behavior ซึ่งแปลว่าคอมไพเลอร์มีสิทธิ์ทำอะไรก็ได้ รวมถึงตัดโค้ดทิ้ง
-        หรือให้ผลต่างกันในแต่ละครั้งที่คอมไพล์ การอธิบายได้จึงมีค่าในแง่การเรียนรู้
-        ว่าหน่วยความจำถูกใช้ซ้ำอย่างไร ไม่ใช่ในแง่การเขียนโปรแกรมจริง
-
-  \item \textbf{ข้อ 1 กับข้อ 2 เป็นสองแกนที่ตั้งฉากกัน}: \code{static}
-        ในข้อ 1 ทำให้ตัวแปร \emph{อายุยืนขึ้น} แต่ \emph{ปิด} การมองเห็นจากไฟล์อื่น
-        ส่วน global กับ \code{extern} ในข้อ 2 \emph{เปิด} การมองเห็นให้กว้างที่สุด
-        เห็นได้ชัดที่สุดจากตาราง symbol คือ \code{d y.0} ตัวเล็ก เทียบกับ
-        \code{D x} ตัวใหญ่ ทั้งสองตัวอยู่ใน \code{.data} เหมือนกัน มีที่อยู่คงที่
-        เมื่อคอมไพล์ด้วย \code{-no-pie} เหมือนกัน ต่างกันแค่ว่าใครเห็นชื่อมันได้บ้าง
-
-  \item \textbf{ในโปรแกรมจริงไม่ควรเขียน \code{extern} ไว้ในไฟล์ \code{.c}}:
-        วิธีที่ถูกต้องคือประกาศ \code{extern int x;} ไว้ในไฟล์ \code{.h}
-        แล้วให้ทุกไฟล์ที่ต้องใช้ \code{\#include} เข้าไป ส่วน definition
-        \code{int x = 20;} เขียนไว้ในไฟล์ \code{.c} เพียงไฟล์เดียว
-        เหตุผลคือถ้าเขียนประกาศซ้ำ ๆ ในหลายไฟล์เอง วันที่ชนิดของตัวแปรเปลี่ยน
-        จะต้องไล่แก้ทุกไฟล์ และถ้าแก้ไม่ครบ linker จะไม่ฟ้องด้วย เพราะมันจับคู่
-        ด้วย \emph{ชื่อ} ไม่ได้ตรวจชนิด ซึ่งจะกลายเป็นบั๊กที่หายาก
-
-  \item \textbf{ตัวแปร global ควรใช้เท่าที่จำเป็น}: ข้อนี้แสดงให้เห็นว่า
-        ตัวแปร global ตัวเดียวถูกอ่านและแก้ได้จากทุกฟังก์ชันในโปรแกรม
-        (ตัวอย่างสองไฟล์ในหลักฐานที่ 5 คือภาพชัด ๆ ที่ฟังก์ชันในอีกไฟล์
-        แก้ค่าแล้วเห็นผลทันที) ซึ่งสะดวกแต่ทำให้ไล่หาสาเหตุของบั๊กยาก
-        เพราะไม่มีทางรู้ว่าใครแก้ค่าไปบ้าง และเมื่อมีหลาย thread ก็เกิด
-        race condition ได้เช่นเดียวกับตัวแปร \code{static} ในข้อ 1
-        แนวทางที่ปลอดภัยกว่าคือส่งค่าผ่านพารามิเตอร์ของฟังก์ชัน
-        หรือถ้าจำเป็นต้องมี global จริง ๆ ก็ประกาศเป็น \code{static}
-        ที่ระดับไฟล์เพื่อจำกัดขอบเขตให้แคบที่สุดเท่าที่ทำได้
+  \item \textbf{ตัวแปรโกลบอล (แตกต่าง):} ที่อยู่ของตัวแปรโกลบอลทั้งใน \code{q2\_extern\_nopie} และในฟังก์ชัน \code{display()} ของ \code{q2\_noextern\_nopie} มีตำแหน่งคงที่เดิมเสมอ (\code{0x404018} และ \code{0x404020}) เนื่องจากอยู่ใน Data Segment ของไบนารีตำแหน่งคงที่
+  \item \textbf{ตัวแปรโลคอลใน \code{main()} (ไม่แตกต่าง):} ที่อยู่ยังคงสุ่มเปลี่ยนทุกครั้งที่รันใหม่ เนื่องจากตัวแปรตั้งอยู่บน Stack ซึ่งยังคงถูกสุ่มด้วยกลไก ASLR ของเคอร์เนล
+  \item \textbf{ค่าของตัวแปร:} ยังคงได้ค่าเดิม คือ $20$ สำหรับตัวแปรโกลบอล และค่าขยะสำหรับตัวแปรโลคอลที่ไม่ได้กำหนดค่าเริ่มต้น
 \end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สรุปผลการทดลองข้อ 2}
+% ---------------------------------------------------------------------
+
+\begin{enumerate}[leftmargin=*]
+  \item คำว่า \code{extern} เป็นการประกาศความจำนงเพื่ออ้างอิงตัวแปรโกลบอลที่มีการนิยามไว้แล้ว ไม่มีการจองหน่วยความจำซ้ำซ้อน
+  \item การลบ \code{extern} ออกจากตัวแปรในฟังก์ชันจะทำให้เกิดการนิยามตัวแปรโลคอลตัวใหม่บน Stack และเกิดการบดบัง (Shadowing) ตัวแปรโกลบอลเดิม
+  \item แฟล็ก \code{-no-pie} ทำให้ตำแหน่งของตัวแปรโกลบอลใน Data Segment มีค่าคงที่ แต่ไม่มีผลต่อตัวแปรอัตโนมัติบน Stack ที่ยังคงถูกสุ่มโดย ASLR
+\end{enumerate}
 
 % =====================================================================
 \section{ข้อ 3: การจัดสรรหน่วยความจำด้วย \code{malloc}, \code{realloc} และ \code{free}}
 % =====================================================================
 
-โจทย์ข้อนี้กำหนดให้คอมไพล์แบบปกติเท่านั้น (\emph{without} \code{-no-pie})
-ทุกผลในหัวข้อนี้จึงมาจากไฟล์ที่เป็น PIE ทั้งหมด
+ตามข้อกำหนดของโจทย์ การทดลองในข้อนี้ทั้งหมดจะคอมไพล์แบบปกติ (\emph{without} \code{-no-pie}) ทำให้ไบนารีทั้งหมดมีคุณสมบัติเป็น PIE ภายใต้ ASLR
 
-% ---------------------------------------------------------------------
-\subsection{พื้นฐานที่ต้องเข้าใจก่อน: หน่วยความจำของ process แบ่งเป็นย่าน}
-% ---------------------------------------------------------------------
+\subsection{หลักการพื้นฐานของการจัดสรรหน่วยความจำ (Stack vs Heap)}
 
-สองข้อแรกพูดถึงตัวแปรที่อยู่ใน \code{.data} กับบน stack ข้อนี้เพิ่มย่านที่สามคือ
-\textbf{heap} ซึ่งเป็นย่านเดียวที่โปรแกรมขอและคืนเนื้อที่ได้เองตอนรัน
-ตารางถัดไปใช้ตัวเลขจริงจากโปรแกรมตรวจสอบ \code{q3\_regions.c} ที่รันด้วย
-\code{setarch -R} (ปิด ASLR) เทียบกับ \code{/proc/self/maps}
-ของ process ตัวเดียวกัน
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Stack Segment:} หน่วยความจำที่คอมไพเลอร์และระบบปฏิบัติการจัดการให้อัตโนมัติ ใช้เก็บ Local variables และ Stack frame ของฟังก์ชัน ขนาดต้องทราบแน่นอนในขณะคอมไพล์
+  \item \textbf{Heap Segment:} หน่วยความจำที่โปรแกรมเมอร์สามารถขอจัดสรร (Allocate) และคืนพื้นที่ (Free) ได้เองแบบพลวัต (Dynamic) ขณะโปรแกรมกำลังทำงานผ่านฟังก์ชันระบบ
+  \item \textbf{พอยน์เตอร์กับเป้าหมายที่ชี้:} ตัวแปรพอยน์เตอร์เอง (\code{\&a}) เป็นตัวแปรโลคอลที่อยู่บน Stack ขนาด 8 ไบต์ (บนระบบ 64-bit) ขณะที่ข้อมูลที่พอยน์เตอร์ชี้ไป (\code{a}) จะตั้งอยู่บน Heap
+\end{itemize}
 
 \begin{table}[H]
 \centering\small
-\caption{ย่านหน่วยความจำของ process หนึ่งตัว พร้อมที่อยู่จริงที่วัดได้}
-\begin{tabular}{p{2.1cm}p{3.5cm}p{3.0cm}p{4.6cm}}
+\caption{เปรียบเทียบย่านหน่วยความจำ Stack, Heap และ Data}
+\begin{tabular}{p{2.8cm}p{3.2cm}p{4.0cm}p{4.2cm}}
 \toprule
-\textbf{ย่าน} & \textbf{ช่วงที่เคอร์เนลรายงาน} & \textbf{ตัวอย่างที่วัดได้} & \textbf{ใครจอง / ใครคืน} \\
+\textbf{ย่านหน่วยความจำ} & \textbf{ช่วงที่อยู่ (ตัวอย่าง)} & \textbf{กลไกการจอง} & \textbf{การคืนพื้นที่} \\
 \midrule
-\code{.data} & \code{555555558000}--\code{555555559000} & \code{0x555555558010} (\code{data\_var})
-  & linker กำหนดตอน link เคอร์เนลโหลดให้ตอนเริ่ม \\
-\code{[heap]} & \code{555555559000}--\code{55555557a000} & \code{0x5555555592a0} (จาก \code{malloc})
-  & โปรแกรมขอเองด้วย \code{malloc} คืนเองด้วย \code{free} \\
-\code{[stack]} & \code{7ffffffde000}--\code{7ffffffff000} & \code{0x7fffffffe030} (อาร์เรย์ \code{c})
-  & คอมไพเลอร์จองในเฟรม คืนอัตโนมัติเมื่อออกจากฟังก์ชัน \\
+\textbf{Data Segment} & \code{0x5555...} & กำหนดขนาดคงที่ตอน Link & คืนอัตโนมัติเมื่อสิ้นสุดโปรแกรม \\
+\textbf{Heap} & \code{0x5555...} / \code{0x6...} & จัดสรรแบบพลวัตด้วย \code{malloc} & คืนด้วย \code{free} โดยโปรแกรมเมอร์ \\
+\textbf{Stack} & \code{0x7fff...} & จองอัตโนมัติในเฟรมฟังก์ชัน & คืนอัตโนมัติเมื่อออกจากฟังก์ชัน \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-สังเกตว่า heap อยู่ \emph{ต่อท้าย} ส่วน \code{.data} ของโปรแกรมพอดี
-(\code{...559000} ต่อจาก \code{...559000}) นี่คือเหตุผลที่ที่อยู่จาก
-\code{malloc} ขึ้นต้นด้วย \code{0x5...} เหมือนตัวแปร global ในข้อ 2
-ไม่ใช่ \code{0x7ff...} แบบ stack และเป็นเหตุผลที่มักพูดกันว่า
-``heap โตขึ้นข้างบน stack โตลงข้างล่าง''
-
-อีกเรื่องที่ต้องแยกให้ขาดตั้งแต่ต้น และเป็นสิ่งที่โจทย์ข้อนี้ตั้งใจถามคือ
-\textbf{ตัวพอยน์เตอร์ กับ สิ่งที่พอยน์เตอร์ชี้ไป เป็นคนละอย่างและอยู่คนละที่}
-ตัวแปร \code{int *a;} เองเป็นตัวแปรอัตโนมัติขนาด 8 ไบต์ที่อยู่บน stack
-ส่วนก้อนหน่วยความจำที่ \code{malloc} คืนมาอยู่บน heap
-คำสั่ง \code{\&a} จึงให้ที่อยู่ของ \emph{ตัวแปรพอยน์เตอร์}
-ส่วน \code{a} เฉย ๆ ให้ที่อยู่ของ \emph{ก้อนที่ถูกชี้}
-
 % ---------------------------------------------------------------------
-\subsection{Step 1--3: รันโปรแกรมตามที่โจทย์ให้มา}
+\subsection{Step 1--3: ผลการทดลองและการวิเคราะห์โค้ดเริ่มต้น}
 % ---------------------------------------------------------------------
 
-\begin{lstlisting}[style=cstyle,caption={\code{src/q3\_alloc.c} คัดลอกจากโจทย์ทุกตัวอักษร รวมทั้งส่วนที่คอมเมนต์ไว้}]
+\begin{lstlisting}[style=cstyle,caption={\code{src/q3\_alloc.c} โค้ดเริ่มต้นตามใบงาน (ยังคอมเมนต์ส่วนของ \code{b} ไว้)}]
+#include <stdio.h>
+#include <stdlib.h>
+
 void main()
 {
     int *a;
@@ -1230,31 +618,39 @@ void main()
 
     a = (int*) malloc(10 * sizeof(int));
     printf("\nAfter malloc Pointer a\n");
-    printf(">>%p\n", a);   printf(">>%p\n", &a[0]);   printf(">>%p\n", &a[9]);
+    printf(">>%p\n", a);
+    printf(">>%p\n", &a[0]);
+    printf(">>%p\n", &a[9]);
 
     printf("\nArray c\n");
-    printf(">>%p\n", c);   printf(">>%p\n", &c[0]);   printf(">>%p\n", &c[9]);
+    printf(">>%p\n", c);
+    printf(">>%p\n", &c[0]);
+    printf(">>%p\n", &c[9]);
 
-    /* b = (float*) malloc(10 * sizeof(float));       <- commented out in step 1
+    /* b = (float*) malloc(10 * sizeof(float));
     printf("\nAfter malloc Pointer b\n");
-    printf(">>%p\n", b);   printf(">>%p\n", &b[0]);   printf(">>%p\n", &b[9]);
+    printf(">>%p\n", b);
+    printf(">>%p\n", &b[0]);
+    printf(">>%p\n", &b[9]);
     */
 
     a = (int*) realloc(a, 1000 * sizeof(int));
     printf("\nAfter realloc Pointer a\n");
-    printf(">>%p\n", a);   printf(">>%p\n", &a[0]);
-    printf(">>%p\n", &a[9]);   printf(">>%p\n", &a[999]);
+    printf(">>%p\n", a);
+    printf(">>%p\n", &a[0]);
+    printf(">>%p\n", &a[9]);
+    printf(">>%p\n", &a[999]);
 
     free(a);
-    // free(b);                                       <- commented out in step 1
+    // free(b);
 }
 \end{lstlisting}
 
 \subsubsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={ผลการรันสองครั้ง วางเทียบกันเพื่อแยกว่าเลขไหนขยับเลขไหนอยู่กับที่}]
-$ gcc -Wall -Wextra -o q3_alloc q3_alloc.c        # only the -Wmain warning
-$ ./q3_alloc                    run 1                   run 2
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1--2 (รัน 2 ครั้งเพื่อเปรียบเทียบระยะห่าง)}]
+$ gcc -Wall -Wextra -o q3_alloc q3_alloc.c
+$ ./q3_alloc                    # Run 1                 # Run 2
 
 Address of Pointer          >>0x7ffd2a83f270        >>0x7ffdf5719350
                             >>0x7ffd2a83f278        >>0x7ffdf5719358
@@ -1276,101 +672,65 @@ After realloc Pointer a     >>0x610cfc37b4b0        >>0x5acd8316e4b0
                             >>0x610cfc37c44c        >>0x5acd8316f44c
 \end{lstlisting}
 
-\subsubsection{อธิบายทีละหัวข้อตามที่โจทย์ถาม}
+\subsubsection{การวิเคราะห์ตามแต่ละส่วนของผลลัพธ์ (Step 3)}
 
-\textbf{(1) หัวข้อ \code{Address of Pointer}} \quad สองบรรทัดนี้คือ \code{\&a}
-กับ \code{\&b} ซึ่งเป็นที่อยู่ของ \emph{ตัวแปรพอยน์เตอร์เอง} ไม่ใช่ของข้อมูลที่ถูกชี้
-ทั้งคู่เป็นตัวแปรอัตโนมัติจึงอยู่บน stack ตรงกับที่ขึ้นต้นด้วย \code{0x7ff...}
-และห่างกัน \code{0x278 - 0x270 = 8} ไบต์พอดี ซึ่งก็คือขนาดของพอยน์เตอร์
-บนเครื่อง 64 บิต จุดที่ควรสังเกตคือ \code{b} เป็น \code{float *}
-แต่ก็ยังกิน 8 ไบต์เท่ากับ \code{int *} เพราะขนาดของพอยน์เตอร์ขึ้นกับ
-\emph{สถาปัตยกรรม} ไม่ได้ขึ้นกับชนิดของสิ่งที่มันชี้ไป
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Address of Pointer (\code{\&a}, \code{\&b}):}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} คือตำแหน่งที่อยู่ของ \emph{ตัวแปรพอยน์เตอร์เอง}
+      \item \textbf{เหตุผล:} เนื่องจาก \code{a} และ \code{b} เป็นตัวแปรโลคอล จึงได้รับการจัดสรรไว้บน Stack (\code{0x7ff...}) โดยมีระยะห่างระหว่างกันเท่ากับ \code{0x278 - 0x270 = 8} ไบต์ ซึ่งตรงกับขนาดของพอยน์เตอร์บนสถาปัตยกรรม 64-bit พอดี (แม้ \code{b} จะเป็น \code{float*} แต่พอยน์เตอร์ทุกชนิดบน 64-bit มีขนาด 8 ไบต์เท่ากัน)
+    \end{itemize}
 
-\textbf{(2) หัวข้อ \code{Effective Address}} \quad สองบรรทัดนี้คือ \code{a}
-กับ \code{b} เฉย ๆ ซึ่งเป็น \emph{ค่าที่เก็บอยู่ข้างในตัวแปรพอยน์เตอร์}
-คือที่อยู่ของก้อนข้อมูลที่มันชี้ไป แต่ ณ จุดนี้ยังไม่มีการ \code{malloc}
-และไม่ได้กำหนดค่าเริ่มต้นให้ ค่าที่อยู่ข้างในจึงเป็นค่าที่ยังไม่กำหนด
-(indeterminate) การอ่านมันคือ undefined behavior แบบเดียวกับตัวแปร \code{x}
-ในข้อ 2 ผลที่ได้คือ \code{(nil)} ซึ่งเป็นวิธีที่ \code{printf} ใช้แสดง
-พอยน์เตอร์ที่มีค่าเป็นศูนย์
+  \item \textbf{Effective Address (\code{a}, \code{b} ก่อนการจัดสรร):}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} คือ \emph{ค่าที่ถูกเก็บอยู่ภายในตัวแปรพอยน์เตอร์} (ตำแหน่งปลายทางที่ชี้ไป)
+      \item \textbf{เหตุผล:} เนื่องจากก่อนเรียก \code{malloc} ตัวแปรทั้งสองยังไม่ได้รับการกำหนดค่าเริ่มต้น จึงมีสถานะเป็น Uninitialized Pointer ซึ่งในสภาพแวดล้อมนี้ระบบแสดงผลเป็น \code{(nil)} (ค่า $0$) จากการที่หน้าหน่วยความจำใหม่ของ Stack ถูกเคอร์เนลล้างเป็นศูนย์ไว้
+    \end{itemize}
 
-ที่น่าสนใจคือ \textbf{ทำไมข้อ 2 ได้ค่าขยะ แต่ข้อนี้ได้ศูนย์} ทั้งที่เป็นตัวแปร
-อัตโนมัติที่ไม่ได้กำหนดค่าเหมือนกัน คำอธิบายคือค่าที่ได้ขึ้นอยู่กับว่า
-\emph{สล็อตนั้นเคยถูกใช้มาก่อนหรือยัง} ในข้อ 2 ตัวแปรไปตกในสล็อตที่โค้ดเริ่มต้น
-โปรแกรมเคยใช้เก็บพอยน์เตอร์มาก่อน จึงเจอเศษค้างอยู่ ส่วนข้อนี้เฟรมของ
-\code{main} กินลึกกว่าและไปตกในหน้าที่ยังไม่เคยถูกแตะเลย ซึ่งเคอร์เนล
-รับประกันว่าหน้าใหม่ที่ยกให้ process จะถูกล้างเป็นศูนย์เสมอ (เพื่อไม่ให้ข้อมูล
-ของ process อื่นรั่วออกมา) จึงอ่านได้ \code{0} ย้ำอีกครั้งว่า
-\textbf{ไม่ใช่การรับประกันของภาษา} เป็นเพียงสิ่งที่บังเอิญเป็นในเครื่องนี้
+  \item \textbf{After malloc Pointer a:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งเริ่มต้นของบล็อกหน่วยความจำบน Heap ที่ได้รับการจัดสรรขนาด 40 ไบต์ ($10 \times \code{sizeof(int)}$)
+      \item \textbf{เหตุผล:} \code{a} และ \code{\&a[0]} มีค่าตรงกัน (\code{0x610cfc37b4b0}) เนื่องจากชื่ออาร์เรย์/พอยน์เตอร์ชี้ไปที่จุดเริ่มต้นของสมาชิกตัวแรก และ \code{\&a[9]} มีค่าห่างออกไป \code{0x4d4 - 0x4b0 = 0x24 = 36} ไบต์ ซึ่งตรงกับ $9 \times 4$ ไบต์ แสดงว่าข้อมูลถูกจัดวางเรียงต่อกันในหน่วยความจำ
+    \end{itemize}
 
-\textbf{(3) หัวข้อ \code{After malloc Pointer a}} \quad หลังเรียก
-\code{malloc(10 * sizeof(int))} คือขอ 40 ไบต์ ค่าใน \code{a} เปลี่ยนจากศูนย์
-เป็นที่อยู่จริงบน heap (\code{0x610cfc37b4b0}) สังเกตว่าขึ้นต้นด้วย \code{0x5}
-หรือ \code{0x6} ซึ่งเป็นย่านเดียวกับตัวโปรแกรม ไม่ใช่ \code{0x7ff...} แบบ stack
-ส่วนอีกสองบรรทัดยืนยันกฎพื้นฐานสองข้อของอาร์เรย์
+  \item \textbf{Array c:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งของอาร์เรย์ขนาด 10 สมาชิกที่จองบน Stack
+      \item \textbf{เหตุผล:} \code{c} และ \code{\&c[0]} มีตำแหน่งตรงกันที่ \code{0x7ffd2a83f280} และ \code{\&c[9]} อยู่ถัดไป 36 ไบต์ที่ \code{0x7ffd2a83f2a4} แต่ตำแหน่งจัดเก็บอยู่ในย่าน Stack (\code{0x7ff...}) ซึ่งอยู่คนละส่วนกับ Heap ของ \code{a} อย่างสิ้นเชิง
+    \end{itemize}
 
-\begin{itemize}[leftmargin=*]
-  \item \code{a} กับ \code{\&a[0]} ให้เลขเดียวกันเสมอ เพราะสมาชิกตัวแรก
-        อยู่ต้นก้อนพอดี ไม่มีส่วนหัวอะไรมาคั่นในมุมมองของโปรแกรม
-  \item \code{\&a[9]} ห่างจาก \code{a} เท่ากับ \code{0x4d4 - 0x4b0 = 0x24 = 36}
-        ไบต์ ตรงกับ $9 \times \code{sizeof(int)} = 9 \times 4$ พอดี
-        นั่นคือเลขดัชนีถูกคูณด้วยขนาดของชนิดข้อมูลให้อัตโนมัติ
-\end{itemize}
-
-\textbf{(4) หัวข้อ \code{Array c}} \quad อาร์เรย์ \code{c} ให้ผลรูปแบบเดียวกับ
-\code{a} คือ \code{c} เท่ากับ \code{\&c[0]} และ \code{\&c[9]} ห่างออกไป 36 ไบต์
-(\code{0x2a4 - 0x280 = 0x24}) แต่ \textbf{อยู่คนละย่านกันโดยสิ้นเชิง}
-คือ \code{0x7ff...} เพราะ \code{c} เป็นอาร์เรย์อัตโนมัติที่คอมไพเลอร์จองไว้
-ในเฟรมของ \code{main} ให้ตั้งแต่ตอนคอมไพล์ ไม่ต้องขอใครและไม่ต้องคืน
-ต่างจาก \code{a} ที่ต้องขอตอนรันและต้อง \code{free} เอง
-เมื่อเรียงที่อยู่ทั้งหมดบน stack จะเห็นว่าคอมไพเลอร์วางตัวแปรทั้งสามไว้ติดกัน
-ตามลำดับที่ประกาศพอดี
-
-\begin{table}[H]
-\centering\small
-\caption{ผังตัวแปรบน stack ของ \code{main} จากการรันครั้งที่ 1}
-\begin{tabular}{llll}
-\toprule
-\textbf{ตัวแปร} & \textbf{ที่อยู่} & \textbf{ขนาด} & \textbf{หมายเหตุ} \\
-\midrule
-\code{a} (ตัวพอยน์เตอร์) & \code{0x7ffd2a83f270} & 8 ไบต์ & ชี้ไปที่ heap \\
-\code{b} (ตัวพอยน์เตอร์) & \code{0x7ffd2a83f278} & 8 ไบต์ & ไม่เคยถูกกำหนดค่า \\
-\code{c[0]} ถึง \code{c[9]} & \code{0x7ffd2a83f280}--\code{0x7ffd2a83f2a4} & 40 ไบต์ & ตัวข้อมูลอยู่บน stack เลย \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{(5) หัวข้อ \code{After realloc Pointer a}} \quad \code{realloc}
-ขยายก้อนเดิมจาก 40 ไบต์เป็น \code{1000 * sizeof(int)} คือ 4000 ไบต์
-ในการรันครั้งนี้ที่อยู่ที่คืนมา \emph{เท่าเดิมทุกบิต} คือยังเป็น
-\code{0x610cfc37b4b0} ซึ่งแปลว่าตัวจัดสรรขยายก้อนเดิมในที่เดิมได้สำเร็จ
-โดยไม่ต้องย้ายข้อมูล เหตุผลว่าทำไมจึงขยายได้ และเงื่อนไขที่ทำให้ขยายไม่ได้
-คือคำถามหลักของ Step 6 ซึ่งจะตอบในหัวข้อถัดไป
-ส่วน \code{\&a[999]} ห่างจาก \code{a} เท่ากับ
-\code{0xc44c - 0xb4b0 = 0xf9c = 3996} ไบต์ ตรงกับ $999 \times 4$ พอดี
-ยืนยันว่าก้อนใหม่ใหญ่พอสำหรับ 1000 ตัวจริง
-
-\textbf{(6) เลขไหนขยับ เลขไหนอยู่กับที่} \quad เทียบสองการรันจะเห็นว่า
-\emph{ทุกเลขเปลี่ยนหมด} เพราะทั้ง stack และ heap ถูกสุ่มตำแหน่งด้วย ASLR
-เหมือนที่พิสูจน์ไว้ในข้อ 1 และข้อ 2 แต่สิ่งที่ \emph{ไม่เปลี่ยน} คือ
-\emph{ความสัมพันธ์} ระหว่างเลขเหล่านั้น ทั้งสองการรันได้ระยะห่างเท่ากันเป๊ะ
-คือ 8 ไบต์ระหว่าง \code{\&a} กับ \code{\&b}, 36 ไบต์จาก \code{a} ถึง
-\code{\&a[9]}, และเลข 12 บิตล่างของที่อยู่ heap ยังเป็น \code{4b0} เท่าเดิม
-เพราะ ASLR สุ่มทีละหน้า ไม่ได้สุ่มตำแหน่งภายในหน้า
+  \item \textbf{After realloc Pointer a:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งของหน่วยความจำหลังขยายขนาดเป็น 4000 ไบต์ ($1000 \times \code{sizeof(int)}$)
+      \item \textbf{เหตุผล:} ในรอบนี้ ที่อยู่ของ \code{a} ยังคงเป็น \textbf{ที่อยู่เดิมทุกประการ} (\code{0x610cfc37b4b0}) เนื่องจากก้อนของ \code{a} อยู่ท้ายสุดของ Heap และพื้นที่ด้านหลังยังว่างอยู่ ตัวจัดสรรจึงสามารถขยายขนาดบล็อกเดิมต่อท้ายได้ทันที (In-place growth) โดยไม่ต้องย้ายที่อยู่ และ \code{\&a[999]} อยู่ห่างจาก \code{a} เท่ากับ $999 \times 4 = 3996$ ไบต์ (\code{0x610cfc37c44c - 0x610cfc37b4b0 = 0xf9c})
+    \end{itemize}
+\end{enumerate}
 
 % ---------------------------------------------------------------------
-\subsection{Step 4--6: เปิดคอมเมนต์สองจุดแล้วรันใหม่}
+\subsection{Step 4--6: ผลการทดลองเมื่อเปิดคอมเมนต์จองตัวแปร \code{b}}
 % ---------------------------------------------------------------------
 
-แก้ตามโจทย์คือเปิดคอมเมนต์บล็อก \code{malloc} ของ \code{b} และบรรทัด
-\code{free(b)} (ไฟล์ \code{src/q3\_alloc\_b.c}) จุดสำคัญคือบล็อกของ \code{b}
-อยู่ \emph{ระหว่าง} \code{malloc} ของ \code{a} กับ \code{realloc} ของ \code{a}
-พอดี
+เปิดคอมเมนต์ใน 2 ตำแหน่งตามที่โจทย์ระบุ ได้แก่ บล็อกคำสั่ง \code{malloc} ของ \code{b} และคำสั่ง \code{free(b)} ที่ท้ายโปรแกรม
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q3\_alloc\_b.c} ส่วนที่มีการเปิดคอมเมนต์}]
+    /* uncommented malloc(b) and free(b) */
+    b = (float*) malloc(10 * sizeof(float));
+    printf("\nAfter malloc Pointer b\n");
+    printf(">>%p\n", b);
+    printf(">>%p\n", &b[0]);
+    printf(">>%p\n", &b[9]);
+
+    a = (int*) realloc(a, 1000 * sizeof(int));
+    ...
+    free(a);
+    free(b);
+\end{lstlisting}
 
 \subsubsection{ผลการทดลอง}
 
-\begin{lstlisting}[style=terminal,caption={ผลการรันหลังเปิดคอมเมนต์ สองครั้ง}]
-$ ./q3_alloc_b                  run 1                   run 2
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4--5 (รัน 2 ครั้งหลังเปิดคอมเมนต์)}]
+$ gcc -Wall -Wextra -o q3_alloc_b q3_alloc_b.c
+$ ./q3_alloc_b                  # Run 1                 # Run 2
 
 Address of Pointer          >>0x7ffd3f507340        >>0x7ffe68018760
                             >>0x7ffd3f507348        >>0x7ffe68018768
@@ -1396,187 +756,41 @@ After realloc Pointer a     >>0x6124eb572510        >>0x5bf849581510
                             >>0x6124eb5734ac        >>0x5bf8495824ac
 \end{lstlisting}
 
-เพื่อให้เทียบตัวเลขของสองโปรแกรมได้ตรง ๆ สคริปต์รันทั้งคู่อีกรอบด้วย
-\code{setarch -R} ซึ่งปิด ASLR ทำให้ heap ของทั้งสองโปรแกรมเริ่มที่เดียวกัน
+\subsubsection{การวิเคราะห์และเปรียบเทียบกับรอบก่อนหน้า (Step 6)}
 
-\begin{lstlisting}[style=terminal,caption={เทียบกันตัวต่อตัวโดยปิด ASLR}]
-                                   q3_alloc         q3_alloc_b
-a after malloc(40)                 0x55555555a2b0   0x55555555a2b0
-b after malloc(40)                 (not allocated)  0x55555555a2e0
-a after realloc(4000)              0x55555555a2b0   0x55555555a310
+\textbf{คำตอบสำหรับโจทย์ Step 6:} ผลลัพธ์ที่ได้ \textbf{แตกต่างจากรอบก่อนหน้าอย่างมีนัยสำคัญ} โดยเฉพาะ \textbf{ที่อยู่ของอาร์เรย์ \code{a} หลังการเรียก \code{realloc()}}
 
-q3_alloc  : realloc returned the SAME address, the block grew in place
-q3_alloc_b: realloc MOVED the block by 96 bytes
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบพฤติกรรมของ \code{realloc(a)} ระหว่างสองกรณี}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{การดำเนินการ} & \textbf{ไม่มีการจอง \code{b} (Step 1)} & \textbf{มีการจอง \code{b} คั่นกลาง (Step 4)} \\
+\midrule
+\code{a} หลัง \code{malloc} & \code{0x610cfc37b4b0} & \code{0x6124eb5724b0} \\
+\code{b} หลัง \code{malloc} & (ไม่มีการจอง) & \code{0x6124eb5724e0} (อยู่ติดท้ายก้อน \code{a}) \\
+\code{a} หลัง \code{realloc} & \code{0x610cfc37b4b0} (\textbf{ที่อยู่เดิม}) & \code{0x6124eb572510} (\textbf{เปลี่ยนที่อยู่ใหม่}) \\
+พฤติกรรมการจัดสรร & ขยายพื้นที่เดิมต่อท้าย (In-place) & ย้ายบล็อกไปยังที่ใหม่บน Heap (Relocate) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-b - a                     = 48 bytes   (40 bytes were requested)
-new a - b                 = 48 bytes
-\end{lstlisting}
-
-\subsubsection{ผลต่างจากเดิมหรือไม่ โดยเฉพาะที่อยู่ของ \code{a} เพราะอะไร}
-
-\textbf{คำตอบคือ ที่อยู่ของ \code{a} หลัง \code{realloc} เปลี่ยนไป
-ทั้งที่โค้ดส่วนของ \code{a} ไม่ได้ถูกแก้เลยแม้แต่ตัวอักษรเดียว}
-และนี่คือประเด็นที่โจทย์ต้องการให้เห็น
-
-เหตุผลอยู่ที่ \emph{ลำดับการจอง} ไม่ใช่ที่ตัวโค้ดของ \code{a}
-เมื่อปิด ASLR แล้วเทียบตัวเลขจะเห็นภาพชัดมาก
-
+\textbf{สาเหตุที่ที่อยู่ของ \code{a} เปลี่ยนไป:}
 \begin{itemize}[leftmargin=*]
-  \item \textbf{กรณีเดิม (ไม่มี \code{b})}: ก้อนของ \code{a} ที่
-        \code{0x...a2b0} เป็นก้อนสุดท้ายบน heap ด้านหลังมันเป็นพื้นที่ว่าง
-        ที่ยังไม่มีใครใช้ (glibc เรียกว่า \emph{top chunk}) เมื่อสั่งขยายเป็น
-        4000 ไบต์ ตัวจัดสรรจึงแค่ ``ดันเส้นแบ่ง'' ให้ก้อนเดิมยาวขึ้นได้เลย
-        ไม่ต้องย้ายข้อมูล ที่อยู่จึงเท่าเดิม
-  \item \textbf{กรณีใหม่ (มี \code{b})}: \code{malloc} ของ \code{b}
-        ไปจองที่ \code{0x...a2e0} ซึ่งอยู่ \emph{ติดหลัง} ก้อนของ \code{a} พอดี
-        พื้นที่ที่ \code{a} เคยขยายเข้าไปได้กลายเป็นของ \code{b} ไปแล้ว
-        ตัวจัดสรรจึงขยายในที่เดิมไม่ได้ ต้องหาที่ใหม่ที่ใหญ่พอ
-        คัดลอกข้อมูล 40 ไบต์เดิมไปไว้ที่ใหม่ แล้วปล่อยก้อนเก่าคืนเป็นพื้นที่ว่าง
-        ที่ใหม่ที่ได้คือ \code{0x...a310} ซึ่งอยู่ถัดจากก้อนของ \code{b} ไปอีก
-        48 ไบต์ คือที่ว่างถัดไปที่ใกล้ที่สุดนั่นเอง
+  \item ใน Step 1 มีการจองเฉพาะ \code{a} ทำให้พื้นที่ถัดจากก้อนของ \code{a} ยังคงเป็นพื้นที่ว่าง ตัวจัดสรรจึงสามารถขยายขนาดในตำแหน่งเดิมได้ทันที
+  \item ใน Step 4 มีการเรียก \code{malloc} ให้กับ \code{b} ก่อนการเรียก \code{realloc(a)} ทำให้ก้อนหน่วยความจำของ \code{b} ถูกจัดสรรลงไปขวางพื้นที่ต่อท้ายก้อนของ \code{a} พอดี (\code{0x...24e0} ต่อจาก \code{0x...24b0})
+  \item เมื่อสั่งขยายขนาด \code{a} เป็น 4000 ไบต์ ตัวจัดสรรไม่สามารถขยายขนาดต่อท้ายที่เดิมได้เพราะติดพื้นที่ของ \code{b} จึงจำเป็นต้องค้นหาพื้นที่ว่างก้อนใหม่ที่มีขนาดใหญ่เพียงพอ ย้ายข้อมูลเดิมจากก้อนเก่าไปยังที่อยู่ใหม่ (\code{0x...2510}) แล้วจึงปลดปล่อยพื้นที่ก้อนเดิม
 \end{itemize}
 
-\textbf{ส่วนเลขอื่นเปลี่ยนอย่างไรบ้าง} \quad หัวข้อ \code{Address of Pointer},
-\code{Effective Address}, \code{After malloc Pointer a} และ \code{Array c}
-ให้ผลรูปแบบเดิมทุกประการ เพราะโค้ดส่วนนั้นทำงานก่อนจะถึงบล็อกของ \code{b}
-สิ่งเดียวที่เพิ่มเข้ามาคือหัวข้อ \code{After malloc Pointer b}
-ซึ่งแสดงว่าตอนนี้ \code{b} ชี้ไปที่ heap จริงแล้ว (ไม่ใช่ \code{(nil)}
-เหมือนตอนต้นโปรแกรม) และ \code{\&b[9]} ห่างจาก \code{b} เท่ากับ
-\code{0x504 - 0x4e0 = 0x24 = 36} ไบต์ ซึ่งบังเอิญเท่ากับของ \code{a}
-เพราะ \code{sizeof(float)} เท่ากับ \code{sizeof(int)} คือ 4 ไบต์เท่ากันพอดี
-
-\textbf{ระยะห่าง 48 ไบต์บอกอะไร} \quad ทั้ง \code{b - a} และ
-ระยะจาก \code{b} ไปยัง \code{a} ก้อนใหม่ เท่ากับ 48 ไบต์ ทั้งที่ขอไปแค่ 40 ไบต์
-ส่วนต่าง 8 ไบต์คือ \emph{ส่วนหัวของก้อน} ที่ตัวจัดสรรใช้เก็บขนาดของก้อนเอาไว้
-เพื่อให้ \code{free} รู้ว่าต้องคืนกี่ไบต์ โดยที่โปรแกรมไม่ต้องบอก
-(สังเกตว่า \code{free(a)} รับแค่พอยน์เตอร์ ไม่ต้องบอกขนาด)
-หลักฐานเรื่องนี้อยู่ในหัวข้อถัดไป
-
 % ---------------------------------------------------------------------
-\subsection{หลักฐานยืนยันคำอธิบาย}
-\label{sec:evidence3}
+\subsection{สรุปผลการทดลองข้อ 3}
 % ---------------------------------------------------------------------
 
-คำอธิบายข้างต้นอ้างสามเรื่องที่ต้องพิสูจน์ คือ (ก) ที่อยู่แต่ละอันอยู่ในย่านที่ว่าไว้จริง
-(ข) ส่วนต่าง 8 ไบต์เป็นส่วนหัวของก้อนจริง และ (ค) \code{realloc}
-ตัดสินใจย้ายหรือไม่ย้ายตามที่ว่าไว้จริง โปรแกรม \code{q3\_regions.c}
-ตรวจสอบทั้งสามเรื่องในการรันเดียว
-
-\textbf{หลักฐานที่ 1: แต่ละที่อยู่อยู่ในย่านที่เคอร์เนลระบุชื่อไว้}
-
-\begin{lstlisting}[style=terminal,caption={ที่อยู่จากโปรแกรม เทียบกับ \code{/proc/self/maps} ของ process ตัวเดียวกัน}]
-== 1. one address from each region ==
-&data_var    (a .data object) = 0x555555558010
-heap_ptr     (from malloc)    = 0x5555555592a0
-&stack_arr[0](a local array)  = 0x7fffffffe030
-&heap_ptr    (the pointer)    = 0x7fffffffdfe8
-
-== 4. the same addresses as named by the kernel ==
-555555558000-555555559000 rw-p 00003000 08:30 13511    /tmp/ps04_q3/q3_regions
-555555559000-55555557a000 rw-p 00000000 00:00 0        [heap]
-7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0        [stack]
-\end{lstlisting}
-
-เทียบทีละบรรทัดจะเห็นว่าตรงกันหมด \code{0x555555558010} ตกอยู่ในช่วง
-\code{...558000}--\code{...559000} ซึ่งเป็นส่วนที่เขียนได้ของตัวไฟล์โปรแกรมเอง
-คือ \code{.data} ส่วน \code{0x5555555592a0} ที่ได้จาก \code{malloc}
-ตกอยู่ในช่วงที่เคอร์เนลตั้งชื่อว่า \code{[heap]} ตรง ๆ
-และทั้ง \code{\&heap\_ptr} กับ \code{\&stack\_arr[0]} ตกอยู่ในช่วง \code{[stack]}
-ทั้งคู่ ยืนยันว่าตัวพอยน์เตอร์อยู่บน stack แต่ก้อนที่มันชี้ไปอยู่บน heap จริง
-
-\textbf{หลักฐานที่ 2: ทำไมสองก้อนที่ขอ 40 ไบต์จึงห่างกัน 48 ไบต์}
-
-\begin{lstlisting}[style=terminal,caption={ระยะห่างระหว่างก้อนที่ขอติดกัน สำหรับขนาดที่ขอต่าง ๆ}]
-== 2. how far apart are consecutive malloc() blocks? ==
-malloc( 1) -> 0x55555555a2e0
-malloc( 8) -> 0x55555555a300   gap from previous block = 32 bytes
-malloc(24) -> 0x55555555a320   gap from previous block = 32 bytes
-malloc(25) -> 0x55555555a340   gap from previous block = 32 bytes
-malloc(40) -> 0x55555555a370   gap from previous block = 48 bytes
-malloc(40) -> 0x55555555a3a0   gap from previous block = 48 bytes
-\end{lstlisting}
-
-ตัวเลขชุดนี้อธิบายได้ด้วยกฎง่าย ๆ ข้อเดียวคือ ก้อนจริงที่ตัวจัดสรรใช้
-เท่ากับ ``ขนาดที่ขอ บวก 8 ไบต์สำหรับส่วนหัว แล้วปัดขึ้นให้ลงตัว 16''
-โดยมีขนาดขั้นต่ำ 32 ไบต์ ลองแทนค่าดู ขอ 24 ได้ $24+8=32$ ลงตัว 16 พอดี
-จึงเป็น 32 ขอ 25 ได้ $25+8=33$ ปัดขึ้นเป็น 48 ขอ 40 ได้ $40+8=48$ ลงตัวพอดี
-จึงเป็น 48 ตรงกับที่วัดได้ทุกบรรทัด และตรงกับระยะ 48 ไบต์ระหว่าง \code{a}
-กับ \code{b} ในโปรแกรมของโจทย์ นี่คือ \emph{ต้นทุนแฝง} ของ \code{malloc}
-ที่โปรแกรมมองไม่เห็น คือขอ 40 ได้ใช้ 40 แต่กินจริง 48
-
-\textbf{หลักฐานที่ 3: เงื่อนไขที่ \code{realloc} ย้ายหรือไม่ย้าย}
-
-\begin{lstlisting}[style=terminal,caption={การทดลองแบบมีกรณีควบคุม ต่างกันแค่มีก้อนอื่นมาขวางหรือไม่}]
-== 3. realloc(): grow in place, or move? ==
-case A  no block behind it : 0x55555555a3d0 -> 0x55555555a3d0   SAME (grown in place)
-case B  a block behind it  : 0x55555555a3d0 -> 0x55555555a430   MOVED
-\end{lstlisting}
-
-สองกรณีนี้ต่างกันเพียงจุดเดียวคือ กรณี B มีการ \code{malloc} ก้อนอื่นคั่นไว้
-ก่อนเรียก \code{realloc} ผลที่ได้คือกรณี A ได้ที่อยู่เดิม ส่วนกรณี B ถูกย้าย
-ซึ่งเป็นพฤติกรรมเดียวกับที่เห็นในโปรแกรมของโจทย์ทุกประการ
-ยืนยันว่าคำอธิบายเรื่อง ``ก้อนของ \code{b} ไปขวางทางขยายของ \code{a}''
-ไม่ใช่การเดา แต่ทำซ้ำได้ในโปรแกรมที่คุมตัวแปรอื่นไว้หมดแล้ว
-
-% ---------------------------------------------------------------------
-\subsection{อภิปรายผล}
-% ---------------------------------------------------------------------
-
-\begin{itemize}[leftmargin=*]
-  \item \textbf{stack กับ heap ต่างกันที่ ``ใครเป็นคนตัดสินใจ''}: อาร์เรย์
-        \code{c} กับก้อนของ \code{a} เก็บข้อมูลชนิดเดียวกันจำนวนเท่ากัน
-        และใช้งานด้วยไวยากรณ์ \code{[i]} เหมือนกันทุกประการ
-        แต่ \code{c} คอมไพเลอร์ตัดสินใจให้ตั้งแต่ตอนคอมไพล์ว่าต้องใหญ่เท่าไร
-        และคืนให้อัตโนมัติเมื่อออกจากฟังก์ชัน ส่วนก้อนของ \code{a}
-        โปรแกรมตัดสินใจเองตอนรัน จะขอเท่าไรก็ได้ (แม้แต่ค่าที่เพิ่งรับจากผู้ใช้)
-        จะขยายทีหลังก็ได้ แต่แลกมาด้วยความรับผิดชอบที่ต้องคืนเอง
-        ข้อดีอีกอย่างของ heap คือก้อนที่ขอไม่หายไปเมื่อฟังก์ชันจบ
-        จึงเป็นวิธีเดียวที่ฟังก์ชันจะคืนอาร์เรย์ที่สร้างขึ้นเองกลับไปให้ผู้เรียกได้
-
-  \item \textbf{\code{realloc} อาจย้ายที่ ดังนั้นห้ามเก็บที่อยู่เก่าไว้ใช้ต่อ}:
-        นี่คือบทเรียนที่ใช้ได้จริงที่สุดของข้อนี้ ผลการทดลองแสดงว่า
-        \emph{โค้ดชุดเดียวกัน} ให้ผลได้ทั้งสองแบบ ขึ้นกับสิ่งที่เกิดขึ้นรอบ ๆ
-        ซึ่งโปรแกรมเมอร์ควบคุมไม่ได้ ถ้ามีพอยน์เตอร์ตัวอื่นชี้เข้าไปในก้อนนั้นอยู่
-        หลัง \code{realloc} มันจะกลายเป็น dangling pointer ทันทีโดยไม่มีสัญญาณเตือน
-        คอมไพเลอร์รุ่นใหม่ช่วยจับให้ได้บ้างด้วย \code{-Wuse-after-free}
-        ซึ่งเจอจริงตอนเขียนโปรแกรมตรวจสอบของข้อนี้ จึงต้องแก้ให้เก็บที่อยู่เก่า
-        เป็นตัวเลขแทนการเก็บเป็นพอยน์เตอร์
-
-  \item \textbf{รูปแบบ \code{a = realloc(a, ...)} ที่โจทย์ใช้เป็นรูปแบบที่มีบั๊ก}:
-        ถ้า \code{realloc} ทำงานไม่สำเร็จ มันจะคืน \code{NULL}
-        \emph{โดยที่ก้อนเดิมยังอยู่ครบ} การเขียนทับ \code{a} ด้วย \code{NULL}
-        จึงทำให้ที่อยู่ของก้อนเดิมหายไปตลอดกาล คืนก็ไม่ได้ ใช้ก็ไม่ได้
-        กลายเป็น memory leak ทันที วิธีที่ถูกต้องคือรับค่าไว้ในตัวแปรชั่วคราวก่อน
-        แล้วค่อยตรวจว่าไม่ใช่ \code{NULL} จึงย้ายมาใส่ \code{a}
-        ในโปรแกรมของโจทย์ยังไม่เห็นปัญหาเพราะขอแค่ 4000 ไบต์ซึ่งไม่มีวันล้มเหลว
-        แต่รูปแบบนี้ไม่ควรนำไปใช้ต่อ
-
-  \item \textbf{\code{free} ต้องคู่กับ \code{malloc} เสมอ และการทดลองนี้แสดงให้เห็นทั้งสองแบบ}:
-        ใน Step 1 บรรทัด \code{free(b)} ถูกคอมเมนต์ไว้ ซึ่ง \emph{ถูกต้องแล้ว}
-        เพราะ \code{b} ยังไม่เคยถูก \code{malloc} เลย ถ้าเผลอเปิดคอมเมนต์
-        เฉพาะบรรทัด \code{free(b)} โดยไม่เปิดบล็อก \code{malloc}
-        โปรแกรมจะพยายามคืนพอยน์เตอร์ที่ไม่เคยขอ ซึ่งเป็น undefined behavior
-        (ถ้าค่าเป็น \code{NULL} พอดีจะรอด เพราะมาตรฐานกำหนดให้ \code{free(NULL)}
-        ไม่ทำอะไร แต่ถ้าเป็นค่าขยะจะพังทันที) ในทางกลับกัน ถ้าเปิดเฉพาะบล็อก
-        \code{malloc} โดยลืมเปิด \code{free(b)} ก็จะรั่ว 40 ไบต์
-        โจทย์จึงสั่งให้เปิดทั้งสองที่พร้อมกัน
-
-  \item \textbf{ค่า \code{(nil)} ที่เห็นเป็นความบังเอิญ ไม่ใช่การรับประกัน}:
-        เทียบกับข้อ 2 ที่ตัวแปรอัตโนมัติแบบเดียวกันให้ค่าขยะที่ไม่เป็นศูนย์
-        จะเห็นว่าผลขึ้นกับว่าสล็อตนั้นเคยถูกใช้มาก่อนหรือไม่ล้วน ๆ
-        พอยน์เตอร์ที่ยังไม่ได้กำหนดค่าจึงอันตรายกว่าตัวแปรธรรมดามาก
-        เพราะถ้าเผลอ dereference โดยที่ค่าเป็นขยะ จะไปเขียนทับหน่วยความจำ
-        ที่ไหนก็ไม่รู้ วิธีป้องกันที่ง่ายที่สุดคือเขียน \code{int *a = NULL;}
-        ตั้งแต่ตอนประกาศเสมอ
-
-  \item \textbf{\code{malloc} ไม่ใช่ system call และไม่ได้คุยกับเคอร์เนลทุกครั้ง}:
-        จาก \code{/proc/self/maps} จะเห็นว่า \code{[heap]} มีขนาดถึง
-        \code{0x21000} คือ 132 KB ทั้งที่โปรแกรมขอไปไม่กี่สิบไบต์
-        เพราะ \code{malloc} เป็นฟังก์ชันในไลบรารี \code{glibc}
-        ที่ขอหน่วยความจำก้อนใหญ่จากเคอร์เนลมาเก็บไว้ก่อน แล้วแบ่งย่อยให้
-        โปรแกรมเองภายใน การเรียก \code{malloc} ส่วนใหญ่จึงไม่ต้องเข้าเคอร์เนลเลย
-        ซึ่งเร็วกว่ามาก และเป็นเหตุผลที่ตัวจัดสรรต้องเก็บส่วนหัว 8 ไบต์
-        ไว้กับทุกก้อน เพราะมันต้องจดจำเองว่าก้อนไหนใหญ่เท่าไรและว่างหรือไม่
-\end{itemize}
+\begin{enumerate}[leftmargin=*]
+  \item ตัวแปรพอยน์เตอร์จะถูกจัดสรรบน Stack เสมอ (ขนาด 8 ไบต์บน 64-bit) ขณะที่พื้นที่หน่วยความจำที่ได้รับจาก \code{malloc} จะอยู่บน Heap Segment
+  \item ฟังก์ชัน \code{realloc} จะพยายามขยายขนาดบล็อกหน่วยความจำในตำแหน่งเดิม (In-place) หากพื้นที่ด้านหลังยังคงว่างอยู่
+  \item หากพื้นที่ด้านหลังถูกจัดสรรให้ตัวแปรอื่นไปแล้ว \code{realloc} จะจัดสรรบล็อกใหม่ ย้ายข้อมูลเดิม และคืนที่อยู่ใหม่ ส่งผลให้พอยน์เตอร์เดิมถูกเปลี่ยนตำแหน่ง ซึ่งโปรแกรมเมอร์ต้องอัปเดตพอยน์เตอร์และไม่ควรใช้อ้างอิงที่อยู่เดิม
+  \item การใช้งาน \code{free} ต้องกระทำอย่างถูกต้องตามคู่ของ \code{malloc} เพื่อป้องกันปัญหาหน่วยความจำรั่วไหล (Memory Leak) หรือข้อผิดพลาดจากการคืนพื้นที่ที่ไม่ได้จัดสรร
+\end{enumerate}
 
 \end{document}
