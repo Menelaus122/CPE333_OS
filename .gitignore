@@ -39,3 +39,6 @@ q2_noextern
 q2_extern_nopie
 q2_noextern_nopie
 q2_shared
+q3_alloc
+q3_alloc_b
+q3_regions
