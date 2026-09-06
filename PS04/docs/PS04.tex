@@ -1,0 +1,663 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2026 - Problem Session 4
+%  Memory class and API in C programming
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX หรือ LuaLaTeX เท่านั้น (pdfLaTeX ใช้ไม่ได้ เพราะใช้ fontspec)
+%  Overleaf: Menu > Compiler > XeLaTeX
+%  Local   : xelatex PS04.tex   (รัน 2 รอบเพื่อให้สารบัญถูกต้อง)
+%
+%  สถานะเอกสาร: เขียนข้อ 1 (Static Storage Class) เสร็จแล้ว
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+% --- เลือกอย่างใดอย่างหนึ่ง ---
+% (A) เครื่องตัวเอง / มีฟอนต์ TH Sarabun New ติดตั้งอยู่แล้ว
+\setmainfont{TH Sarabun New}[Scale=1.45]
+
+% (B) Overleaf หรือเครื่องที่มี Noto  <-- ปลอดภัยที่สุดถ้าคอมไพล์บน Overleaf
+% \setmainfont{Noto Serif Thai}[Scale=1.0, UprightFont = * Regular, BoldFont = * Bold]
+
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย (สำคัญมาก ไม่งั้นบรรทัดจะทะลุขอบกระดาษ)
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={size_t,malloc,calloc,realloc,free,printf,exit,auto,static,extern,register},
+}
+
+\lstdefinestyle{bashstyle}{
+  language=bash,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2026}
+\rhead{\small Problem Session 4}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงาน}\\[0.4cm]
+{\Large\bfseries PS04: Memory class and API in C programming}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+\begin{tabular}{@{}lp{12.4cm}@{}}
+\toprule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11), kernel \code{6.6.87.2-microsoft-standard-WSL2} \\
+สถาปัตยกรรม & x86-64 (64 บิต) \\
+คอมไพเลอร์ & \code{gcc 13.3.0} (Ubuntu 13.3.0-6ubuntu2\textasciitilde 24.04.1) ตั้งค่ามาพร้อม \code{-{}-enable-default-pie} \\
+เครื่องมือตรวจสอบ & \code{binutils} (\code{nm}, \code{readelf}), \code{file}, \code{util-linux} (\code{setarch}) \\
+ค่า ASLR & \code{/proc/sys/kernel/randomize\_va\_space} = \code{2} (สุ่มเต็มรูปแบบ) \\
+Shell & \code{GNU bash 5.2.21(1)-release} \\
+วันที่เก็บผล & 6 กันยายน 2569 \\
+\bottomrule
+\end{tabular}
+
+\textbf{ผลการทดลองดิบ} \quad ทุกบรรทัดที่ยกมาในรายงานนี้ตัดมาจากไฟล์
+\code{result/q1\_verified.txt} ซึ่งสร้างซ้ำได้ด้วย \code{make result}
+(สคริปต์ \code{run\_q1.sh} ในโฟลเดอร์ \code{src}) โจทย์กำหนดว่า
+\emph{ทุกขั้นตอนต้องรันบนเครื่องเดียวกัน} สคริปต์นี้จึงคอมไพล์และรันทั้งสี่กรณี
+(มีหรือไม่มี \code{static} คูณกับ มีหรือไม่มี \code{-no-pie}) รวดเดียวจบในการเรียกครั้งเดียว
+ในรายงานแสดงเฉพาะบรรทัดที่จำเป็นต่อการอภิปราย ส่วนที่ตัดออกจะมีเครื่องหมาย
+\code{...} หรือหมายเหตุ \code{(lines omitted)} กำกับไว้ และเพื่อให้ผลการรัน
+สามครั้งอยู่ในหน้าเดียวกันได้ ได้ย้ายบรรทัด \code{The address of y is ...}
+ขึ้นมาต่อท้ายบรรทัด \code{The value of y is ...} ของรอบเดียวกัน
+โดยไม่แก้ตัวเลขใด ๆ
+
+\textbf{หมายเหตุสองเรื่องเกี่ยวกับวิธีทดลอง} \quad
+(1) รายงานนี้คอมไพล์ด้วย \code{-Wall -Wextra} ตลอด จึงมี warning
+\code{return type of main is not int [-Wmain]} ติดมาทุกครั้ง เพราะโค้ดที่โจทย์ให้มา
+ประกาศ \code{void main()} ซึ่งไม่ตรงมาตรฐาน C (มาตรฐานกำหนดให้ \code{main}
+คืนค่า \code{int}) รายงานคงโค้ดไว้ตามโจทย์ทุกตัวอักษร เพราะเป็นเพียง warning
+ไม่ใช่ error และไม่กระทบผลการทดลองเรื่องที่อยู่ของตัวแปรเลย
+(2) การอธิบายว่า ``ที่อยู่เปลี่ยนเพราะ ASLR'' จะเชื่อถือได้ก็ต่อเมื่อ \emph{ปิด} ASLR
+แล้วที่อยู่ต้องหยุดเปลี่ยน สคริปต์จึงรันโปรแกรมชุดเดิมซ้ำด้วย \code{setarch -R}
+(ปิดการสุ่ม address space เฉพาะ process ลูก) ไว้เป็นกรณีควบคุมในหัวข้อ 4 ของไฟล์ผล
+
+% =====================================================================
+\section{ข้อ 1: Static Storage Class}
+% =====================================================================
+
+% ---------------------------------------------------------------------
+\subsection{พื้นฐานที่ต้องเข้าใจก่อน: storage class คืออะไร}
+% ---------------------------------------------------------------------
+
+คำว่า \emph{storage class} ในภาษา C ไม่ได้บอกว่าตัวแปร ``เป็นชนิดอะไร''
+แต่บอกว่าตัวแปรนั้น \textbf{ถูกเก็บไว้ที่ไหนในหน่วยความจำ} และ
+\textbf{มีชีวิตอยู่นานแค่ไหน} คุณสมบัติที่ต้องแยกให้ออกมีสามเรื่อง
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ขอบเขตการมองเห็น (scope)} คือบริเวณในโค้ดที่เรียกชื่อตัวแปรนี้ได้
+  \item \textbf{อายุ (lifetime)} คือช่วงเวลาที่เนื้อที่ในหน่วยความจำของตัวแปรยังถูกจองไว้
+  \item \textbf{การเชื่อมโยง (linkage)} คือไฟล์อื่นเห็นชื่อนี้ด้วยหรือไม่
+\end{itemize}
+
+หัวใจของข้อนี้คือ \textbf{scope กับ lifetime เป็นคนละเรื่องกัน} ตัวแปรหนึ่งตัว
+มีขอบเขตแคบมาก (เห็นได้เฉพาะในบล็อกเดียว) แต่มีอายุยืนตลอดโปรแกรมได้
+และนั่นคือสิ่งที่คำว่า \code{static} ทำ
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบ storage class ของตัวแปรในภาษา C}
+\begin{tabular}{p{2.9cm}p{2.4cm}p{3.0cm}p{2.2cm}p{2.9cm}}
+\toprule
+\textbf{ประกาศแบบ} & \textbf{ขอบเขต} & \textbf{อายุ} & \textbf{เก็บที่} & \textbf{ค่าเริ่มต้นถ้าไม่ใส่} \\
+\midrule
+\code{int y;} ในบล็อก (คือ \code{auto}) & เฉพาะบล็อกนั้น & เกิดตอนเข้าบล็อก ตายตอนออกจากบล็อก & stack & ค่าขยะที่ค้างอยู่ \\
+\code{static int y;} ในบล็อก & เฉพาะบล็อกนั้น & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
+\code{static int y;} นอกฟังก์ชัน & ทั้งไฟล์ & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
+\code{int y;} นอกฟังก์ชัน & ทั้งโปรแกรม & ตลอดโปรแกรม & \code{.data} หรือ \code{.bss} & \code{0} เสมอ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+อีกจุดที่ควรรู้คือคำว่า \code{auto} ในบรรทัด \code{auto int x = 3;} ของโจทย์
+\textbf{ไม่ได้ทำอะไรเลย} เพราะตัวแปรที่ประกาศในบล็อกเป็น \code{auto}
+อยู่แล้วโดยปริยาย เขียนหรือไม่เขียนผลลัพธ์เหมือนกันทุกประการ
+(ในมาตรฐาน C23 คำนี้ถูกนำกลับมาใช้ในความหมายใหม่ คือให้คอมไพเลอร์เดาชนิดตัวแปรเอง
+แต่ \code{gcc 13} ที่ใช้ในการทดลองนี้ตั้งต้นเป็น \code{-std=gnu17} จึงยังเป็นความหมายเดิม)
+
+% ---------------------------------------------------------------------
+\subsection{Step 1: โปรแกรมที่มี \code{static} คอมไพล์แบบปกติ}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_static.c} คัดลอกจากโจทย์ทุกตัวอักษร}]
+#include <stdio.h>
+#include <stdlib.h>
+
+void main()
+{
+    auto int x = 3;
+
+    while (x > 0)
+    {
+        static int y = 5;
+        y++;
+
+        printf("The value of y is %d\n", y);
+        printf("The address of y is %p\n\n", &y);
+
+        x--;
+    }
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={คอมไพล์แบบปกติแล้วรัน 3 ครั้ง}]
+$ gcc -Wall -Wextra -o q1_static q1_static.c
+q1_static.c:10:6: warning: return type of 'main' is not 'int' [-Wmain]
+   10 | void main()
+      |      ^~~~
+(exit status = 0)
+
+$ ./q1_static                              # run 1
+The value of y is 6      The address of y is 0x5c5469622010
+The value of y is 7      The address of y is 0x5c5469622010
+The value of y is 8      The address of y is 0x5c5469622010
+
+$ ./q1_static                              # run 2
+The value of y is 6      The address of y is 0x60a5f69ee010
+The value of y is 7      The address of y is 0x60a5f69ee010
+The value of y is 8      The address of y is 0x60a5f69ee010
+
+$ ./q1_static                              # run 3
+The value of y is 6      The address of y is 0x5faa56b46010
+The value of y is 7      The address of y is 0x5faa56b46010
+The value of y is 8      The address of y is 0x5faa56b46010
+\end{lstlisting}
+
+\subsubsection{อธิบายผล}
+
+ผลที่ได้มีสองส่วนที่ต้องอธิบายแยกกัน คือ \emph{ค่า} กับ \emph{ที่อยู่}
+
+\textbf{ค่าเป็น 6, 7, 8 ไม่ใช่ 6, 6, 6} \quad เพราะบรรทัด \code{static int y = 5;}
+\textbf{ไม่ใช่คำสั่งที่ทำงานตอนวนลูป} แต่เป็นการบอกคอมไพเลอร์ให้จองเนื้อที่
+ไว้ในส่วน \code{.data} ของไฟล์โปรแกรม พร้อมเขียนเลข \code{5} ลงไปในไฟล์ตั้งแต่
+ตอนคอมไพล์ เมื่อโปรแกรมถูกโหลดขึ้นหน่วยความจำ ค่า \code{5} ก็ติดมากับส่วนนั้นเลย
+การ ``กำหนดค่าเริ่มต้น'' จึงเกิดขึ้น \textbf{ครั้งเดียวก่อนโปรแกรมเริ่มทำงาน}
+ไม่ได้เกิดซ้ำทุกรอบที่ผ่านบรรทัดนั้น พอวนลูปรอบที่สอง โปรแกรมข้ามบรรทัดประกาศ
+ไปทำ \code{y++} ต่อจากค่าเดิมทันที ค่าจึงสะสมเป็น $5 \to 6 \to 7 \to 8$
+
+\textbf{ที่อยู่เท่ากันทั้ง 3 รอบภายในการรันเดียว} \quad เป็นผลโดยตรงจากข้อแรก
+คือมีตัวแปร \code{y} อยู่ \emph{ตัวเดียว} ตลอดโปรแกรม ไม่ได้ถูกสร้างใหม่ทุกรอบ
+เมื่อมีตัวเดียวก็ย่อมมีที่อยู่เดียว
+
+\textbf{แต่ที่อยู่เปลี่ยนทุกครั้งที่รันใหม่} \quad ทั้งที่เป็นไฟล์โปรแกรมเดียวกัน
+สาเหตุคือ Ubuntu ตั้งค่า \code{gcc} ให้สร้าง \textbf{PIE (Position-Independent
+Executable)} เป็นค่าตั้งต้น (ยืนยันได้จาก \code{gcc -v} ที่มี
+\code{-{}-enable-default-pie}) ไฟล์แบบนี้ไม่ได้ผูกที่อยู่จริงไว้ในตัวไฟล์
+แต่เก็บเป็น \emph{ระยะห่างจากจุดเริ่มของโปรแกรม} เอาไว้ เคอร์เนลจึงเลือก
+\emph{ฐานที่โหลด} ใหม่แบบสุ่มได้ทุกครั้งที่รัน ซึ่งเป็นกลไก \textbf{ASLR}
+(Address Space Layout Randomization) ที่เปิดอยู่ในเครื่องนี้
+(\code{randomize\_va\_space} มีค่า 2) ที่อยู่ที่พิมพ์ออกมาจึงเป็น
+``ฐานที่สุ่มได้ บวกกับ ระยะห่างคงที่'' หลักฐานอยู่ในหัวข้อ~\ref{sec:evidence}
+
+% ---------------------------------------------------------------------
+\subsection{Step 2--3: ลบคำว่า \code{static} ออก}
+% ---------------------------------------------------------------------
+
+แก้ไขบรรทัดเดียวคือลบคำว่า \code{static} ออก (ไฟล์ \code{src/q1\_auto.c})
+ส่วนอื่นเหมือนเดิมทุกตัวอักษร
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_auto.c} เฉพาะส่วนที่เปลี่ยน}]
+    while (x > 0)
+    {
+        int y = 5;          /* the word "static" is gone */
+        y++;
+        ...
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ลบ \code{static} ออกแล้วรัน 3 ครั้ง}]
+$ gcc -Wall -Wextra -o q1_auto q1_auto.c
+$ ./q1_auto                                # run 1
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+
+$ ./q1_auto                                # run 2
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+
+$ ./q1_auto                                # run 3
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+\end{lstlisting}
+
+\subsubsection{อธิบายผลและเปรียบเทียบกับ Step 1}
+
+\textbf{ค่ากลายเป็น 6, 6, 6} \quad เพราะตอนนี้ \code{y} เป็นตัวแปรอัตโนมัติ
+อายุของมันผูกกับ \emph{บล็อก} ไม่ใช่โปรแกรม ทุกครั้งที่วนเข้าบล็อกใหม่
+ตัวแปรจะถูกสร้างใหม่และคำสั่ง \code{= 5} \emph{ทำงานจริงทุกรอบ}
+(ต่างจาก \code{static} ที่เป็นการเขียนค่าลงไฟล์ตั้งแต่ตอนคอมไพล์)
+พอบวกหนึ่งจึงได้ 6 เท่ากันทุกรอบ ค่าที่สะสมไว้รอบก่อนหายไปหมดตอนออกจากบล็อก
+
+\textbf{ที่อยู่ยังเท่ากันทั้ง 3 รอบ แต่เป็นคนละเหตุผลกับ Step 1} \quad
+จุดนี้เป็นจุดที่เข้าใจผิดกันบ่อยที่สุด ที่อยู่เท่ากันไม่ได้แปลว่าเป็นตัวแปรตัวเดิม
+ความจริงคือคอมไพเลอร์จองสล็อตให้ \code{y} ไว้ใน \emph{stack frame ของ \code{main}}
+ตั้งแต่ตอนเข้าฟังก์ชัน (เช่น ``ถอยจากยอด frame ไป 20 ไบต์'') และ frame ของ
+\code{main} ไม่ได้ถูกทำลายระหว่างวนลูป การวนเข้าออกบล็อกจึงกลับมาใช้
+\textbf{สล็อตเดิมซ้ำ} ทุกรอบ ที่อยู่จึงบังเอิญเท่ากัน แต่ \emph{เนื้อหา} ในสล็อตนั้น
+ถูกเขียนทับด้วยเลข 5 ใหม่ทุกรอบ ซึ่งเห็นได้จากค่าที่ไม่สะสม
+ถ้าย้ายบล็อกนั้นไปอยู่ในฟังก์ชันที่เรียกตัวเองซ้อนกัน (recursive)
+ที่อยู่ก็จะต่างกันไปทุกครั้งทันที เพราะแต่ละครั้งได้ frame คนละอันบน stack
+
+\textbf{ที่อยู่ยังเปลี่ยนทุกครั้งที่รันใหม่ และอยู่คนละย่านกับ Step 1} \quad
+สังเกตว่าเลขของ Step 1 ขึ้นต้นด้วย \code{0x5...} แต่ของ Step 2 ขึ้นต้นด้วย
+\code{0x7ff...} ซึ่งไม่ใช่ความบังเอิญ เลข \code{0x7ff...} คือย่านบนสุดของ
+address space ที่ระบบปฏิบัติการวาง \emph{stack} ไว้ ส่วน \code{0x5...} คือย่านที่
+เคอร์เนลใช้โหลดตัวโปรแกรมแบบ PIE หลักฐานว่าเลขนี้เป็น stack จริง
+อยู่ในหัวข้อ~\ref{sec:evidence} ส่วนสาเหตุที่เปลี่ยนทุกครั้งก็คือ ASLR เช่นกัน
+เพียงแต่เป็น \emph{การสุ่มตำแหน่ง stack} ซึ่งเป็นคนละกลไกกับการสุ่มฐานของ PIE
+ประเด็นนี้จะสำคัญมากใน Step 4
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปความต่างระหว่างมีและไม่มี \code{static}}
+\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{\code{static int y = 5;}} & \textbf{\code{int y = 5;}} \\
+\midrule
+ค่าที่พิมพ์ออกมา & \code{6, 7, 8} & \code{6, 6, 6} \\
+กำหนดค่าเริ่มต้นเมื่อไร & ครั้งเดียว ตอนคอมไพล์และโหลดโปรแกรม & ทุกครั้งที่วนเข้าบล็อก \\
+จำนวนตัวแปรจริง ๆ & 1 ตัวตลอดโปรแกรม & สร้างใหม่ทุกรอบ แต่ใช้ที่เดิมซ้ำ \\
+อยู่ส่วนไหนของหน่วยความจำ & \code{.data} (ย่าน \code{0x5...} เมื่อเป็น PIE) & stack (ย่าน \code{0x7ff...}) \\
+อายุ & ตลอดโปรแกรม & เฉพาะช่วงที่อยู่ในบล็อก \\
+ขอบเขตการมองเห็น & เฉพาะในบล็อก (เหมือนกันทั้งคู่) & เฉพาะในบล็อก (เหมือนกันทั้งคู่) \\
+มีชื่อในตาราง symbol ไหม & มี ชื่อ \code{y.0} & ไม่มี เป็นแค่ระยะห่างใน frame \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4: คอมไพล์ใหม่ด้วย \code{-no-pie}}
+% ---------------------------------------------------------------------
+
+ทำซ้ำ Step 1--3 ทั้งหมด โดยเปลี่ยนเฉพาะคำสั่งคอมไพล์เป็น
+\code{gcc -no-pie -o <output> <source>} ใช้ซอร์สโค้ดไฟล์เดิมทั้งสองไฟล์
+ไม่แก้อะไรเลยแม้แต่ตัวอักษรเดียว
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่มี \code{static}}]
+$ gcc -no-pie -Wall -Wextra -o q1_static_nopie q1_static.c
+$ ./q1_static_nopie                        # run 1
+The value of y is 6      The address of y is 0x404018
+The value of y is 7      The address of y is 0x404018
+The value of y is 8      The address of y is 0x404018
+
+$ ./q1_static_nopie                        # run 2
+The value of y is 6      The address of y is 0x404018
+The value of y is 7      The address of y is 0x404018
+The value of y is 8      The address of y is 0x404018
+
+$ ./q1_static_nopie                        # run 3
+The value of y is 6      The address of y is 0x404018
+The value of y is 7      The address of y is 0x404018
+The value of y is 8      The address of y is 0x404018
+\end{lstlisting}
+
+\begin{lstlisting}[style=terminal,caption={\code{-no-pie} กับโปรแกรมที่ไม่มี \code{static}}]
+$ gcc -no-pie -Wall -Wextra -o q1_auto_nopie q1_auto.c
+$ ./q1_auto_nopie                          # run 1
+The value of y is 6      The address of y is 0x7ffe931c00e0
+The value of y is 6      The address of y is 0x7ffe931c00e0
+The value of y is 6      The address of y is 0x7ffe931c00e0
+
+$ ./q1_auto_nopie                          # run 2
+The value of y is 6      The address of y is 0x7fff0bc434d0
+The value of y is 6      The address of y is 0x7fff0bc434d0
+The value of y is 6      The address of y is 0x7fff0bc434d0
+
+$ ./q1_auto_nopie                          # run 3
+The value of y is 6      The address of y is 0x7ffdbc93c020
+The value of y is 6      The address of y is 0x7ffdbc93c020
+The value of y is 6      The address of y is 0x7ffdbc93c020
+\end{lstlisting}
+
+\subsubsection{ต่างจากเดิมหรือไม่ เพราะอะไร}
+
+คำตอบคือ \textbf{ต่างเฉพาะครึ่งเดียว} และครึ่งที่ต่างกับครึ่งที่ไม่ต่างนี่เอง
+ที่ทำให้เห็นว่า \code{-no-pie} ทำงานกับหน่วยความจำส่วนไหนกันแน่
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปผลทั้งสี่กรณี: ที่อยู่ของ \code{y} คงที่ข้ามการรันหรือไม่}
+\begin{tabular}{p{2.2cm}p{3.4cm}p{3.6cm}p{4.2cm}}
+\toprule
+\textbf{กรณี} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ \code{-no-pie}} & \textbf{สรุป} \\
+\midrule
+มี \code{static} & \code{0x5c54...}, \code{0x60a5...}, \code{0x5faa...} เปลี่ยนทุกครั้ง
+                 & \code{0x404018} เท่ากันทั้งสามครั้ง
+                 & \textbf{ต่างกัน} \code{-no-pie} ตรึงที่อยู่ได้ \\
+ไม่มี \code{static} & \code{0x7fff...}, \code{0x7ffd...}, \code{0x7ffd...} เปลี่ยนทุกครั้ง
+                 & \code{0x7ffe...}, \code{0x7fff...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง
+                 & \textbf{ไม่ต่าง} \code{-no-pie} ไม่ช่วยอะไร \\
+\midrule
+ค่าที่พิมพ์ & \code{6,7,8} และ \code{6,6,6} & \code{6,7,8} และ \code{6,6,6} & \textbf{ไม่ต่าง} เหมือนเดิมทุกกรณี \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{(1) ค่าของ \code{y} ไม่เปลี่ยนเลยไม่ว่าจะคอมไพล์แบบไหน} \quad เพราะ
+\code{-no-pie} เป็นเรื่องของ \emph{การจัดวางในหน่วยความจำ} ล้วน ๆ ไม่ได้เปลี่ยน
+ความหมายของภาษา C แม้แต่นิดเดียว \code{static} ก็ยังคงเป็น \code{static}
+ตัวแปรอัตโนมัติก็ยังเกิดใหม่ทุกรอบเหมือนเดิม
+
+\textbf{(2) กรณี \code{static} ต่างชัดเจน} \quad ที่อยู่กลายเป็น \code{0x404018}
+เท่ากันเป๊ะทั้งสามครั้ง เพราะ \code{-no-pie} สั่งให้ linker สร้างไฟล์ชนิด
+\code{EXEC} ที่ \textbf{ผูกที่อยู่จริงไว้ตายตัวตั้งแต่ตอน link}
+เคอร์เนลไม่มีทางเลือก ต้องโหลดโปรแกรมลงที่อยู่นั้นเป๊ะ ๆ เสมอ ตัวแปร \code{y}
+ที่อยู่ในส่วน \code{.data} จึงมีที่อยู่เดิมทุกครั้ง ตรวจสอบได้ด้วย \code{nm}
+ว่าเลข \code{0x404018} ที่โปรแกรมพิมพ์ออกมา คือเลขเดียวกับที่อยู่ในตาราง symbol
+ของไฟล์ ไม่ได้ถูกกำหนดขึ้นตอนรันเลย
+
+\textbf{(3) กรณีไม่มี \code{static} ไม่ต่างเลย} \quad ที่อยู่ยังเป็น \code{0x7ff...}
+และยังสุ่มทุกครั้งเหมือนเดิม เพราะ \code{y} ตัวนี้อยู่บน \textbf{stack}
+ซึ่ง \emph{ไม่ได้อยู่ในไฟล์โปรแกรม} เลย stack เป็นสิ่งที่เคอร์เนลสร้างให้
+ตอนสร้าง process และตำแหน่งของมันถูกสุ่มโดยกลไก ASLR ของเคอร์เนล
+ซึ่งเป็นคนละกลไกกับการสุ่มฐานของ PIE โดยสิ้นเชิง \code{-no-pie} จึงปิดได้
+เฉพาะการสุ่มฐานของตัวโปรแกรม แต่ปิดการสุ่ม stack ไม่ได้
+ถ้าอยากปิดการสุ่ม stack ด้วยต้องสั่งที่ระบบปฏิบัติการ เช่น \code{setarch -R}
+หรือแก้ค่า \code{/proc/sys/kernel/randomize\_va\_space} ซึ่งได้ทดลองไว้แล้วในหัวข้อถัดไป
+
+\textbf{ข้อสรุปของ Step 4} \quad \code{-no-pie} ไม่ได้ ``ปิด ASLR''
+อย่างที่มักเข้าใจกัน มันแค่ทำให้ \emph{ตัวโปรแกรมและข้อมูลของโปรแกรม}
+(\code{.text}, \code{.data}, \code{.bss}) มีที่อยู่ตายตัว ส่วน stack, heap
+และไลบรารีที่โหลดตอนรัน ยังถูกสุ่มอยู่เหมือนเดิม
+
+% ---------------------------------------------------------------------
+\subsection{หลักฐานยืนยันคำอธิบาย}
+\label{sec:evidence}
+% ---------------------------------------------------------------------
+
+คำอธิบายทั้งหมดข้างต้นจะเป็นแค่การอ้างลอย ๆ ถ้าไม่มีการตรวจสอบจากอีกทาง
+สคริปต์เก็บผลจึงมีหัวข้อ 4 ที่ไล่ตรวจสามเรื่อง คือ ตัวไฟล์เป็นชนิดอะไร
+ตัวแปรอยู่ตรงไหนในไฟล์ และถ้าปิด ASLR แล้วผลจะเปลี่ยนไปอย่างไร
+
+\textbf{หลักฐานที่ 1: ไฟล์ที่ได้เป็นคนละชนิดกันจริง}
+
+\begin{lstlisting}[style=terminal,caption={ชนิดของไฟล์ ELF ทั้งสี่ (ตัด BuildID ออก)}]
+$ file q1_static q1_auto q1_static_nopie q1_auto_nopie
+q1_static:       ELF 64-bit LSB pie executable, x86-64, dynamically linked, ...
+q1_auto:         ELF 64-bit LSB pie executable, x86-64, dynamically linked, ...
+q1_static_nopie: ELF 64-bit LSB executable,     x86-64, dynamically linked, ...
+q1_auto_nopie:   ELF 64-bit LSB executable,     x86-64, dynamically linked, ...
+
+$ readelf -h q1_static       | grep -E 'Type|Entry'
+  Type:                              DYN (Position-Independent Executable file)
+  Entry point address:               0x1060          <- an offset, not a real address
+$ readelf -h q1_static_nopie | grep -E 'Type|Entry'
+  Type:                              EXEC (Executable file)
+  Entry point address:               0x401050        <- a real, fixed address
+\end{lstlisting}
+
+\textbf{หลักฐานที่ 2: ตัวแปร \code{static} มีชื่อและที่อยู่อยู่ในไฟล์ ส่วนตัวแปรอัตโนมัติไม่มี}
+
+\begin{lstlisting}[style=terminal,caption={ตาราง symbol และส่วน \code{.data}}]
+$ nm q1_static_nopie | grep -i ' y'          # 'd' = a local symbol in .data
+0000000000404018 d y.0                       <- exactly what the program printed
+
+$ nm q1_static       | grep -i ' y'          # PIE: the same symbol, but as an offset
+0000000000004010 d y.0
+
+$ nm q1_auto_nopie   | grep -i ' y'          # nothing at all
+(exit status = 1   -> 1 means grep found no symbol named y)
+
+$ readelf -S q1_static_nopie | grep -A1 ' .data '
+  [25] .data             PROGBITS         0000000000404008  00003008
+       0000000000000014  0000000000000000  WA       0     0     8
+\end{lstlisting}
+
+บรรทัดแรกคือหลักฐานที่ตรงที่สุดของทั้งข้อ เลข \code{0x404018} ที่โปรแกรมพิมพ์
+ออกมาตอนรัน คือเลขเดียวกับที่ \code{nm} อ่านได้จาก \emph{ตัวไฟล์} โดยไม่ต้องรันเลย
+และมันตกอยู่ในช่วงของส่วน \code{.data} ที่เริ่มที่ \code{0x404008} พอดี
+ส่วนชื่อ \code{y.0} ที่มีเลขต่อท้าย เป็นเพราะคอมไพเลอร์ต้องตั้งชื่อไม่ให้ชนกับ
+\code{static} ตัวอื่นที่อาจชื่อ \code{y} เหมือนกันในฟังก์ชันอื่น
+ในทางกลับกัน \code{q1\_auto\_nopie} ไม่มี symbol ชื่อ \code{y} เลย
+เพราะตัวแปรอัตโนมัติไม่ใช่ ``ของ'' ที่อยู่ในไฟล์ แต่เป็นเพียงระยะห่างในโค้ด
+ที่นำไปคำนวณกับ stack pointer ตอนรัน
+
+\textbf{หลักฐานที่ 3: ปิด ASLR แล้วที่อยู่หยุดสุ่มจริง (กรณีควบคุม)}
+
+\begin{lstlisting}[style=terminal,caption={รันไฟล์ PIE ชุดเดิมด้วย \code{setarch -R} ซึ่งปิดการสุ่ม address space}]
+$ setarch -R ./q1_static | grep address        # run 1, 2, 3
+The address of y is 0x555555558010
+The address of y is 0x555555558010
+The address of y is 0x555555558010
+
+$ setarch -R ./q1_auto   | grep address        # run 1, 2, 3
+The address of y is 0x7fffffffe290
+The address of y is 0x7fffffffe290
+The address of y is 0x7fffffffe290
+\end{lstlisting}
+
+ไฟล์เดียวกันกับที่เพิ่งให้ผลสุ่มไปเมื่อครู่ พอปิด ASLR กลับให้เลขเดิมทุกครั้ง
+นี่คือหลักฐานว่าตัวการที่ทำให้ที่อยู่เปลี่ยนคือ ASLR ไม่ใช่ตัวภาษา C
+และไม่ใช่ \code{static} ที่สำคัญคือ \code{q1\_auto} ที่คอมไพล์แบบ PIE
+ก็หยุดสุ่มด้วย ทั้งที่ \code{-no-pie} ทำให้มันหยุดสุ่มไม่ได้
+ยืนยันข้อสรุปของ Step 4 ว่าที่อยู่ของ stack ถูกคุมด้วย ASLR ของเคอร์เนล
+ไม่ใช่ด้วยชนิดของไฟล์ ELF
+
+\textbf{หลักฐานที่ 4: เลข \code{0x7ff...} เป็นที่อยู่บน stack จริง}
+
+\begin{lstlisting}[style=terminal,caption={เทียบกับแผนที่หน่วยความจำจริง (ปิด ASLR ทั้งคู่เพื่อให้เทียบตัวเลขกันได้)}]
+$ setarch -R ./q1_auto | grep address | head -1
+The address of y is 0x7fffffffe290                     <- inside the range below
+
+$ setarch -R bash -c 'grep "\[stack\]" /proc/self/maps'
+7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
+
+$ setarch -R ./q1_static | grep address | head -1
+The address of y is 0x555555558010                     <- NOT inside that range
+\end{lstlisting}
+
+ที่อยู่ \code{0x7fffffffe290} ที่โปรแกรมพิมพ์ออกมา ตกอยู่ในช่วง
+\code{0x7ffffffde000} ถึง \code{0x7ffffffff000} ที่เคอร์เนลระบุว่าเป็น
+\code{[stack]} พอดี ในขณะที่ที่อยู่ของตัวแปร \code{static} อยู่คนละย่านโดยสิ้นเชิง
+
+\textbf{หลักฐานที่ 5: ที่อยู่ของ PIE เท่ากับ ฐานที่สุ่มได้ บวก ระยะห่างคงที่}
+
+\begin{lstlisting}[style=terminal,caption={แยกส่วนที่สุ่มออกจากส่วนที่คงที่ (ระยะห่างของ \code{y} คือ \code{0x4010} จาก \code{nm})}]
+$ ./q1_static | head -2        # run 1, 2, 3  ->  base = printed address - 0x4010
+printed &y = 0x59dfb0606010    load base = 0x59dfb0602000
+printed &y = 0x6234ef9d2010    load base = 0x6234ef9ce000
+printed &y = 0x64fd3cae1010    load base = 0x64fd3cadd000
+
+$ ./q1_static_nopie | head -2  # run 1, 2, 3  ->  base = printed address - 0x404018
+printed &y = 0x404018    load base = 0x0
+printed &y = 0x404018    load base = 0x0
+printed &y = 0x404018    load base = 0x0
+\end{lstlisting}
+
+ข้อสังเกตสองอย่าง หนึ่งคือฐานที่คำนวณได้ลงท้ายด้วย \code{000} ทุกครั้ง
+เพราะเคอร์เนลสุ่มได้ทีละหน้า (page ละ 4096 ไบต์) ไม่ได้สุ่มทีละไบต์
+สองคือไฟล์แบบ \code{-no-pie} มีฐานเป็นศูนย์ นั่นคือที่อยู่ที่พิมพ์ออกมา
+เท่ากับที่อยู่ที่ระบุไว้ในไฟล์เป๊ะ ๆ ซึ่งเป็นนิยามของคำว่า ``ไม่ position-independent''
+
+% ---------------------------------------------------------------------
+\subsection{อภิปรายผล}
+% ---------------------------------------------------------------------
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{\code{static} เปลี่ยน ``อายุ'' ไม่ได้เปลี่ยน ``ขอบเขต''}:
+        เป็นบทเรียนหลักของข้อนี้ ตัวแปร \code{y} ในทั้งสองเวอร์ชันมีขอบเขต
+        เท่ากันเป๊ะ คือเรียกใช้ได้เฉพาะในบล็อกของ \code{while} เท่านั้น
+        โค้ดนอกบล็อกยังคอมไพล์ไม่ผ่านเหมือนกัน สิ่งที่ \code{static} เปลี่ยน
+        คือย้ายตัวแปรจาก stack ไปอยู่ \code{.data} ทำให้อายุยืนตลอดโปรแกรม
+        ผลคือได้ตัวแปรที่ ``จำค่าได้ระหว่างการเรียกแต่ละครั้ง แต่ไม่มีใครนอกบล็อก
+        ไปยุ่งกับมันได้'' ซึ่งเป็นเหตุผลที่นิยมใช้ทำตัวนับหรือ cache ในฟังก์ชัน
+
+  \item \textbf{การกำหนดค่าเริ่มต้นของ \code{static} เกิดตอนคอมไพล์ ไม่ใช่ตอนรัน}:
+        เป็นสาเหตุที่ค่าออกมาเป็น 6, 7, 8 และเป็นเหตุผลที่มาตรฐาน C บังคับว่า
+        ค่าเริ่มต้นของตัวแปร \code{static} ต้องเป็นค่าคงที่ที่รู้ตั้งแต่ตอนคอมไพล์
+        (เขียน \code{static int y = rand();} ไม่ได้ แต่ \code{int y = rand();} ได้)
+        ผลข้างเคียงอีกอย่างคือถ้าไม่ใส่ค่าเริ่มต้น ตัวแปร \code{static}
+        จะได้ค่า \code{0} เสมอโดยไม่ต้องเสียเนื้อที่ในไฟล์ เพราะไปอยู่ในส่วน
+        \code{.bss} ที่เคอร์เนลล้างเป็นศูนย์ให้ตอนโหลด ต่างจากตัวแปรอัตโนมัติ
+        ที่ถ้าไม่ใส่ค่าเริ่มต้นจะได้ค่าขยะที่ค้างอยู่ใน stack
+
+  \item \textbf{ที่อยู่ที่พิมพ์ออกมาเป็น virtual address ไม่ใช่ที่อยู่จริงบน RAM}:
+        เห็นได้ชัดจากกรณี \code{-no-pie} ที่ทุก process ได้เลข \code{0x404018}
+        เหมือนกันหมด ถ้ารันพร้อมกันสิบตัวก็ยังเป็นเลขนี้ทั้งสิบตัวและไม่ชนกัน
+        เพราะแต่ละ process มี address space ของตัวเอง โดยมีหน่วย MMU
+        กับตาราง page ของเคอร์เนลแปลงเลขนี้ไปเป็นที่อยู่จริงคนละที่กัน
+        นี่คือภาพรูปธรรมของเรื่อง virtual memory ที่เรียนในทฤษฎี
+
+  \item \textbf{เหตุผลที่ Linux รุ่นใหม่ทำ PIE เป็นค่าตั้งต้น คือความปลอดภัย}:
+        การโจมตีแบบ buffer overflow ยุคใหม่ (เช่น return-to-libc หรือ ROP)
+        ต้องรู้ที่อยู่ของโค้ดหรือข้อมูลที่จะกระโดดไปให้แม่นยำ การสุ่มฐานทุกครั้ง
+        ที่รันทำให้ผู้โจมตีต้องเดา ซึ่งมักทำให้โปรแกรมพังไปเสียก่อน
+        แลกมาด้วยราคาเล็กน้อยคือโค้ดต้องอ้างอิงแบบ relative
+        จึงเป็นเหตุผลที่ \code{-no-pie} ยังมีอยู่ คือใช้ตอน debug
+        ที่อยากให้ที่อยู่คงที่เพื่อเทียบผลได้ หรือใช้กับโค้ดเก่า
+        ที่เขียนแบบผูกที่อยู่ตายตัว ไม่ใช่ตัวเลือกที่ควรใช้กับโปรแกรมจริง
+
+  \item \textbf{ข้อควรระวังของ \code{static} ในโปรแกรมจริง}: เมื่อฟังก์ชันมี
+        \code{static} อยู่ข้างใน ฟังก์ชันนั้นจะ ``จำอดีต'' ได้ ผลคือเรียกด้วย
+        อาร์กิวเมนต์เดิมสองครั้งอาจได้ผลไม่เหมือนกัน ทำให้ทดสอบยากขึ้นมาก
+        และที่ร้ายกว่านั้นคือถ้ามีหลาย thread เรียกฟังก์ชันเดียวกันพร้อมกัน
+        ทุก thread จะใช้ตัวแปรตัวเดียวกัน เกิด race condition ทันที
+        (ฟังก์ชันเก่าในไลบรารีมาตรฐานอย่าง \code{strtok} หรือ \code{ctime}
+        มีปัญหานี้ จึงมีรุ่นลงท้ายด้วย \code{\_r} ที่ให้ผู้เรียกส่งที่เก็บสถานะมาเองแทน)
+
+  \item \textbf{\code{void main()} ไม่ถูกต้องตามมาตรฐาน}: มาตรฐาน C กำหนดให้
+        \code{main} คืนค่า \code{int} เพื่อส่ง exit status ให้ระบบปฏิบัติการ
+        รายงานนี้คงโค้ดไว้ตามโจทย์และแนบ warning มาแสดงตามจริง แต่ในการใช้งานจริง
+        ควรเขียนเป็น \code{int main(void)} และ \code{return 0;} เสมอ
+        โดยเฉพาะเมื่อโปรแกรมจะถูกเรียกจากสคริปต์ที่ตรวจ exit status
+\end{itemize}
+
+\end{document}
