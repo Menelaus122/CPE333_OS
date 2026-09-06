@@ -8,7 +8,7 @@ SRC_DIR = src
 DOC_DIR = docs
 RESULT_DIR = result
 
-.PHONY: all build pdf result result-q1 result-q2 clean
+.PHONY: all build pdf result result-q1 result-q2 result-q3 clean
 
 all: build pdf
 
@@ -17,7 +17,8 @@ build: $(SRC_DIR)/q1_static $(SRC_DIR)/q1_auto \
        $(SRC_DIR)/q1_static_nopie $(SRC_DIR)/q1_auto_nopie \
        $(SRC_DIR)/q2_extern $(SRC_DIR)/q2_noextern \
        $(SRC_DIR)/q2_extern_nopie $(SRC_DIR)/q2_noextern_nopie \
-       $(SRC_DIR)/q2_shared
+       $(SRC_DIR)/q2_shared \
+       $(SRC_DIR)/q3_alloc $(SRC_DIR)/q3_alloc_b $(SRC_DIR)/q3_regions
 
 $(SRC_DIR)/q1_static_nopie: $(SRC_DIR)/q1_static.c
 	$(CC) $(CFLAGS) -no-pie $< -o $@
@@ -42,7 +43,7 @@ pdf:
 	cd $(DOC_DIR) && $(XELATEX) PS04.tex && $(XELATEX) PS04.tex
 
 # เก็บผลการทดลองใหม่ทั้งหมด (ต้องรันบน Linux/WSL)
-result: result-q1 result-q2
+result: result-q1 result-q2 result-q3
 
 result-q1:
 	bash $(SRC_DIR)/run_q1.sh > $(RESULT_DIR)/q1_verified.txt 2>&1
@@ -50,8 +51,12 @@ result-q1:
 result-q2:
 	bash $(SRC_DIR)/run_q2.sh > $(RESULT_DIR)/q2_verified.txt 2>&1
 
+result-q3:
+	bash $(SRC_DIR)/run_q3.sh > $(RESULT_DIR)/q3_verified.txt 2>&1
+
 clean:
 	rm -f $(SRC_DIR)/*.o
 	rm -f $(SRC_DIR)/q1_static $(SRC_DIR)/q1_auto $(SRC_DIR)/q1_static_nopie $(SRC_DIR)/q1_auto_nopie
 	rm -f $(SRC_DIR)/q2_extern $(SRC_DIR)/q2_noextern $(SRC_DIR)/q2_extern_nopie $(SRC_DIR)/q2_noextern_nopie $(SRC_DIR)/q2_shared
+	rm -f $(SRC_DIR)/q3_alloc $(SRC_DIR)/q3_alloc_b $(SRC_DIR)/q3_regions
 	rm -f $(DOC_DIR)/*.aux $(DOC_DIR)/*.fdb_latexmk $(DOC_DIR)/*.fls $(DOC_DIR)/*.log $(DOC_DIR)/*.out $(DOC_DIR)/*.toc
