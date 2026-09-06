@@ -34,3 +34,8 @@ q1_static
 q1_auto
 q1_static_nopie
 q1_auto_nopie
+q2_extern
+q2_noextern
+q2_extern_nopie
+q2_noextern_nopie
+q2_shared
