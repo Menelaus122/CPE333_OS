@@ -1,0 +1,243 @@
+
+====================================================================
+0. Environment
+====================================================================
+$ uname -r ; lsb_release -ds ; gcc --version | head -1 ; ldd --version | head -1
+6.6.87.2-microsoft-standard-WSL2
+Ubuntu 24.04.1 LTS
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+ldd (Ubuntu GLIBC 2.39-0ubuntu8.8) 2.39
+
+$ cat /proc/sys/kernel/randomize_va_space   # 2 = full ASLR is ON
+2
+
+====================================================================
+1. STEP 1-2 : the program exactly as the sheet gives it (b still commented out)
+====================================================================
+$ gcc -Wall -Wextra -o q3_alloc q3_alloc.c
+q3_alloc.c:10:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+   10 | void main()
+      |      ^~~~
+(exit status = 0)
+
+----- 1.1 first run -----
+$ ./q3_alloc
+
+Address of Pointer
+>>0x7ffd2a83f270
+>>0x7ffd2a83f278
+
+Effective Address
+>>(nil)
+>>(nil)
+
+After malloc Pointer a
+>>0x610cfc37b4b0
+>>0x610cfc37b4b0
+>>0x610cfc37b4d4
+
+Array c
+>>0x7ffd2a83f280
+>>0x7ffd2a83f280
+>>0x7ffd2a83f2a4
+
+After realloc Pointer a
+>>0x610cfc37b4b0
+>>0x610cfc37b4b0
+>>0x610cfc37b4d4
+>>0x610cfc37c44c
+
+----- 1.2 second run, to separate what moves from what stays -----
+$ ./q3_alloc
+
+Address of Pointer
+>>0x7ffdf5719350
+>>0x7ffdf5719358
+
+Effective Address
+>>(nil)
+>>(nil)
+
+After malloc Pointer a
+>>0x5acd8316e4b0
+>>0x5acd8316e4b0
+>>0x5acd8316e4d4
+
+Array c
+>>0x7ffdf5719360
+>>0x7ffdf5719360
+>>0x7ffdf5719384
+
+After realloc Pointer a
+>>0x5acd8316e4b0
+>>0x5acd8316e4b0
+>>0x5acd8316e4d4
+>>0x5acd8316f44c
+
+====================================================================
+2. STEP 4-5 : the two commented places uncommented (b is allocated and freed)
+====================================================================
+$ diff q3_alloc.c q3_alloc_b.c        # only the two blocks the sheet asks about
+2,5c2,4
+<  *  CPE 333 PS04 - Q3 Step 1 : memory allocation functions
+<  *  Source code taken verbatim from the problem sheet (PS4_2026_OS.md),
+<  *  with the two blocks still commented out as the sheet gives them.
+<  *  Build:  gcc -o q3_alloc q3_alloc.c            (the sheet says: without -no-pie)
+---
+>  *  CPE 333 PS04 - Q3 Step 4 : the same program with the two places uncommented
+>  *  (the malloc block for pointer b, and free(b) at the end)
+>  *  Build:  gcc -o q3_alloc_b q3_alloc_b.c
+35c34
+<     /* b = (float*) malloc(10 * sizeof(float));
+---
+>     b = (float*) malloc(10 * sizeof(float));
+40d38
+<     */
+50c48
+<     // free(b);
+---
+>     free(b);
+
+$ gcc -Wall -Wextra -o q3_alloc_b q3_alloc_b.c
+q3_alloc_b.c:9:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+    9 | void main()
+      |      ^~~~
+(exit status = 0)
+
+----- 2.1 first run -----
+$ ./q3_alloc_b
+
+Address of Pointer
+>>0x7ffd3f507340
+>>0x7ffd3f507348
+
+Effective Address
+>>(nil)
+>>(nil)
+
+After malloc Pointer a
+>>0x6124eb5724b0
+>>0x6124eb5724b0
+>>0x6124eb5724d4
+
+Array c
+>>0x7ffd3f507350
+>>0x7ffd3f507350
+>>0x7ffd3f507374
+
+After malloc Pointer b
+>>0x6124eb5724e0
+>>0x6124eb5724e0
+>>0x6124eb572504
+
+After realloc Pointer a
+>>0x6124eb572510
+>>0x6124eb572510
+>>0x6124eb572534
+>>0x6124eb5734ac
+
+----- 2.2 second run -----
+$ ./q3_alloc_b
+
+Address of Pointer
+>>0x7ffe68018760
+>>0x7ffe68018768
+
+Effective Address
+>>(nil)
+>>(nil)
+
+After malloc Pointer a
+>>0x5bf8495814b0
+>>0x5bf8495814b0
+>>0x5bf8495814d4
+
+Array c
+>>0x7ffe68018770
+>>0x7ffe68018770
+>>0x7ffe68018794
+
+After malloc Pointer b
+>>0x5bf8495814e0
+>>0x5bf8495814e0
+>>0x5bf849581504
+
+After realloc Pointer a
+>>0x5bf849581510
+>>0x5bf849581510
+>>0x5bf849581534
+>>0x5bf8495824ac
+
+====================================================================
+3. STEP 6 : the two programs compared directly, with ASLR switched off
+====================================================================
+(setarch -R makes both programs start from the same heap base, so the
+ addresses of the two runs can be compared number by number)
+
+$ setarch -R ./q3_alloc   > out_a.txt
+$ setarch -R ./q3_alloc_b > out_b.txt
+$ diff out_a.txt out_b.txt
+19a20,24
+> After malloc Pointer b
+> >>0x55555555a2e0
+> >>0x55555555a2e0
+> >>0x55555555a304
+> 
+21,24c26,29
+< >>0x55555555a2b0
+< >>0x55555555a2b0
+< >>0x55555555a2d4
+< >>0x55555555b24c
+---
+> >>0x55555555a310
+> >>0x55555555a310
+> >>0x55555555a334
+> >>0x55555555b2ac
+
+----- 3.1 the numbers that matter, side by side -----
+                                   q3_alloc         q3_alloc_b      
+a after malloc(40)                 0x55555555a2b0   0x55555555a2b0  
+b after malloc(40)                 (not allocated)  0x55555555a2e0  
+a after realloc(4000)              0x55555555a2b0   0x55555555a310  
+
+q3_alloc  : realloc returned the SAME address, the block grew in place
+q3_alloc_b: realloc MOVED the block by 96 bytes
+
+b - a                     = 48 bytes   (40 bytes were requested)
+new a - b                 = 48 bytes
+
+====================================================================
+4. Evidence : which region is which, chunk overhead, and realloc's rule
+====================================================================
+$ gcc -Wall -Wextra -o q3_regions q3_regions.c
+(exit status = 0)
+
+$ setarch -R ./q3_regions            # ASLR off so the numbers stay comparable
+== 1. one address from each region ==
+&data_var    (a .data object) = 0x555555558010
+heap_ptr     (from malloc)    = 0x5555555592a0
+&stack_arr[0](a local array)  = 0x7fffffffe030
+&heap_ptr    (the pointer)    = 0x7fffffffdfe8
+
+== 2. how far apart are consecutive malloc() blocks? ==
+malloc( 1) -> 0x55555555a2e0
+malloc( 8) -> 0x55555555a300   gap from previous block = 32 bytes
+malloc(24) -> 0x55555555a320   gap from previous block = 32 bytes
+malloc(25) -> 0x55555555a340   gap from previous block = 32 bytes
+malloc(40) -> 0x55555555a370   gap from previous block = 48 bytes
+malloc(40) -> 0x55555555a3a0   gap from previous block = 48 bytes
+
+== 3. realloc(): grow in place, or move? ==
+case A  no block behind it : 0x55555555a3d0 -> 0x55555555a3d0   SAME (grown in place)
+case B  a block behind it  : 0x55555555a3d0 -> 0x55555555a430   MOVED
+
+
+----- 4.1 the kernel's own map of the same process (only the lines that matter) -----
+$ ... reading /proc/self/maps from inside the program
+555555558000-555555559000 rw-p 00003000 08:30 13511                      /tmp/ps04_q3/q3_regions
+555555559000-55555557a000 rw-p 00000000 00:00 0                          [heap]
+7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
+
+====================================================================
+END OF Q3
+====================================================================

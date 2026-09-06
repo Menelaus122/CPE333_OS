@@ -1,0 +1,796 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2569 - Problem Session 4
+%  Memory class and API in C programming
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+\setmainfont{TH Sarabun New}[Scale=1.45]
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={size_t,malloc,calloc,realloc,free,printf,exit,auto,static,extern,register},
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2569}
+\rhead{\small Problem Session 4}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงานปฏิบัติการ}\\[0.4cm]
+{\Large\bfseries PS04: Memory class and API in C programming}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+การทดลองทั้งหมดดำเนินการบนระบบปฏิบัติการตามข้อกำหนดของปฏิบัติการ โดยมีรายละเอียดสภาพแวดล้อมดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อมูลสภาพแวดล้อมของระบบที่ใช้ในการทดลอง}
+\begin{tabular}{@{}lp{12.4cm}@{}}
+\toprule
+\textbf{รายการ} & \textbf{รายละเอียด} \\
+\midrule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS (บน WSL2 / Windows 11), Kernel \code{6.6.87.2-microsoft-standard-WSL2} \\
+สถาปัตยกรรม & x86-64 (64-bit) \\
+คอมไพเลอร์ & \code{gcc 13.3.0} (ตั้งค่าเริ่มต้นเป็น \code{--enable-default-pie}) \\
+ค่า ASLR & \code{/proc/sys/kernel/randomize\_va\_space = 2} (เปิดการสุ่มอย่างสมบูรณ์) \\
+Shell & \code{GNU bash 5.2.21(1)-release} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{หมายเหตุ:} การคอมไพล์โปรแกรมด้วยแฟล็ก \code{-Wall -Wextra} ตามมาตรฐานจะพบ Warning \code{return type of 'main' is not 'int' [-Wmain]} เนื่องจากโค้ดต้นฉบับจากใบงานใช้ \code{void main()} ซึ่งในรายงานนี้ได้คงโค้ดไว้ตามข้อกำหนดเดิมของใบงานทุกประการ
+
+% =====================================================================
+\section{ข้อ 1: Static Storage Class}
+% =====================================================================
+
+\subsection{หลักการพื้นฐานของ Storage Class}
+
+Storage Class ในภาษา C กำหนดคุณสมบัติสำคัญ 3 ประการของตัวแปร ได้แก่
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ขอบเขต (Scope):} บริเวณในโปรแกรมที่สามารถเข้าถึงชื่อตัวแปรนั้นได้
+  \item \textbf{อายุการใช้งาน (Lifetime):} ช่วงเวลาที่ตัวแปรคงอยู่ในหน่วยความจำระหว่างการทำงาน
+  \item \textbf{ตำแหน่งในหน่วยความจำ (Memory Segment):} บริเวณที่ระบบจัดสรรพื้นที่ให้ เช่น Stack หรือ Data Segment
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบ Storage Class รูปแบบต่าง ๆ ในภาษา C}
+\begin{tabular}{p{3.2cm}p{2.2cm}p{2.8cm}p{2.2cm}p{2.8cm}}
+\toprule
+\textbf{การประกาศ} & \textbf{ขอบเขต} & \textbf{อายุการใช้งาน} & \textbf{ตำแหน่งจัดเก็บ} & \textbf{ค่าเริ่มต้นโดยปริยาย} \\
+\midrule
+\code{int y;} ในบล็อก (\code{auto}) & ภายในบล็อก & ชั่วคราว (เข้า/ออกบล็อก) & Stack & ค่าขยะ (Indeterminate) \\
+\code{static int y;} ในบล็อก & ภายในบล็อก & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
+\code{static int y;} นอกฟังก์ชัน & ภายในไฟล์ & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
+\code{int y;} นอกฟังก์ชัน (Global) & ทั้งโปรแกรม & ตลอดการทำงานของโปรแกรม & \code{.data} / \code{.bss} & \code{0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ทั้งนี้ คำว่า \code{auto} ใน \code{auto int x = 3;} เป็นเพียงการระบุคลาสอัตโนมัติอย่างชัดแจ้ง ซึ่งเป็นค่าเริ่มต้นของตัวแปรภายในฟังก์ชันอยู่แล้ว
+
+% ---------------------------------------------------------------------
+\subsection{Step 1: โค้ดโปรแกรมที่มี \code{static} (คอมไพล์แบบปกติ)}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_static.c} โค้ดเริ่มต้นตามใบงาน}]
+#include <stdio.h>
+#include <stdlib.h>
+
+void main()
+{
+    auto int x = 3;
+
+    while (x > 0)
+    {
+        static int y = 5;
+        y++;
+
+        printf("The value of y is %d\n", y);
+        printf("The address of y is %p\n\n", &y);
+
+        x--;
+    }
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+ผลการคอมไพล์และรันโปรแกรม 3 ครั้ง:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q1_static q1_static.c
+q1_static.c: In function 'main':
+q1_static.c:10:6: warning: return type of 'main' is not 'int' [-Wmain]
+
+$ ./q1_static                              # Run 1
+The value of y is 6      The address of y is 0x5c5469622010
+The value of y is 7      The address of y is 0x5c5469622010
+The value of y is 8      The address of y is 0x5c5469622010
+
+$ ./q1_static                              # Run 2
+The value of y is 6      The address of y is 0x60a5f69ee010
+The value of y is 7      The address of y is 0x60a5f69ee010
+The value of y is 8      The address of y is 0x60a5f69ee010
+
+$ ./q1_static                              # Run 3
+The value of y is 6      The address of y is 0x5faa56b46010
+The value of y is 7      The address of y is 0x5faa56b46010
+The value of y is 8      The address of y is 0x5faa56b46010
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ผลการทดลอง}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ค่าของตัวแปร ($y = 6 \to 7 \to 8$):} ตัวแปร \code{static} ถูกจัดสรรไว้ใน Data Segment (\code{.data}) และได้รับการกำหนดค่าเริ่มต้น ($5$) เพียงครั้งเดียวตั้งแต่ขั้นตอนคอมไพล์และโหลดโปรแกรม เมื่อวนลูปคำสั่งประกาศจะไม่ถูกทำงานซ้ำ คำสั่ง \code{y++} จึงบวกค่าสะสมต่อเนื่องจากรอบก่อนหน้า
+  \item \textbf{ที่อยู่ของตัวแปรภายในการรันเดียวกัน:} มีตำแหน่งคงที่เดิมทั้ง 3 รอบของการวนลูป เนื่องจากระบบใช้พื้นที่ใน Data Segment ตำแหน่งเดิมตลอดอายุของโปรแกรม
+  \item \textbf{ที่อยู่ของตัวแปรข้ามการรัน:} มีการเปลี่ยนแปลงทุกครั้งที่สั่งรันใหม่ เนื่องจาก Ubuntu ตั้งค่าให้ \code{gcc} สร้างไบนารีแบบ PIE (Position-Independent Executable) เป็นค่าเริ่มต้น ทำงานร่วมกับกลไก ASLR (Address Space Layout Randomization) ของระบบปฏิบัติการ ซึ่งจะสุ่มฐานตำแหน่งของโปรแกรมใหม่ทุกครั้งที่ถูกโหลดขึ้นหน่วยความจำ
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{Step 2--3: โค้ดโปรแกรมที่ลบคำว่า \code{static} ออก}
+% ---------------------------------------------------------------------
+
+ทำการแก้ไขโค้ดโดยลบคำว่า \code{static} ออก ทำให้ตัวแปร \code{y} กลายเป็นตัวแปรอัตโนมัติ (\code{int y = 5;})
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q1\_auto.c} ส่วนที่มีการปรับปรุง}]
+    while (x > 0)
+    {
+        int y = 5;          /* deleted 'static' keyword */
+        y++;
+        printf("The value of y is %d\n", y);
+        printf("The address of y is %p\n\n", &y);
+        x--;
+    }
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+ผลการคอมไพล์และรันโปรแกรม 3 ครั้ง:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 2--3 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q1_auto q1_auto.c
+$ ./q1_auto                                # Run 1
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+The value of y is 6      The address of y is 0x7fff16657ab0
+
+$ ./q1_auto                                # Run 2
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+The value of y is 6      The address of y is 0x7ffde6d8b730
+
+$ ./q1_auto                                # Run 3
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+The value of y is 6      The address of y is 0x7ffd35c62ec0
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ผลและเปรียบเทียบกับ Step 1}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ค่าของตัวแปร ($y = 6, 6, 6$):} ตัวแปร \code{y} เป็น Automatic variable บน Stack ซึ่งมีอายุจำกัดเฉพาะในบล็อกของลูป \code{while} ในแต่ละรอบคำสั่ง \code{int y = 5;} จะทำงานเพื่อกำหนดค่าเริ่มต้นใหม่เสมอ ส่งผลให้ \code{y++} ได้ค่า $6$ เท่ากันทุกรอบ
+  \item \textbf{ที่อยู่ของตัวแปรภายในการรันเดียวกัน:} เท่ากันทั้ง 3 รอบ เนื่องจากการทำงานในลูปยังคงอยู่ใน Stack Frame ของฟังก์ชัน \code{main()} คอมไพเลอร์จึงนำสล็อตหน่วยความจำเดิมบน Stack มาใช้ซ้ำ (Stack slot reuse)
+  \item \textbf{ที่อยู่ของตัวแปรข้ามการรัน:} อยู่ในย่าน Stack (\code{0x7ff...}) ซึ่งต่างจากตัวแปร \code{static} ที่อยู่ในย่าน Data Segment (\code{0x5...}) โดยตำแหน่งจะถูกสุ่มใหม่ทุกครั้งตามกลไก ASLR ของ Stack
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ระหว่างการใช้และไม่ใช้ \code{static}}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{มี \code{static} (Step 1)} & \textbf{ไม่มี \code{static} (Step 2)} \\
+\midrule
+ค่าที่พิมพ์ออก & \code{6, 7, 8} (สะสมค่าต่อเนื่อง) & \code{6, 6, 6} (เริ่มต้นใหม่ทุกรอบ) \\
+การกำหนดค่าเริ่มต้น & ทำครั้งเดียวตอนโหลดโปรแกรม & ทำซ้ำทุกครั้งเมื่อเข้าบล็อก \\
+ตำแหน่งจัดเก็บ & Data Segment (\code{.data}) & Stack Segment \\
+ขอบเขตการมองเห็น & เฉพาะในบล็อก \code{while} & เฉพาะในบล็อก \code{while} \\
+อายุการใช้งาน & ตลอดระยะเวลาการทำงานของโปรแกรม & ชั่วคราวเฉพาะช่วงที่อยู่ในบล็อก \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4: การคอมไพล์ด้วยแฟล็ก \code{-no-pie} และการเปรียบเทียบ}
+% ---------------------------------------------------------------------
+
+คอมไพล์โปรแกรมทั้งสองเวอร์ชันใหม่โดยระบุแฟล็ก \code{-no-pie}:
+\begin{lstlisting}[style=terminal]
+$ gcc -no-pie -Wall -Wextra -o q1_static_nopie q1_static.c
+$ gcc -no-pie -Wall -Wextra -o q1_auto_nopie   q1_auto.c
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4 เมื่อใช้แฟล็ก \code{-no-pie}}]
+----- 3.1 With static (-no-pie) -----
+$ ./q1_static_nopie                        # Run 1, 2, 3: identical across all runs
+The value of y is 6      The address of y is 0x404018
+The value of y is 7      The address of y is 0x404018
+The value of y is 8      The address of y is 0x404018
+
+----- 3.2 Without static (-no-pie) -----
+$ ./q1_auto_nopie                          # Run 1
+The value of y is 6      The address of y is 0x7ffe931c00e0
+$ ./q1_auto_nopie                          # Run 2
+The value of y is 6      The address of y is 0x7fff0bc434d0
+$ ./q1_auto_nopie                          # Run 3
+The value of y is 6      The address of y is 0x7ffdbc93c020
+\end{lstlisting}
+
+\subsubsection{วิเคราะห์ความแตกต่างจากเดิมและสาเหตุ}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ระหว่างการคอมไพล์แบบปกติ (PIE) กับ \code{-no-pie}}
+\begin{tabular}{p{2.4cm}p{4.2cm}p{4.2cm}p{3.2cm}}
+\toprule
+\textbf{กรณี} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ด้วย \code{-no-pie}} & \textbf{ข้อสรุป} \\
+\midrule
+มี \code{static} & \code{0x5c54...}, \code{0x60a5...}, \code{0x5faa...} เปลี่ยนทุกครั้ง & \code{0x404018} เท่ากันทุกครั้ง & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+ไม่มี \code{static} & \code{0x7fff...}, \code{0x7ffd...}, \code{0x7ffd...} เปลี่ยนทุกครั้ง & \code{0x7ffe...}, \code{0x7fff...}, \code{0x7ffd...} ยังเปลี่ยนทุกครั้ง & \textbf{ไม่แตกต่าง} ที่อยู่ยังสุ่ม \\
+ค่าของตัวแปร & $6,7,8$ และ $6,6,6$ & $6,7,8$ และ $6,6,6$ & \textbf{ไม่แตกต่าง} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{กรณีมี \code{static} (แตกต่าง):} ที่อยู่ของตัวแปรคงที่เป็น \code{0x404018} เท่ากันทุกครั้งที่รันใหม่ เนื่องจากแฟล็ก \code{-no-pie} สั่งให้ Linker สร้างไฟล์ Executable แบบตำแหน่งคงที่ (ELF EXEC) ซึ่งระบุ Virtual Address ที่แน่นอนตั้งแต่ขั้นตอนเชื่อมโยง เคอร์เนลจึงโหลด Data Segment ลงที่เดิมเสมอ
+  \item \textbf{กรณีไม่มี \code{static} (ไม่แตกต่าง):} ที่อยู่ของตัวแปรยังคงสุ่มเปลี่ยนในย่าน \code{0x7ff...} เพราะตัวแปรอัตโนมัติอยู่บน Stack ซึ่งถูกจัดสรรและสุ่มตำแหน่งโดยตรงจากกลไก ASLR ของเคอร์เนล โดยแฟล็ก \code{-no-pie} มีผลเฉพาะการจัดวางตัวโปรแกรมและข้อมูลใน Data Segment เท่านั้น ไม่ได้ปิดการสุ่มตำแหน่งของ Stack
+  \item \textbf{ค่าของตัวแปร:} คงเดิมทั้งสองกรณี เนื่องจากแฟล็ก \code{-no-pie} ควบคุมเฉพาะการจัดวางหน่วยความจำในระดับระบบปฏิบัติการ ไม่ส่งผลต่อตรรกะการประมวลผลของภาษา C
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สรุปผลการทดลองข้อ 1}
+% ---------------------------------------------------------------------
+
+\begin{enumerate}[leftmargin=*]
+  \item คีย์เวิร์ด \code{static} ในบล็อกทำหน้าที่เปลี่ยนอายุการใช้งานของตัวแปรให้คงอยู่ตลอดการทำงานของโปรแกรม โดยย้ายตำแหน่งจัดเก็บจาก Stack ไปยัง Data Segment ทำให้สามารถเก็บค่าสะสมข้ามการทำงานของลูปได้
+  \item ตัวแปรอัตโนมัติถูกจัดสรรบน Stack และสร้างใหม่ทุกครั้งที่เข้าสู่บล็อกคำสั่ง แม้ที่อยู่ภายในการรันเดียวกันจะดูเหมือนเดิม แต่เกิดจากการใช้พื้นที่สล็อตเดิมบน Stack Frame ซ้ำ
+  \item แฟล็ก \code{-no-pie} ปิดการสุ่มตำแหน่งเฉพาะส่วนของตัวโปรแกรมและ Data Segment เท่านั้น ไม่สามารถปิดการสุ่มตำแหน่งของ Stack ได้
+\end{enumerate}
+
+% =====================================================================
+\section{ข้อ 2: Extern Storage Class}
+% =====================================================================
+
+\subsection{หลักการพื้นฐาน: การนิยาม (Definition) และการประกาศ (Declaration)}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การนิยาม (Definition):} เช่น \code{int x = 20;} ที่อยู่นอกฟังก์ชัน เป็นการสั่งให้ระบบจองพื้นที่หน่วยความจำขนาด 4 ไบต์จริงใน Data Segment โดยในโปรแกรมหนึ่งจะมีนิยามของตัวแปรโกลบอลชื่อเดียวกันได้เพียงแห่งเดียว
+  \item \textbf{การประกาศ (Declaration):} เช่น \code{extern int x;} เป็นการแจ้งคอมไพเลอร์ว่ามีตัวแปรชื่อนี้และชนิดนี้อยู่ เพื่อให้สามารถอ้างอิงได้ โดยไม่มีการจองพื้นที่หน่วยความจำใหม่
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบการนิยามกับการประกาศตัวแปร}
+\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{การนิยาม (\code{int x = 20;} นอกฟังก์ชัน)} & \textbf{การประกาศ (\code{extern int x;})} \\
+\midrule
+การทำงาน & จองเนื้อที่จริง 4 ไบต์ใน \code{.data} & ไม่มีการจองเนื้อที่หน่วยความจำ \\
+จำนวนครั้งที่เขียนได้ & 1 ครั้งในทั้งโปรแกรม & ซ้ำได้หลายจุดตามที่ต้องการอ้างอิง \\
+ขั้นตอนที่จัดการ & คอมไพเลอร์จัดสรรพื้นที่ & Linker ทำการเชื่อมโยงสัญลักษณ์ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 1: โค้ดโปรแกรมที่มี \code{extern} ทั้งสองฟังก์ชัน}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_extern.c} โค้ดเริ่มต้นตามใบงาน}]
+#include <stdio.h>
+#include <stdlib.h>
+
+int x = 20;
+
+void display()
+{
+    extern int x;
+    printf(" Display value of x: %d\n", x);
+    printf(" Address of x (in display function): %p\n\n", &x);
+}
+
+void main()
+{
+    extern int x;
+    printf(" Print value of x: %d\n", x);
+    printf(" Address of x (in main function): %p\n\n", &x);
+
+    display();
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q2_extern q2_extern.c
+$ ./q2_extern                              # Run 1
+ Print value of x: 20        Address of x (in main function):    0x574a1053e010
+ Display value of x: 20      Address of x (in display function): 0x574a1053e010
+
+$ ./q2_extern                              # Run 2
+ Print value of x: 20        Address of x (in main function):    0x650dd456f010
+ Display value of x: 20      Address of x (in display function): 0x650dd456f010
+
+$ ./q2_extern                              # Run 3
+ Print value of x: 20        Address of x (in main function):    0x59201f88d010
+ Display value of x: 20      Address of x (in display function): 0x59201f88d010
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ผลการทดลอง}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ค่าของตัวแปร ($x = 20$):} แสดงค่า $20$ ทั้งใน \code{main()} และ \code{display()} เนื่องจากทั้งสองฟังก์ชันอ้างอิงถึงตัวแปรโกลบอล \code{x} ตัวเดียวกันที่นิยามไว้นอกฟังก์ชัน
+  \item \textbf{ตำแหน่งที่อยู่ของตัวแปร:} มีค่าตรงกันทั้งใน \code{main()} และ \code{display()} ทุกรอบการรัน ยืนยันว่าเป็นการเข้าถึงพื้นที่หน่วยความจำเดียวกันใน Data Segment
+  \item \textbf{ตำแหน่งที่อยู่ข้ามการรัน:} เปลี่ยนแปลงไปทุกครั้งที่รันใหม่ เนื่องจากโปรแกรมคอมไพล์แบบ PIE และทำงานภายใต้ ASLR ของระบบปฏิบัติการ
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{Step 2--3: โค้ดโปรแกรมที่ลบคำว่า \code{extern} ในฟังก์ชัน \code{main()}}
+% ---------------------------------------------------------------------
+
+ทำการแก้ไขตามข้อกำหนดโดยลบคำว่า \code{extern} ใน \code{main()} ออก (กลายเป็น \code{int x;}) ขณะที่ใน \code{display()} ยังคงมี \code{extern} ตามเดิม
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q2\_noextern.c} ส่วนที่มีการปรับปรุง}]
+void main()
+{
+    int x;                  /* deleted 'extern' keyword: local variable */
+    printf(" Print value of x: %d\n", x);
+    printf(" Address of x (in main function): %p\n\n", &x);
+
+    display();
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+การคอมไพล์และการรันโปรแกรม 3 ครั้ง:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 2--3 (รัน 3 ครั้ง)}]
+$ gcc -Wall -Wextra -o q2_noextern q2_noextern.c
+q2_noextern.c: In function 'main':
+q2_noextern.c:22:5: warning: 'x' is used uninitialized [-Wuninitialized]
+   22 |     printf(" Print value of x: %d\n", x);
+
+$ ./q2_noextern                            # Run 1
+ Print value of x: 32767     Address of x (in main function):    0x7fffbd75e6e4
+ Display value of x: 20      Address of x (in display function): 0x64d04c4a1010
+
+$ ./q2_noextern                            # Run 2
+ Print value of x: 32767     Address of x (in main function):    0x7fff6f1a5714
+ Display value of x: 20      Address of x (in display function): 0x5595b064f010
+
+$ ./q2_noextern                            # Run 3
+ Print value of x: 32766     Address of x (in main function):    0x7ffe04a25a14
+ Display value of x: 20      Address of x (in display function): 0x579c5bb0f010
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ผลและเปรียบเทียบกับ Step 1}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การเกิด Variable Shadowing:} เมื่อลบคำว่า \code{extern} ออก บรรทัด \code{int x;} ใน \code{main()} จะเปลี่ยนสถานะจากการประกาศเป็นการนิยามตัวแปรอัตโนมัติตัวใหม่บน Stack ทำให้ชื่อตัวแปร \code{x} ระดับโลคอลเข้าไปบดบังตัวแปรโกลบอล \code{x} ภายในขอบเขตของ \code{main()}
+  \item \textbf{ค่าของ \code{x} ใน \code{main()}:} แสดงค่าขยะ (Garbage value เช่น 32767) เนื่องจากเป็นตัวแปรอัตโนมัติบน Stack ที่ไม่ได้กำหนดค่าเริ่มต้น คอมไพเลอร์จึงแจ้งเตือน \code{-Wuninitialized}
+  \item \textbf{ค่าของ \code{x} ใน \code{display()}:} ยังคงแสดงค่า $20$ ถูกต้องตามเดิม เนื่องจากในฟังก์ชัน \code{display()} ไม่ได้ถูกแก้ไข จึงยังคงอ้างอิงและเข้าถึงตัวแปรโกลบอลใน Data Segment ตามปกติ
+  \item \textbf{ตำแหน่งที่อยู่:} ที่อยู่ใน \code{main()} เป็นย่าน Stack (\code{0x7ff...}) ในขณะที่ที่อยู่ใน \code{display()} เป็นย่าน Data Segment (\code{0x5...} / \code{0x6...}) แสดงให้เห็นอย่างชัดเจนว่าเป็นตัวแปรคนละตัวกัน
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ระหว่างมีและไม่มี \code{extern} ใน \code{main()}}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{ประเด็น} & \textbf{มี \code{extern int x;} ใน main} & \textbf{ลบออกเป็น \code{int x;} ใน main} \\
+\midrule
+ความหมายของบรรทัด & การประกาศ (อ้างอิงตัวแปรโกลบอล) & การนิยาม (สร้างตัวแปรโลคอลใหม่บน Stack) \\
+ค่าที่พิมพ์ใน \code{main()} & \code{20} & ค่าขยะ (เช่น \code{32767}) \\
+ค่าที่พิมพ์ใน \code{display()} & \code{20} & \code{20} (ไม่ได้รับผลกระทบ) \\
+ที่อยู่ของตัวแปร & ตรงกันทั้งสองฟังก์ชัน (\code{.data}) & คนละตำแหน่ง (\code{main} อยู่บน Stack) \\
+การแจ้งเตือนคอมไพเลอร์ & ไม่มี & \code{'x' is used uninitialized} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4: การคอมไพล์ด้วยแฟล็ก \code{-no-pie} และการเปรียบเทียบ}
+% ---------------------------------------------------------------------
+
+คอมไพล์โปรแกรมทั้งสองเวอร์ชันด้วยแฟล็ก \code{-no-pie}:
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4 เมื่อใช้แฟล็ก \code{-no-pie}}]
+----- 3.1 With extern in both functions (-no-pie) -----
+$ ./q2_extern_nopie                        # Run 1, 2, 3: identical across all runs
+ Print value of x: 20        Address of x (in main function):    0x404018
+ Display value of x: 20      Address of x (in display function): 0x404018
+
+----- 3.2 Without extern in main() (-no-pie) -----
+$ ./q2_noextern_nopie                      # Run 1
+ Print value of x: 32767     Address of x (in main function):    0x7fff29c5a044
+ Display value of x: 20      Address of x (in display function): 0x404020
+$ ./q2_noextern_nopie                      # Run 2
+ Print value of x: 32766     Address of x (in main function):    0x7ffead28b514
+ Display value of x: 20      Address of x (in display function): 0x404020
+$ ./q2_noextern_nopie                      # Run 3
+ Print value of x: 32765     Address of x (in main function):    0x7ffd1d346e74
+ Display value of x: 20      Address of x (in display function): 0x404020
+\end{lstlisting}
+
+\subsubsection{วิเคราะห์ความแตกต่างจากเดิมและสาเหตุ}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบผลลัพธ์ของข้อ 2 ระหว่างการคอมไพล์ปกติกับ \code{-no-pie}}
+\begin{tabular}{p{3.2cm}p{4.0cm}p{3.8cm}p{3.0cm}}
+\toprule
+\textbf{ตัวแปรที่พิจารณา} & \textbf{คอมไพล์ปกติ (PIE)} & \textbf{คอมไพล์ด้วย \code{-no-pie}} & \textbf{ข้อสรุป} \\
+\midrule
+Global \code{x} (มี extern) & เปลี่ยนตำแหน่งทุกครั้งที่รัน & \code{0x404018} คงที่ทุกรอบ & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+Global \code{x} ใน display & เปลี่ยนตำแหน่งทุกครั้งที่รัน & \code{0x404020} คงที่ทุกรอบ & \textbf{แตกต่าง} ที่อยู่คงที่ \\
+Local \code{x} ใน main & \code{0x7fff...} เปลี่ยนทุกครั้ง & \code{0x7fff...} เปลี่ยนทุกครั้ง & \textbf{ไม่แตกต่าง} ที่อยู่ยังสุ่ม \\
+ค่าของตัวแปร & $20$ และค่าขยะ & $20$ และค่าขยะ & \textbf{ไม่แตกต่าง} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{ตัวแปรโกลบอล (แตกต่าง):} ที่อยู่ของตัวแปรโกลบอลทั้งใน \code{q2\_extern\_nopie} และในฟังก์ชัน \code{display()} ของ \code{q2\_noextern\_nopie} มีตำแหน่งคงที่เดิมเสมอ (\code{0x404018} และ \code{0x404020}) เนื่องจากอยู่ใน Data Segment ของไบนารีตำแหน่งคงที่
+  \item \textbf{ตัวแปรโลคอลใน \code{main()} (ไม่แตกต่าง):} ที่อยู่ยังคงสุ่มเปลี่ยนทุกครั้งที่รันใหม่ เนื่องจากตัวแปรตั้งอยู่บน Stack ซึ่งยังคงถูกสุ่มด้วยกลไก ASLR ของเคอร์เนล
+  \item \textbf{ค่าของตัวแปร:} ยังคงได้ค่าเดิม คือ $20$ สำหรับตัวแปรโกลบอล และค่าขยะสำหรับตัวแปรโลคอลที่ไม่ได้กำหนดค่าเริ่มต้น
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สรุปผลการทดลองข้อ 2}
+% ---------------------------------------------------------------------
+
+\begin{enumerate}[leftmargin=*]
+  \item คำว่า \code{extern} เป็นการประกาศความจำนงเพื่ออ้างอิงตัวแปรโกลบอลที่มีการนิยามไว้แล้ว ไม่มีการจองหน่วยความจำซ้ำซ้อน
+  \item การลบ \code{extern} ออกจากตัวแปรในฟังก์ชันจะทำให้เกิดการนิยามตัวแปรโลคอลตัวใหม่บน Stack และเกิดการบดบัง (Shadowing) ตัวแปรโกลบอลเดิม
+  \item แฟล็ก \code{-no-pie} ทำให้ตำแหน่งของตัวแปรโกลบอลใน Data Segment มีค่าคงที่ แต่ไม่มีผลต่อตัวแปรอัตโนมัติบน Stack ที่ยังคงถูกสุ่มโดย ASLR
+\end{enumerate}
+
+% =====================================================================
+\section{ข้อ 3: การจัดสรรหน่วยความจำด้วย \code{malloc}, \code{realloc} และ \code{free}}
+% =====================================================================
+
+ตามข้อกำหนดของโจทย์ การทดลองในข้อนี้ทั้งหมดจะคอมไพล์แบบปกติ (\emph{without} \code{-no-pie}) ทำให้ไบนารีทั้งหมดมีคุณสมบัติเป็น PIE ภายใต้ ASLR
+
+\subsection{หลักการพื้นฐานของการจัดสรรหน่วยความจำ (Stack vs Heap)}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Stack Segment:} หน่วยความจำที่คอมไพเลอร์และระบบปฏิบัติการจัดการให้อัตโนมัติ ใช้เก็บ Local variables และ Stack frame ของฟังก์ชัน ขนาดต้องทราบแน่นอนในขณะคอมไพล์
+  \item \textbf{Heap Segment:} หน่วยความจำที่โปรแกรมเมอร์สามารถขอจัดสรร (Allocate) และคืนพื้นที่ (Free) ได้เองแบบพลวัต (Dynamic) ขณะโปรแกรมกำลังทำงานผ่านฟังก์ชันระบบ
+  \item \textbf{พอยน์เตอร์กับเป้าหมายที่ชี้:} ตัวแปรพอยน์เตอร์เอง (\code{\&a}) เป็นตัวแปรโลคอลที่อยู่บน Stack ขนาด 8 ไบต์ (บนระบบ 64-bit) ขณะที่ข้อมูลที่พอยน์เตอร์ชี้ไป (\code{a}) จะตั้งอยู่บน Heap
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบย่านหน่วยความจำ Stack, Heap และ Data}
+\begin{tabular}{p{2.8cm}p{3.2cm}p{4.0cm}p{4.2cm}}
+\toprule
+\textbf{ย่านหน่วยความจำ} & \textbf{ช่วงที่อยู่ (ตัวอย่าง)} & \textbf{กลไกการจอง} & \textbf{การคืนพื้นที่} \\
+\midrule
+\textbf{Data Segment} & \code{0x5555...} & กำหนดขนาดคงที่ตอน Link & คืนอัตโนมัติเมื่อสิ้นสุดโปรแกรม \\
+\textbf{Heap} & \code{0x5555...} / \code{0x6...} & จัดสรรแบบพลวัตด้วย \code{malloc} & คืนด้วย \code{free} โดยโปรแกรมเมอร์ \\
+\textbf{Stack} & \code{0x7fff...} & จองอัตโนมัติในเฟรมฟังก์ชัน & คืนอัตโนมัติเมื่อออกจากฟังก์ชัน \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\subsection{Step 1--3: ผลการทดลองและการวิเคราะห์โค้ดเริ่มต้น}
+% ---------------------------------------------------------------------
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q3\_alloc.c} โค้ดเริ่มต้นตามใบงาน (ยังคอมเมนต์ส่วนของ \code{b} ไว้)}]
+#include <stdio.h>
+#include <stdlib.h>
+
+void main()
+{
+    int *a;
+    float *b;
+    int c[10];
+
+    printf("\nAddress of Pointer\n");
+    printf(">>%p\n", &a);
+    printf(">>%p\n", &b);
+
+    printf("\nEffective Address\n");
+    printf(">>%p\n", a);
+    printf(">>%p\n", b);
+
+    a = (int*) malloc(10 * sizeof(int));
+    printf("\nAfter malloc Pointer a\n");
+    printf(">>%p\n", a);
+    printf(">>%p\n", &a[0]);
+    printf(">>%p\n", &a[9]);
+
+    printf("\nArray c\n");
+    printf(">>%p\n", c);
+    printf(">>%p\n", &c[0]);
+    printf(">>%p\n", &c[9]);
+
+    /* b = (float*) malloc(10 * sizeof(float));
+    printf("\nAfter malloc Pointer b\n");
+    printf(">>%p\n", b);
+    printf(">>%p\n", &b[0]);
+    printf(">>%p\n", &b[9]);
+    */
+
+    a = (int*) realloc(a, 1000 * sizeof(int));
+    printf("\nAfter realloc Pointer a\n");
+    printf(">>%p\n", a);
+    printf(">>%p\n", &a[0]);
+    printf(">>%p\n", &a[9]);
+    printf(">>%p\n", &a[999]);
+
+    free(a);
+    // free(b);
+}
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 1--2 (รัน 2 ครั้งเพื่อเปรียบเทียบระยะห่าง)}]
+$ gcc -Wall -Wextra -o q3_alloc q3_alloc.c
+$ ./q3_alloc                    # Run 1                 # Run 2
+
+Address of Pointer          >>0x7ffd2a83f270        >>0x7ffdf5719350
+                            >>0x7ffd2a83f278        >>0x7ffdf5719358
+
+Effective Address           >>(nil)                 >>(nil)
+                            >>(nil)                 >>(nil)
+
+After malloc Pointer a      >>0x610cfc37b4b0        >>0x5acd8316e4b0
+                            >>0x610cfc37b4b0        >>0x5acd8316e4b0
+                            >>0x610cfc37b4d4        >>0x5acd8316e4d4
+
+Array c                     >>0x7ffd2a83f280        >>0x7ffdf5719360
+                            >>0x7ffd2a83f280        >>0x7ffdf5719360
+                            >>0x7ffd2a83f2a4        >>0x7ffdf5719384
+
+After realloc Pointer a     >>0x610cfc37b4b0        >>0x5acd8316e4b0
+                            >>0x610cfc37b4b0        >>0x5acd8316e4b0
+                            >>0x610cfc37b4d4        >>0x5acd8316e4d4
+                            >>0x610cfc37c44c        >>0x5acd8316f44c
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์ตามแต่ละส่วนของผลลัพธ์ (Step 3)}
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Address of Pointer (\code{\&a}, \code{\&b}):}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} คือตำแหน่งที่อยู่ของ \emph{ตัวแปรพอยน์เตอร์เอง}
+      \item \textbf{เหตุผล:} เนื่องจาก \code{a} และ \code{b} เป็นตัวแปรโลคอล จึงได้รับการจัดสรรไว้บน Stack (\code{0x7ff...}) โดยมีระยะห่างระหว่างกันเท่ากับ \code{0x278 - 0x270 = 8} ไบต์ ซึ่งตรงกับขนาดของพอยน์เตอร์บนสถาปัตยกรรม 64-bit พอดี (แม้ \code{b} จะเป็น \code{float*} แต่พอยน์เตอร์ทุกชนิดบน 64-bit มีขนาด 8 ไบต์เท่ากัน)
+    \end{itemize}
+
+  \item \textbf{Effective Address (\code{a}, \code{b} ก่อนการจัดสรร):}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} คือ \emph{ค่าที่ถูกเก็บอยู่ภายในตัวแปรพอยน์เตอร์} (ตำแหน่งปลายทางที่ชี้ไป)
+      \item \textbf{เหตุผล:} เนื่องจากก่อนเรียก \code{malloc} ตัวแปรทั้งสองยังไม่ได้รับการกำหนดค่าเริ่มต้น จึงมีสถานะเป็น Uninitialized Pointer ซึ่งในสภาพแวดล้อมนี้ระบบแสดงผลเป็น \code{(nil)} (ค่า $0$) จากการที่หน้าหน่วยความจำใหม่ของ Stack ถูกเคอร์เนลล้างเป็นศูนย์ไว้
+    \end{itemize}
+
+  \item \textbf{After malloc Pointer a:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งเริ่มต้นของบล็อกหน่วยความจำบน Heap ที่ได้รับการจัดสรรขนาด 40 ไบต์ ($10 \times \code{sizeof(int)}$)
+      \item \textbf{เหตุผล:} \code{a} และ \code{\&a[0]} มีค่าตรงกัน (\code{0x610cfc37b4b0}) เนื่องจากชื่ออาร์เรย์/พอยน์เตอร์ชี้ไปที่จุดเริ่มต้นของสมาชิกตัวแรก และ \code{\&a[9]} มีค่าห่างออกไป \code{0x4d4 - 0x4b0 = 0x24 = 36} ไบต์ ซึ่งตรงกับ $9 \times 4$ ไบต์ แสดงว่าข้อมูลถูกจัดวางเรียงต่อกันในหน่วยความจำ
+    \end{itemize}
+
+  \item \textbf{Array c:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งของอาร์เรย์ขนาด 10 สมาชิกที่จองบน Stack
+      \item \textbf{เหตุผล:} \code{c} และ \code{\&c[0]} มีตำแหน่งตรงกันที่ \code{0x7ffd2a83f280} และ \code{\&c[9]} อยู่ถัดไป 36 ไบต์ที่ \code{0x7ffd2a83f2a4} แต่ตำแหน่งจัดเก็บอยู่ในย่าน Stack (\code{0x7ff...}) ซึ่งอยู่คนละส่วนกับ Heap ของ \code{a} อย่างสิ้นเชิง
+    \end{itemize}
+
+  \item \textbf{After realloc Pointer a:}
+    \begin{itemize}
+      \item \textbf{ความหมาย:} ตำแหน่งของหน่วยความจำหลังขยายขนาดเป็น 4000 ไบต์ ($1000 \times \code{sizeof(int)}$)
+      \item \textbf{เหตุผล:} ในรอบนี้ ที่อยู่ของ \code{a} ยังคงเป็น \textbf{ที่อยู่เดิมทุกประการ} (\code{0x610cfc37b4b0}) เนื่องจากก้อนของ \code{a} อยู่ท้ายสุดของ Heap และพื้นที่ด้านหลังยังว่างอยู่ ตัวจัดสรรจึงสามารถขยายขนาดบล็อกเดิมต่อท้ายได้ทันที (In-place growth) โดยไม่ต้องย้ายที่อยู่ และ \code{\&a[999]} อยู่ห่างจาก \code{a} เท่ากับ $999 \times 4 = 3996$ ไบต์ (\code{0x610cfc37c44c - 0x610cfc37b4b0 = 0xf9c})
+    \end{itemize}
+\end{enumerate}
+
+% ---------------------------------------------------------------------
+\subsection{Step 4--6: ผลการทดลองเมื่อเปิดคอมเมนต์จองตัวแปร \code{b}}
+% ---------------------------------------------------------------------
+
+เปิดคอมเมนต์ใน 2 ตำแหน่งตามที่โจทย์ระบุ ได้แก่ บล็อกคำสั่ง \code{malloc} ของ \code{b} และคำสั่ง \code{free(b)} ที่ท้ายโปรแกรม
+
+\begin{lstlisting}[style=cstyle,caption={\code{src/q3\_alloc\_b.c} ส่วนที่มีการเปิดคอมเมนต์}]
+    /* uncommented malloc(b) and free(b) */
+    b = (float*) malloc(10 * sizeof(float));
+    printf("\nAfter malloc Pointer b\n");
+    printf(">>%p\n", b);
+    printf(">>%p\n", &b[0]);
+    printf(">>%p\n", &b[9]);
+
+    a = (int*) realloc(a, 1000 * sizeof(int));
+    ...
+    free(a);
+    free(b);
+\end{lstlisting}
+
+\subsubsection{ผลการทดลอง}
+
+\begin{lstlisting}[style=terminal,caption={ผลการทดลอง Step 4--5 (รัน 2 ครั้งหลังเปิดคอมเมนต์)}]
+$ gcc -Wall -Wextra -o q3_alloc_b q3_alloc_b.c
+$ ./q3_alloc_b                  # Run 1                 # Run 2
+
+Address of Pointer          >>0x7ffd3f507340        >>0x7ffe68018760
+                            >>0x7ffd3f507348        >>0x7ffe68018768
+
+Effective Address           >>(nil)                 >>(nil)
+                            >>(nil)                 >>(nil)
+
+After malloc Pointer a      >>0x6124eb5724b0        >>0x5bf8495814b0
+                            >>0x6124eb5724b0        >>0x5bf8495814b0
+                            >>0x6124eb5724d4        >>0x5bf8495814d4
+
+Array c                     >>0x7ffd3f507350        >>0x7ffe68018770
+                            >>0x7ffd3f507350        >>0x7ffe68018770
+                            >>0x7ffd3f507374        >>0x7ffe68018794
+
+After malloc Pointer b      >>0x6124eb5724e0        >>0x5bf8495814e0
+                            >>0x6124eb5724e0        >>0x5bf8495814e0
+                            >>0x6124eb572504        >>0x5bf849581504
+
+After realloc Pointer a     >>0x6124eb572510        >>0x5bf849581510
+                            >>0x6124eb572510        >>0x5bf849581510
+                            >>0x6124eb572534        >>0x5bf849581534
+                            >>0x6124eb5734ac        >>0x5bf8495824ac
+\end{lstlisting}
+
+\subsubsection{การวิเคราะห์และเปรียบเทียบกับรอบก่อนหน้า (Step 6)}
+
+\textbf{คำตอบสำหรับโจทย์ Step 6:} ผลลัพธ์ที่ได้ \textbf{แตกต่างจากรอบก่อนหน้าอย่างมีนัยสำคัญ} โดยเฉพาะ \textbf{ที่อยู่ของอาร์เรย์ \code{a} หลังการเรียก \code{realloc()}}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบพฤติกรรมของ \code{realloc(a)} ระหว่างสองกรณี}
+\begin{tabular}{p{3.5cm}p{5.2cm}p{5.2cm}}
+\toprule
+\textbf{การดำเนินการ} & \textbf{ไม่มีการจอง \code{b} (Step 1)} & \textbf{มีการจอง \code{b} คั่นกลาง (Step 4)} \\
+\midrule
+\code{a} หลัง \code{malloc} & \code{0x610cfc37b4b0} & \code{0x6124eb5724b0} \\
+\code{b} หลัง \code{malloc} & (ไม่มีการจอง) & \code{0x6124eb5724e0} (อยู่ติดท้ายก้อน \code{a}) \\
+\code{a} หลัง \code{realloc} & \code{0x610cfc37b4b0} (\textbf{ที่อยู่เดิม}) & \code{0x6124eb572510} (\textbf{เปลี่ยนที่อยู่ใหม่}) \\
+พฤติกรรมการจัดสรร & ขยายพื้นที่เดิมต่อท้าย (In-place) & ย้ายบล็อกไปยังที่ใหม่บน Heap (Relocate) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{สาเหตุที่ที่อยู่ของ \code{a} เปลี่ยนไป:}
+\begin{itemize}[leftmargin=*]
+  \item ใน Step 1 มีการจองเฉพาะ \code{a} ทำให้พื้นที่ถัดจากก้อนของ \code{a} ยังคงเป็นพื้นที่ว่าง ตัวจัดสรรจึงสามารถขยายขนาดในตำแหน่งเดิมได้ทันที
+  \item ใน Step 4 มีการเรียก \code{malloc} ให้กับ \code{b} ก่อนการเรียก \code{realloc(a)} ทำให้ก้อนหน่วยความจำของ \code{b} ถูกจัดสรรลงไปขวางพื้นที่ต่อท้ายก้อนของ \code{a} พอดี (\code{0x...24e0} ต่อจาก \code{0x...24b0})
+  \item เมื่อสั่งขยายขนาด \code{a} เป็น 4000 ไบต์ ตัวจัดสรรไม่สามารถขยายขนาดต่อท้ายที่เดิมได้เพราะติดพื้นที่ของ \code{b} จึงจำเป็นต้องค้นหาพื้นที่ว่างก้อนใหม่ที่มีขนาดใหญ่เพียงพอ ย้ายข้อมูลเดิมจากก้อนเก่าไปยังที่อยู่ใหม่ (\code{0x...2510}) แล้วจึงปลดปล่อยพื้นที่ก้อนเดิม
+\end{itemize}
+
+% ---------------------------------------------------------------------
+\subsection{สรุปผลการทดลองข้อ 3}
+% ---------------------------------------------------------------------
+
+\begin{enumerate}[leftmargin=*]
+  \item ตัวแปรพอยน์เตอร์จะถูกจัดสรรบน Stack เสมอ (ขนาด 8 ไบต์บน 64-bit) ขณะที่พื้นที่หน่วยความจำที่ได้รับจาก \code{malloc} จะอยู่บน Heap Segment
+  \item ฟังก์ชัน \code{realloc} จะพยายามขยายขนาดบล็อกหน่วยความจำในตำแหน่งเดิม (In-place) หากพื้นที่ด้านหลังยังคงว่างอยู่
+  \item หากพื้นที่ด้านหลังถูกจัดสรรให้ตัวแปรอื่นไปแล้ว \code{realloc} จะจัดสรรบล็อกใหม่ ย้ายข้อมูลเดิม และคืนที่อยู่ใหม่ ส่งผลให้พอยน์เตอร์เดิมถูกเปลี่ยนตำแหน่ง ซึ่งโปรแกรมเมอร์ต้องอัปเดตพอยน์เตอร์และไม่ควรใช้อ้างอิงที่อยู่เดิม
+  \item การใช้งาน \code{free} ต้องกระทำอย่างถูกต้องตามคู่ของ \code{malloc} เพื่อป้องกันปัญหาหน่วยความจำรั่วไหล (Memory Leak) หรือข้อผิดพลาดจากการคืนพื้นที่ที่ไม่ได้จัดสรร
+\end{enumerate}
+
+\end{document}

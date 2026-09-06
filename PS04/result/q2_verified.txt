@@ -1,0 +1,227 @@
+
+====================================================================
+0. Environment
+====================================================================
+$ uname -r ; lsb_release -ds ; gcc --version | head -1
+6.6.87.2-microsoft-standard-WSL2
+Ubuntu 24.04.1 LTS
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+
+$ cat /proc/sys/kernel/randomize_va_space   # 2 = full ASLR is ON
+2
+
+====================================================================
+1. STEP 1 : with 'extern' in main(), compiled WITHOUT -no-pie (default = PIE)
+====================================================================
+$ gcc -Wall -Wextra -o q2_extern q2_extern.c
+q2_extern.c:19:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+   19 | void main()
+      |      ^~~~
+(exit status = 0)
+
+$ ./q2_extern                              # run 1
+ Print value of x: 20
+ Address of x (in main function): 0x574a1053e010
+
+ Display value of x: 20
+ Address of x (in display function): 0x574a1053e010
+
+$ ./q2_extern                              # run 2
+ Print value of x: 20
+ Address of x (in main function): 0x650dd456f010
+
+ Display value of x: 20
+ Address of x (in display function): 0x650dd456f010
+
+$ ./q2_extern                              # run 3
+ Print value of x: 20
+ Address of x (in main function): 0x59201f88d010
+
+ Display value of x: 20
+ Address of x (in display function): 0x59201f88d010
+
+
+====================================================================
+2. STEP 2-3 : 'extern' deleted from main(), compiled WITHOUT -no-pie
+====================================================================
+$ gcc -Wall -Wextra -o q2_noextern q2_noextern.c
+q2_noextern.c:19:6: warning: return type of ‘main’ is not ‘int’ [-Wmain]
+   19 | void main()
+      |      ^~~~
+q2_noextern.c: In function ‘main’:
+q2_noextern.c:22:5: warning: ‘x’ is used uninitialized [-Wuninitialized]
+   22 |     printf(" Print value of x: %d\n", x);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+q2_noextern.c:21:9: note: ‘x’ declared here
+   21 |     int x;
+      |         ^
+(exit status = 0)
+
+$ ./q2_noextern                              # run 1
+ Print value of x: 32767
+ Address of x (in main function): 0x7fffbd75e6e4
+
+ Display value of x: 20
+ Address of x (in display function): 0x64d04c4a1010
+
+$ ./q2_noextern                              # run 2
+ Print value of x: 32767
+ Address of x (in main function): 0x7fff6f1a5714
+
+ Display value of x: 20
+ Address of x (in display function): 0x5595b064f010
+
+$ ./q2_noextern                              # run 3
+ Print value of x: 32766
+ Address of x (in main function): 0x7ffe04a25a14
+
+ Display value of x: 20
+ Address of x (in display function): 0x579c5bb0f010
+
+
+====================================================================
+3. STEP 4 : the very same two programs rebuilt with -no-pie
+====================================================================
+$ gcc -no-pie -Wall -Wextra -o q2_extern_nopie   q2_extern.c    2>/dev/null
+$ gcc -no-pie -Wall -Wextra -o q2_noextern_nopie q2_noextern.c  2>/dev/null
+
+----- 3.1 extern + -no-pie -----
+$ ./q2_extern_nopie                              # run 1
+ Print value of x: 20
+ Address of x (in main function): 0x404018
+
+ Display value of x: 20
+ Address of x (in display function): 0x404018
+
+$ ./q2_extern_nopie                              # run 2
+ Print value of x: 20
+ Address of x (in main function): 0x404018
+
+ Display value of x: 20
+ Address of x (in display function): 0x404018
+
+$ ./q2_extern_nopie                              # run 3
+ Print value of x: 20
+ Address of x (in main function): 0x404018
+
+ Display value of x: 20
+ Address of x (in display function): 0x404018
+
+
+----- 3.2 no extern + -no-pie -----
+$ ./q2_noextern_nopie                              # run 1
+ Print value of x: 32767
+ Address of x (in main function): 0x7fff29c5a044
+
+ Display value of x: 20
+ Address of x (in display function): 0x404020
+
+$ ./q2_noextern_nopie                              # run 2
+ Print value of x: 32766
+ Address of x (in main function): 0x7ffead28b514
+
+ Display value of x: 20
+ Address of x (in display function): 0x404020
+
+$ ./q2_noextern_nopie                              # run 3
+ Print value of x: 32765
+ Address of x (in main function): 0x7ffd1d346e74
+
+ Display value of x: 20
+ Address of x (in display function): 0x404020
+
+
+====================================================================
+4. Evidence : declaration vs definition, and which x is which
+====================================================================
+
+----- 4.1 symbol table : the global x is a GLOBAL symbol, the local x has no symbol at all -----
+$ nm q2_extern_nopie   | grep -w x           # 'D' upper case = external linkage
+0000000000404018 D x
+$ nm q2_noextern_nopie | grep -w x           # the global x is still there, unchanged
+0000000000404020 D x
+
+$ readelf -s q2_extern_nopie | grep -w x     # OBJECT, GLOBAL, 4 bytes, in .data
+    21: 0000000000404018     4 OBJECT  GLOBAL DEFAULT   25 x
+
+(compare with Q1: the static y was 'd' lower case = local, no other file can see it)
+
+----- 4.2 the 'extern' keyword inside main() is a no-op -----
+$ diff q2_extern.c q2_nodecl.c        # the whole declaration line is gone from main()
+21d20
+<     extern int x;
+
+$ objdump -d q2_extern_nopie | sed -n '/<main>:/,/^$/p' > dis_extern.txt
+$ objdump -d q2_nodecl_nopie | sed -n '/<main>:/,/^$/p' > dis_nodecl.txt
+$ diff dis_extern.txt dis_nodecl.txt
+identical, the extern declaration inside main() generates no code at all
+
+$ cat dis_extern.txt                  # the machine code of main() in both files
+  40117b:	endbr64
+  40117f:	push   %rbp
+  401180:	mov    %rsp,%rbp
+  401183:	mov    0x2e8f(%rip),%eax        # 404018 <x>
+  401189:	mov    %eax,%esi
+  40118b:	lea    0xec0(%rip),%rax        # 402052 <_IO_stdin_used+0x52>
+  401192:	mov    %rax,%rdi
+  401195:	mov    $0x0,%eax
+  40119a:	call   401040 <printf@plt>
+  40119f:	lea    0x2e72(%rip),%rax        # 404018 <x>
+  4011a6:	mov    %rax,%rsi
+  4011a9:	lea    0xec0(%rip),%rax        # 402070 <_IO_stdin_used+0x70>
+  4011b0:	mov    %rax,%rdi
+  4011b3:	mov    $0x0,%eax
+  4011b8:	call   401040 <printf@plt>
+  4011bd:	mov    $0x0,%eax
+  4011c2:	call   401136 <display>
+  4011c7:	nop
+  4011c8:	pop    %rbp
+  4011c9:	ret
+
+
+----- 4.3 a declaration is not a definition : remove the global and the LINKER complains -----
+$ diff q2_extern.c q2_nodef.c         # the definition 'int x = 20;' is gone
+10d9
+< int x = 20;
+$ gcc -w -o q2_nodef q2_nodef.c
+ld: /tmp/cc2i7Swa.o: warning: relocation against `x' in read-only section `.text'
+ld: /tmp/cc2i7Swa.o: in function `display':
+q2_nodef.c:(.text+0xa): undefined reference to `x'
+ld: q2_nodef.c:(.text+0x27): undefined reference to `x'
+ld: /tmp/cc2i7Swa.o: in function `main':
+q2_nodef.c:(.text+0x4f): undefined reference to `x'
+ld: q2_nodef.c:(.text+0x6c): undefined reference to `x'
+ld: warning: creating DT_TEXTREL in a PIE
+collect2: error: ld returned 1 exit status
+(exit status of gcc = 1   -> the compiler was happy, the linker was not)
+
+----- 4.4 ASLR switched off (setarch -R) : the addresses stop moving -----
+$ setarch -R ./q2_extern   | grep Address     # run 1, 2, 3
+ Address of x (in main function): 0x555555558010
+ Address of x (in main function): 0x555555558010
+ Address of x (in main function): 0x555555558010
+
+$ setarch -R ./q2_noextern | grep Address     # run 1, 2, 3 (the local x in main)
+ Address of x (in main function): 0x7fffffffe294
+ Address of x (in main function): 0x7fffffffe294
+ Address of x (in main function): 0x7fffffffe294
+
+$ setarch -R bash -c 'grep \[stack\] /proc/self/maps'
+7ffffffde000-7ffffffff000 rw-p 00000000 00:00 0                          [stack]
+
+----- 4.5 what extern is actually for : one variable shared by two .c files -----
+$ gcc -Wall -Wextra -o q2_shared q2_shared_main.c q2_shared_def.c
+(exit status = 0)
+$ ./q2_shared
+ q2_shared_main.c: value = 100, address = 0x5f9fe0256010
+ q2_shared_def.c : value = 101, address = 0x5f9fe0256010
+ q2_shared_main.c: value = 101, address = 0x5f9fe0256010   (changed by the other file)
+
+$ nm q2_shared_main.o | grep -w shared_counter    # 'U' = Undefined, only a declaration
+                 U shared_counter
+$ nm q2_shared_def.o  | grep -w shared_counter    # 'D' = Defined, this is where it lives
+0000000000000000 D shared_counter
+
+====================================================================
+END OF Q2
+====================================================================

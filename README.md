@@ -6,6 +6,7 @@
 | --- | --- | --- | --- |
 | **PS02** | Process Creation & Pipes | 1--5 | [`PS02/docs/PS02.pdf`](PS02/docs/PS02.pdf) |
 | **PS03** | Process Manipulation and Monitoring | 1, 2, 5 | [`PS03/docs/PS03.pdf`](PS03/docs/PS03.pdf) |
+| **PS04** | Memory class and API in C programming | 1--3 | [`PS04/docs/PS04.pdf`](PS04/docs/PS04.pdf) |
 
 ---
 
@@ -40,32 +41,56 @@ CPE333_OS/
 │       ├── q3_verified.txt # ผลการทดลองข้อ 3
 │       ├── q4_verified.txt # ผลการทดลองข้อ 4
 │       └── q5_verified.txt # ผลการทดลองข้อ 5
-└── PS03/                  # Problem Session 3: Process Manipulation and Monitoring
+├── PS03/                  # Problem Session 3: Process Manipulation and Monitoring
+│   ├── Makefile           # คำสั่งอัตโนมัติสำหรับคอมไพล์ C, LaTeX และเก็บผลการทดลองซ้ำ
+│   ├── src/               # ซอร์สโค้ดและสคริปต์ของการทดลอง (ข้อ 1, 2, 5)
+│   │   ├── q1_burn.c      # ข้อ 1: CPU burner ใช้วัดผลของค่า nice เป็นตัวเลข
+│   │   ├── q1_sigdemo.c   # ข้อ 1: process ที่ดักจับ SIGTERM/SIGINT เพื่อแสดงว่าทำไมต้องมี SIGKILL
+│   │   ├── ss1_1.sh       # ข้อ 2: สคริปต์ sleep รวม 10 วินาที (เทียบ foreground กับ background)
+│   │   ├── ss1_2.sh       # ข้อ 2: สคริปต์ sleep 1000 วินาที (ใช้ทดลอง CTRL+Z, fg, bg)
+│   │   ├── PS3.c          # ข้อ 5: STCF (Shortest Time-to-Completion First) scheduler
+│   │   ├── run_q1.sh      # สคริปต์เก็บผลการทดลองข้อ 1 (ps/top, nice/renice, kill)
+│   │   ├── run_q2.sh      # สคริปต์เก็บผลการทดลองข้อ 2 (ใช้ pseudo terminal เพื่อให้กด CTRL+Z ได้)
+│   │   └── run_q5.sh      # สคริปต์เก็บผลการทดลองข้อ 5 (รันทั้งสามเคสและ diff กับเฉลย)
+│   ├── material/          # ไฟล์ตั้งต้นที่โจทย์ให้มา (ไม่ได้แก้ไข)
+│   │   ├── PS3.c          # โครงโปรแกรมก่อนเติมฟังก์ชัน scheduler
+│   │   ├── case1.csv      # ข้อมูลทดสอบชุดที่ 1
+│   │   ├── case2.csv      # ข้อมูลทดสอบชุดที่ 2 (มีช่วง IDLE)
+│   │   └── case3.csv      # ข้อมูลทดสอบชุดที่ 3 (pid ในไฟล์ไม่เรียงลำดับ)
+│   ├── docs/              # เอกสารและรายงาน LaTeX
+│   │   ├── PS03.tex       # ไฟล์รายงานหลัก (LaTeX Source)
+│   │   ├── PS03.pdf       # รายงานฉบับสมบูรณ์ (เนื้อหา 15 หน้า ไม่รวมปกและสารบัญ)
+│   │   ├── PS03_2026.md   # โจทย์การทดลอง
+│   │   ├── q5_result_screenshot.png # screenshot ผลการรัน scheduler ตามที่โจทย์ข้อ 5 กำหนด
+│   │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
+│   └── result/            # ผลลัพธ์จากการทดลองจริง (ทุกบรรทัดที่อ้างในรายงานมาจากที่นี่)
+│       ├── q1_verified.txt # ผลการทดลองข้อ 1
+│       ├── q2_verified.txt # ผลการทดลองข้อ 2 (transcript จาก terminal จริง)
+│       └── q5_verified.txt # ผลการทดลองข้อ 5
+└── PS04/                  # Problem Session 4: Memory class and API in C programming
     ├── Makefile           # คำสั่งอัตโนมัติสำหรับคอมไพล์ C, LaTeX และเก็บผลการทดลองซ้ำ
-    ├── src/               # ซอร์สโค้ดและสคริปต์ของการทดลอง (ข้อ 1, 2, 5)
-    │   ├── q1_burn.c      # ข้อ 1: CPU burner ใช้วัดผลของค่า nice เป็นตัวเลข
-    │   ├── q1_sigdemo.c   # ข้อ 1: process ที่ดักจับ SIGTERM/SIGINT เพื่อแสดงว่าทำไมต้องมี SIGKILL
-    │   ├── ss1_1.sh       # ข้อ 2: สคริปต์ sleep รวม 10 วินาที (เทียบ foreground กับ background)
-    │   ├── ss1_2.sh       # ข้อ 2: สคริปต์ sleep 1000 วินาที (ใช้ทดลอง CTRL+Z, fg, bg)
-    │   ├── PS3.c          # ข้อ 5: STCF (Shortest Time-to-Completion First) scheduler
-    │   ├── run_q1.sh      # สคริปต์เก็บผลการทดลองข้อ 1 (ps/top, nice/renice, kill)
-    │   ├── run_q2.sh      # สคริปต์เก็บผลการทดลองข้อ 2 (ใช้ pseudo terminal เพื่อให้กด CTRL+Z ได้)
-    │   └── run_q5.sh      # สคริปต์เก็บผลการทดลองข้อ 5 (รันทั้งสามเคสและ diff กับเฉลย)
-    ├── material/          # ไฟล์ตั้งต้นที่โจทย์ให้มา (ไม่ได้แก้ไข)
-    │   ├── PS3.c          # โครงโปรแกรมก่อนเติมฟังก์ชัน scheduler
-    │   ├── case1.csv      # ข้อมูลทดสอบชุดที่ 1
-    │   ├── case2.csv      # ข้อมูลทดสอบชุดที่ 2 (มีช่วง IDLE)
-    │   └── case3.csv      # ข้อมูลทดสอบชุดที่ 3 (pid ในไฟล์ไม่เรียงลำดับ)
+    ├── src/               # ซอร์สโค้ดและสคริปต์ของการทดลอง (ข้อ 1--3)
+    │   ├── q1_static.c        # ข้อ 1: โค้ดตามใบงาน มี static ในลูป while
+    │   ├── q1_auto.c          # ข้อ 1: โค้ดเดิมที่ลบคำว่า static ออก (Step 2)
+    │   ├── q2_extern.c        # ข้อ 2: โค้ดตามใบงาน มี extern ทั้งใน main() และ display()
+    │   ├── q2_noextern.c      # ข้อ 2: โค้ดเดิมที่ลบคำว่า extern ใน main() ออก (Step 2)
+    │   ├── q2_shared_main.c   # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่ประกาศตัวแปร
+    │   ├── q2_shared_def.c    # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่นิยามตัวแปร
+    │   ├── q3_alloc.c         # ข้อ 3: โค้ดตามใบงาน ยังคอมเมนต์ส่วนของ b ไว้
+    │   ├── q3_alloc_b.c       # ข้อ 3: โค้ดเดิมที่เปิดคอมเมนต์ malloc(b) และ free(b) (Step 4)
+    │   ├── q3_regions.c       # ข้อ 3: โปรแกรมตรวจสอบ อ่าน /proc/self/maps ของตัวเอง
+    │   ├── run_q1.sh          # สคริปต์เก็บผลข้อ 1 (คอมไพล์ทั้งแบบ PIE และ -no-pie)
+    │   ├── run_q2.sh          # สคริปต์เก็บผลข้อ 2 (รวม nm/readelf และการทดสอบ linker)
+    │   └── run_q3.sh          # สคริปต์เก็บผลข้อ 3 (malloc / realloc / free)
     ├── docs/              # เอกสารและรายงาน LaTeX
-    │   ├── PS03.tex       # ไฟล์รายงานหลัก (LaTeX Source)
-    │   ├── PS03.pdf       # รายงานฉบับสมบูรณ์ (เนื้อหา 15 หน้า ไม่รวมปกและสารบัญ)
-    │   ├── PS03_2026.md   # โจทย์การทดลอง
-    │   ├── q5_result_screenshot.png # screenshot ผลการรัน scheduler ตามที่โจทย์ข้อ 5 กำหนด
+    │   ├── PS04.tex       # ไฟล์รายงานหลัก (LaTeX Source)
+    │   ├── PS04.pdf       # รายงานฉบับสมบูรณ์ (เนื้อหา 13 หน้า รวมปกและสารบัญ)
+    │   ├── PS4_2026_OS.md # โจทย์การทดลอง
     │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
     └── result/            # ผลลัพธ์จากการทดลองจริง (ทุกบรรทัดที่อ้างในรายงานมาจากที่นี่)
-        ├── q1_verified.txt # ผลการทดลองข้อ 1
-        ├── q2_verified.txt # ผลการทดลองข้อ 2 (transcript จาก terminal จริง)
-        └── q5_verified.txt # ผลการทดลองข้อ 5
+        ├── q1_verified.txt # ผลการทดลองข้อ 1 (Static Storage Class)
+        ├── q2_verified.txt # ผลการทดลองข้อ 2 (Extern Storage Class)
+        └── q3_verified.txt # ผลการทดลองข้อ 3 (malloc / realloc / free)
 ```
 
 ---
@@ -74,10 +99,10 @@ CPE333_OS/
 
 ### 1. การใช้ Makefile (แนะนำ)
 
-ทั้ง `PS02/` และ `PS03/` มี `Makefile` ของตัวเอง ใช้คำสั่งเดียวกันได้:
+ทั้ง `PS02/`, `PS03/` และ `PS04/` มี `Makefile` ของตัวเอง ใช้คำสั่งเดียวกันได้:
 
 ```bash
-cd PS02        # หรือ cd PS03
+cd PS02        # หรือ cd PS03 / cd PS04
 
 # คอมไพล์โปรแกรมภาษา C ทั้งหมดใน src/
 make build
@@ -89,15 +114,24 @@ make pdf
 make clean
 ```
 
-เฉพาะ `PS03/` มีเป้าหมายเพิ่มสำหรับ **เก็บผลการทดลองใหม่ทั้งหมด** (ใช้เวลาประมาณ 3 นาที และต้องรันบน Linux หรือ WSL):
+`PS03/` และ `PS04/` มีเป้าหมายเพิ่มสำหรับ **เก็บผลการทดลองใหม่ทั้งหมด** (ต้องรันบน Linux หรือ WSL):
 
 ```bash
-cd PS03
+cd PS03                    # ใช้เวลาประมาณ 3 นาที
 
 make result        # เก็บผลใหม่ทั้งสามข้อ ทับไฟล์ใน result/
 make result-q1     # เก็บเฉพาะข้อ 1
 make result-q2     # เก็บเฉพาะข้อ 2
 make result-q5     # เก็บเฉพาะข้อ 5
+```
+
+```bash
+cd PS04                    # ใช้เวลาไม่ถึงนาที
+
+make result        # เก็บผลใหม่ทั้งสามข้อ ทับไฟล์ใน result/
+make result-q1     # เก็บเฉพาะข้อ 1
+make result-q2     # เก็บเฉพาะข้อ 2
+make result-q3     # เก็บเฉพาะข้อ 3
 ```
 
 ---
@@ -153,6 +187,36 @@ cp ../material/case*.csv .
 ./PS3 case3.csv
 ```
 
+**PS04 (`PS04/src`)**
+
+โจทย์ PS04 กำหนดให้คอมไพล์โปรแกรมชุดเดียวกันสองแบบ คือแบบปกติ (เป็น PIE โดยปริยาย) และแบบ `-no-pie` เพื่อเทียบว่าที่อยู่ของตัวแปรเปลี่ยนไปอย่างไร
+
+```bash
+cd PS04/src
+
+# ข้อ 1: Static Storage Class (Step 1--3 แบบปกติ, Step 4 แบบ -no-pie)
+gcc -Wall -Wextra -o q1_static q1_static.c
+gcc -Wall -Wextra -o q1_auto   q1_auto.c
+gcc -Wall -Wextra -no-pie -o q1_static_nopie q1_static.c
+gcc -Wall -Wextra -no-pie -o q1_auto_nopie   q1_auto.c
+
+# ข้อ 2: Extern Storage Class
+gcc -Wall -Wextra -o q2_extern   q2_extern.c
+gcc -Wall -Wextra -o q2_noextern q2_noextern.c
+gcc -Wall -Wextra -no-pie -o q2_extern_nopie   q2_extern.c
+gcc -Wall -Wextra -no-pie -o q2_noextern_nopie q2_noextern.c
+
+# ข้อ 2: ตัวอย่างการใช้ extern แชร์ตัวแปรข้ามไฟล์ ต้องลิงก์สองไฟล์เข้าด้วยกัน
+gcc -Wall -Wextra -o q2_shared q2_shared_main.c q2_shared_def.c
+
+# ข้อ 3: malloc / realloc / free (โจทย์ระบุให้คอมไพล์แบบปกติเท่านั้น)
+gcc -Wall -Wextra -o q3_alloc   q3_alloc.c
+gcc -Wall -Wextra -o q3_alloc_b q3_alloc_b.c
+gcc -Wall -Wextra -o q3_regions q3_regions.c
+```
+
+> **หมายเหตุ:** โค้ดต้นฉบับจากใบงานประกาศ `void main()` ซึ่งไม่ตรงมาตรฐาน C การคอมไพล์ด้วย `-Wall -Wextra` จึงมี warning `[-Wmain]` ติดมาทุกไฟล์ และไฟล์ `q2_noextern.c` มี warning `[-Wuninitialized]` เพิ่มอีกหนึ่งข้อ ทั้งสองอย่างเป็นส่วนหนึ่งของผลการทดลองที่ต้องอธิบายในรายงาน จึงคงโค้ดไว้ตามใบงานทุกตัวอักษร ส่วน `q3_regions.c` ที่เขียนขึ้นเองคอมไพล์ผ่านโดยไม่มี warning
+
 ---
 
 ### 3. การคอมไพล์รายงาน LaTeX
@@ -162,6 +226,7 @@ cp ../material/case*.csv .
 ```bash
 cd PS02/docs && xelatex PS02.tex && xelatex PS02.tex
 cd PS03/docs && xelatex PS03.tex && xelatex PS03.tex
+cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 ```
 *(รันคำสั่ง 2 รอบ เพื่อให้สารบัญและเลขหน้าอัปเดตอย่างถูกต้อง)*
 
@@ -178,6 +243,12 @@ cd PS03/docs && xelatex PS03.tex && xelatex PS03.tex
 - **ข้อ 1** เครื่องที่ใช้มี 22 CPU ถ้าปล่อยให้โปรแกรมทดสอบวิ่งอิสระจะไม่เห็นผลของค่า `nice` เลย เพราะไม่มีการแย่ง CPU เกิดขึ้นจริง สคริปต์เก็บผลจึงใช้ `taskset -c 0` บังคับให้ทุก process ทดสอบอยู่บน CPU แกนเดียวกัน
 - **ข้อ 2** คำสั่ง `jobs`, `fg`, `bg` และการกด `CTRL+Z` ใช้ได้เฉพาะ shell แบบ interactive ที่มี tty จริง สคริปต์ `run_q2.sh` จึงใช้ `script(1)` สร้าง pseudo terminal ขึ้นมาก่อน
 - สคริปต์ใน `src/` ทุกไฟล์ต้องมี line ending เป็น LF ซึ่งบังคับไว้แล้วใน `.gitattributes`
+
+ข้อควรทราบสำหรับ PS04:
+
+- **ทั้งสามข้อ** ต้องรันบนเครื่องเดียวกันตามที่ใบงานกำหนด (*All steps must be executed on the same machine*) สคริปต์ `run_qN.sh` แต่ละไฟล์จึงคอมไพล์และรันทุกกรณีของข้อนั้นจบในการเรียกครั้งเดียว
+- **ที่อยู่ที่พิมพ์ออกมาจะไม่ซ้ำเดิม** ในการรันแต่ละครั้ง เพราะ `gcc` ของ Ubuntu สร้างไบนารีแบบ PIE เป็นค่าเริ่มต้น (`--enable-default-pie`) ทำงานร่วมกับ ASLR ของเคอร์เนล (`/proc/sys/kernel/randomize_va_space` = 2) การรันซ้ำจึงได้ตัวเลขต่างจากที่บันทึกไว้ใน `result/` แต่ **ความสัมพันธ์ระหว่างตัวเลข** เช่น ระยะห่างระหว่างสมาชิกอาร์เรย์ หรือการที่ที่อยู่ใน `main()` กับ `display()` ตรงกัน จะเหมือนเดิมเสมอ
+- **ถ้าต้องการตัวเลขที่ซ้ำเดิมทุกครั้ง** ให้รันผ่าน `setarch -R <program>` ซึ่งปิด ASLR เฉพาะ process ลูก สคริปต์เก็บผลใช้วิธีนี้เป็นกรณีควบคุม และใช้ในข้อ 3 เพื่อให้เทียบที่อยู่ของสองโปรแกรมกันได้ตรง ๆ
 
 ---
 
