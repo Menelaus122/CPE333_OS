@@ -42,3 +42,14 @@ q2_shared
 q3_alloc
 q3_alloc_b
 q3_regions
+
+# Mini-Project 1 : ไฟล์ขนาดใหญ่จาก VM และการ build เคอร์เนล ไม่นำเข้า Git
+*.deb
+*.ddeb
+*.iso
+*.vmdk
+*.vmem
+*.vmsn
+~$*.docx
+# เครื่องมือถ่ายภาพหน้าต่างของ Claude ใช้บนเครื่องนี้เท่านั้น
+Miniproj1/tools/
