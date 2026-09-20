@@ -53,3 +53,7 @@ q3_regions
 ~$*.docx
 # เครื่องมือถ่ายภาพหน้าต่างของ Claude ใช้บนเครื่องนี้เท่านั้น
 Miniproj1/tools/
+
+# PS06 : เครื่องมือช่วยทำรายงาน (ตัว script commit ไว้ แต่ dependency ไม่นำเข้า Git)
+PS06/tools/node_modules/
+*.tmp.png

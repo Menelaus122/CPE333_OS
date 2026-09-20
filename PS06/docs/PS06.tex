@@ -1,0 +1,762 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2569 - Problem Session 6
+%  Virtual Memory
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+\setmainfont{TH Sarabun New}[Scale=1.45]
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={free,vmstat,swapon,swapoff,mkswap,fallocate,sysctl,swappiness,resmon,dd,systemctl},
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2569}
+\rhead{\small Problem Session 6}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงานปฏิบัติการ}\\[0.4cm]
+{\Large\bfseries PS06: Virtual Memory}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+ปฏิบัติการนี้แบ่งการทดลองออกเป็นสองฝั่ง คือฝั่ง Linux (ข้อ 1 และข้อ 2) และฝั่ง MS Windows (ข้อ 3) โดยทั้งสองฝั่งทำงานอยู่บนเครื่องคอมพิวเตอร์เดียวกัน รายละเอียดของสภาพแวดล้อมเป็นดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อมูลสภาพแวดล้อมของระบบที่ใช้ในการทดลอง}
+\begin{tabular}{@{}p{3.9cm}p{12.2cm}@{}}
+\toprule
+\textbf{รายการ} & \textbf{รายละเอียด} \\
+\midrule
+ระบบปฏิบัติการฝั่ง Windows & Windows 11 Home Single Language (build 26200) \\
+ระบบปฏิบัติการฝั่ง Linux & Ubuntu 24.04.1 LTS ทำงานบน WSL2 \\
+Kernel ของ Linux & \code{6.6.87.2-microsoft-standard-WSL2} (x86-64) \\
+หน่วยความจำหลักที่ Linux เห็น & 15 GiB (WSL2 แบ่งมาจาก RAM ของเครื่อง) \\
+Swap เดิมของระบบ Linux & 4 GiB เป็น partition \code{/dev/sdc} ที่ WSL2 สร้างให้อัตโนมัติ \\
+init ของ Linux & \code{systemd} (เปิดผ่าน \code{systemd=true} ใน \code{/etc/wsl.conf}) \\
+เครื่องมือ monitoring & \code{procps-ng 4.0.4} ซึ่งเป็น package ที่ให้ทั้ง \code{free} และ \code{vmstat} \\
+เครื่องมือฝั่ง Windows & Resource Monitor (\code{resmon.exe}) ที่มากับระบบปฏิบัติการ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{หมายเหตุเรื่องหลักฐาน:} เนื่องจากใบงานกำหนดให้แสดงภาพหน้าจอของผลการรันคำสั่ง (ข้อ 1.2 ระบุ \textit{with screenshots} และข้อ 2 ระบุ \textit{Please capture the output image from running the command}) รายงานฉบับนี้จึงใช้ภาพหน้าจอจริงเป็นหลักฐานของทุกขั้นตอน ตัวเลขทุกตัวที่อ้างถึงในคำอธิบายและย่อหน้าสรุปอ่านมาจากภาพที่แสดงไว้ในรายงานโดยตรง ภาพทั้งหมดเก็บไว้ที่ \code{PS06/result/screenshots/} และลำดับคำสั่งที่ใช้ถ่ายภาพอยู่ใน \code{PS06/docs/COMMANDS.md}
+
+% =====================================================================
+\section{ข้อ 1: ทำความเข้าใจแนวคิดของ Virtual Memory}
+% =====================================================================
+
+\subsection{หลักการพื้นฐานที่ระบบปฏิบัติการสมัยใหม่ใช้ร่วมกัน}
+
+Virtual Memory คือกลไกที่ระบบปฏิบัติการสร้าง address space เสมือนขึ้นมาให้แต่ละ process โดย address ที่ program มองเห็น (virtual address) ไม่ใช่ address จริงบนแผง RAM (physical address) แต่ต้องผ่านการแปลงด้วย hardware หน่วยหนึ่งชื่อ MMU (Memory Management Unit) เสียก่อน แนวคิดนี้ให้ประโยชน์สามข้อพร้อมกัน
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{การแยกขอบเขต (Isolation):} แต่ละ process มีตาราง mapping ของตัวเอง process หนึ่งจึงอ้างถึงหน่วยความจำของอีก process หนึ่งไม่ได้ เป็นพื้นฐานของความปลอดภัยและความเสถียรของระบบ
+  \item \textbf{การใช้หน่วยความจำเกินขนาดจริง (Over-subscription):} ผลรวมของ address space ของทุก process ใหญ่กว่า RAM จริงได้ เพราะ page ที่ไม่ได้ใช้งานจะถูกย้ายไปเก็บบน disk (swap หรือ page file)
+  \item \textbf{การแบ่งใช้หน่วยความจำร่วมกัน (Sharing):} page เดียวกันบน RAM ถูก map เข้าไปในหลาย process ได้ เช่น code ของ shared library หรือ page ที่เกิดจาก \code{fork()} ซึ่งใช้เทคนิค copy-on-write
+\end{itemize}
+
+หน่วยที่เล็กที่สุดของการจัดการคือ \textbf{page} (ฝั่ง virtual) และ \textbf{page frame} (ฝั่ง physical) ซึ่งบนสถาปัตยกรรม x86-64 มีขนาดมาตรฐาน 4 KiB การแปลง address ใช้โครงสร้างที่เรียกว่า page table ซึ่งบน x86-64 เป็นแบบ 4 ระดับ (CPU รุ่นใหม่บางรุ่นรองรับ 5 ระดับ) และเพื่อไม่ให้ต้องเดิน page table ทุกครั้งที่อ่านเขียนหน่วยความจำ CPU จึง cache ผลการแปลงล่าสุดไว้ใน TLB (Translation Lookaside Buffer)
+
+เมื่อ process อ้างถึง page ที่ยังไม่มี mapping ที่ใช้งานได้ CPU จะยกข้อผิดพลาดที่เรียกว่า \textbf{page fault} ขึ้นมาให้ kernel จัดการ แบ่งเป็นสองแบบสำคัญ
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Soft fault (minor fault):} ข้อมูลอยู่ใน RAM อยู่แล้ว เพียงแต่ยังไม่ได้ map เข้ากับ process นั้น เช่น page อยู่ใน page cache ของ Linux หรืออยู่ใน standby list ของ Windows แก้ได้เร็วมากเพราะไม่ต้องอ่าน disk
+  \item \textbf{Hard fault (major fault):} ข้อมูลไม่อยู่ใน RAM ต้องอ่านกลับจาก disk ซึ่งช้ากว่าหลายหมื่นเท่า จำนวน hard fault ต่อวินาทีจึงเป็นตัวชี้วัดสำคัญว่าเครื่องขาดหน่วยความจำจริงหรือไม่
+\end{itemize}
+
+เทคนิคอื่นที่ทั้งสองระบบปฏิบัติการใช้เหมือนกันคือ \textbf{demand paging} (โหลด page เข้ามาเมื่อถูกอ้างถึงจริงเท่านั้น), \textbf{copy-on-write} (สำเนา page ต่อเมื่อมีการเขียนจริง), \textbf{memory-mapped file} (map file เข้ากับ address space โดยตรง) และ \textbf{page replacement} (เลือก page ที่จะถูกไล่ออกจาก RAM เมื่อหน่วยความจำใกล้หมด) หากหน่วยความจำไม่พอจนระบบต้องสลับ page เข้าออก disk ตลอดเวลาจนแทบไม่ได้ทำงานจริง เรียกอาการนั้นว่า \textbf{thrashing}
+
+\subsection{การ implement บน Linux}
+
+\textbf{โครงสร้างข้อมูลหลัก} ทุก process ใน Linux มี \code{struct mm\_struct} หนึ่งชุดเป็นตัวแทนของ address space ภายในเก็บรายการของ \code{struct vm\_area\_struct} (เรียกสั้น ๆ ว่า VMA) ซึ่งแต่ละตัวแทน region ที่มีคุณสมบัติเหมือนกันหนึ่งช่วง เช่น code segment, heap, stack หรือ region ที่เกิดจาก \code{mmap()} ส่วน page frame ทุก frame บนเครื่องมี \code{struct page} กำกับไว้หนึ่งตัวเพื่อเก็บสถานะ เช่น ตัวนับการอ้างอิงและ flag ว่า page นั้นสกปรก (dirty) หรือไม่ การแปลง address ใช้ page table 4 ระดับคือ PGD, PUD, PMD และ PTE
+
+\textbf{ประเภทของ page} Linux แบ่ง page ที่เรียกคืนได้ออกเป็นสองกลุ่มใหญ่ คือ \textbf{file-backed page} ซึ่งมีต้นฉบับอยู่บน file system อยู่แล้ว (page cache) เรียกคืนได้โดยเขียนกลับเฉพาะ page ที่ dirty กับ \textbf{anonymous page} ซึ่งไม่มีต้นฉบับบน disk เช่น heap และ stack การจะเรียกคืน anonymous page ได้ต้องเขียนลง swap ก่อนเสมอ นี่คือเหตุผลที่ระบบซึ่งไม่มี swap เลยจะเรียกคืนได้เฉพาะ page cache เท่านั้น
+
+\textbf{การเรียกคืนหน่วยความจำ} Linux จัดกลุ่ม page ไว้ในรายการแบบ LRU สองชั้นคือ active list และ inactive list แยกกันระหว่าง anonymous และ file-backed เมื่อหน่วยความจำว่างต่ำกว่า watermark ที่กำหนด kernel thread ชื่อ \code{kswapd} จะตื่นขึ้นมาเรียกคืน page ในเบื้องหลัง และถ้าหน่วยความจำหมดเร็วกว่าที่ \code{kswapd} ตามทัน process ที่ขอหน่วยความจำจะต้องช่วยเรียกคืนเองแบบ direct reclaim ซึ่งทำให้ process นั้นหยุดรอ ค่า \code{vm.swappiness} (0--200 ค่าเริ่มต้นคือ 60) เป็นตัวกำหนดว่า kernel จะเอนไปเรียกคืน anonymous page ผ่าน swap มากน้อยเพียงใดเมื่อเทียบกับการทิ้ง page cache
+
+\textbf{นโยบาย overcommit และ OOM killer} โดยค่าเริ่มต้น Linux ยอมให้ process จองหน่วยความจำรวมกันเกินขนาดจริงได้ (\code{vm.overcommit\_memory = 0}) เพราะโดยทั่วไป program จองมากกว่าที่ใช้จริง ผลคือ \code{malloc()} มักสำเร็จเสมอ แต่ถ้าถึงจุดที่ทุก process เขียนข้อมูลลงหน่วยความจำที่จองไว้จนเต็มเครื่องจริง kernel จะเรียก \textbf{OOM killer} ขึ้นมาเลือกฆ่า process ที่มีคะแนน \code{oom\_score} สูงที่สุดทิ้ง ซึ่งต่างจาก Windows ที่ใช้วิธีปฏิเสธการจองตั้งแต่แรก
+
+\textbf{รูปแบบของ swap} Linux รองรับทั้ง swap partition และ swap file โดยประสิทธิภาพต่างกันน้อยมากบน file system สมัยใหม่ ทำให้ swap file เป็นที่นิยมกว่าเพราะปรับขนาดได้โดยไม่ต้องแบ่ง partition ใหม่ นอกจากนี้ยังมี \code{zram} (block device สำหรับ swap ที่บีบอัดข้อมูลไว้ใน RAM) และ \code{zswap} (cache แบบบีบอัดที่คั่นอยู่หน้า swap จริง) ซึ่งทำหน้าที่คล้ายกับ Memory Compression ของ Windows รวมถึง Transparent Huge Pages ที่รวม page ขนาด 4 KiB จำนวน 512 หน้าให้เป็น page ขนาด 2 MiB เพื่อลด TLB miss
+
+\subsection{การ implement บน MS Windows}
+
+\textbf{โครงสร้างข้อมูลหลัก} ฝั่ง Windows ใช้ \textbf{VAD tree} (Virtual Address Descriptor) ซึ่งเป็น balanced tree เก็บ region ของ address space ของแต่ละ process แทนรายการ VMA ของ Linux ส่วนสถานะของ page frame ทุก frame เก็บรวมศูนย์ไว้ในโครงสร้างชื่อ \textbf{PFN database} การแปลง address ก็ใช้ page table 4 ระดับเช่นกันเพราะทำงานบน hardware ชุดเดียวกัน
+
+\textbf{Working set และการจัดสรรแบบรายบ้าน} แนวคิดที่ต่างจาก Linux ชัดที่สุดคือ Windows จัดการหน่วยความจำเป็น \textbf{working set} ของแต่ละ process กล่าวคือแต่ละ process มีโควตา page ที่ถือครองอยู่ใน RAM ได้ และมี component ชื่อ \textbf{Balance Set Manager} คอยตัดแต่งโควตานี้ (working set trimming) เมื่อระบบขาดหน่วยความจำ ขณะที่ Linux มองหน่วยความจำเป็น pool รวมของทั้งระบบแล้วเรียกคืนตาม LRU ของทั้งเครื่อง
+
+\textbf{รายการ page ระดับระบบ} page ที่ถูกตัดออกจาก working set จะไม่ถูกทิ้งทันที แต่ไหลเข้าสู่รายการกลางสามรายการ ได้แก่ \textbf{modified list} (page ที่ถูกแก้ไขแล้ว รอ Modified Page Writer เขียนลง page file หรือ file ต้นฉบับ), \textbf{standby list} (page ที่สะอาดแล้ว ยังเก็บเนื้อหาไว้ ใช้เป็น cache ของทั้งระบบ) และ \textbf{free/zero list} (page ว่างพร้อมแจกจ่าย) จุดสำคัญคือ page ที่อยู่ใน standby list ยังดึงกลับเข้า working set ได้ด้วย soft fault ซึ่งเร็วมาก บทบาทของ standby list จึงเทียบได้กับ page cache ของ Linux และเป็นเหตุผลที่ Resource Monitor แสดงหน่วยความจำส่วนนี้แยกออกมาให้เห็นในข้อ 3
+
+\textbf{Commit charge และ page file} Windows ไม่ใช้นโยบาย overcommit แบบ Linux แต่ใช้ระบบ \textbf{commit charge} คือทุกครั้งที่ process ขอหน่วยความจำแบบ private ระบบจะจองโควตาไว้ในบัญชีกลางทันที และ \textbf{commit limit} ของระบบเท่ากับขนาด RAM รวมกับขนาดของ \code{pagefile.sys} เมื่อ commit charge ชนเพดาน การจองครั้งถัดไปจะล้มเหลวทันทีพร้อมข้อความแจ้งเตือนหน่วยความจำต่ำ แทนที่จะฆ่า process ทิ้งแบบ OOM killer โดยค่าเริ่มต้น Windows ให้ระบบจัดการขนาดของ \code{pagefile.sys} เองและขยายได้อัตโนมัติ
+
+\textbf{กลไกเสริม} Windows 10 ขึ้นไปมี \textbf{Memory Compression} ซึ่งบีบอัด page ที่กำลังจะถูกย้ายลง page file เก็บไว้ใน RAM ก่อน เพื่อลดการอ่านเขียน disk และมี \textbf{SysMain} (ชื่อเดิมคือ Superfetch) ที่เรียนรู้รูปแบบการใช้งานแล้วโหลด page ของ program ที่ผู้ใช้เปิดบ่อยเข้า standby list ไว้ล่วงหน้า
+
+\subsection{ตารางเปรียบเทียบ Linux กับ MS Windows}
+
+\begin{table}[H]
+\centering\small
+\caption{เปรียบเทียบการ implement Virtual Memory ระหว่าง Linux และ MS Windows}
+\begin{tabular}{@{}p{3.3cm}p{6.1cm}p{6.1cm}@{}}
+\toprule
+\textbf{ประเด็น} & \textbf{Linux} & \textbf{MS Windows} \\
+\midrule
+โครงสร้างของ address space & \code{mm\_struct} และรายการ VMA & VAD tree ต่อหนึ่ง process \\
+สถานะของ page frame & \code{struct page} ต่อหนึ่ง frame & PFN database รวมศูนย์ \\
+หน่วยของการเรียกคืน & LRU active/inactive list ของทั้งระบบ & working set รายบ้าน ตัดแต่งโดย Balance Set Manager \\
+ผู้ทำงานเบื้องหลัง & \code{kswapd} และ direct reclaim & Balance Set Manager และ Modified Page Writer \\
+ที่พัก page ก่อนถูกทิ้ง & page cache และ inactive list & modified list, standby list, free/zero list \\
+Backing store & swap partition หรือ swap file มีได้หลายชุดและกำหนด priority ได้ & \code{pagefile.sys} ปกติหนึ่งชุด ให้ระบบจัดการขนาดเอง \\
+การบีบอัดหน่วยความจำ & \code{zram} หรือ \code{zswap} ต้องเปิดใช้งานเอง & Memory Compression เปิดใช้งานโดยค่าเริ่มต้น \\
+นโยบายการจอง & overcommit ได้ตาม \code{vm.overcommit\_memory} & commit charge เทียบกับ commit limit ที่เท่ากับ RAM บวกขนาด page file \\
+เมื่อหน่วยความจำหมด & OOM killer เลือกฆ่า process ที่ \code{oom\_score} สูงสุด & ปฏิเสธการจองครั้งใหม่และแจ้งเตือน low memory \\
+ปุ่มปรับพฤติกรรม & \code{vm.swappiness}, \code{vm.vfs\_cache\_pressure}, \code{vm.overcommit\_ratio} & ตั้งขนาด page file ผ่าน System Properties หรือ registry \\
+เครื่องมือ monitoring มาตรฐาน & \code{free}, \code{vmstat}, \code{/proc/meminfo}, \code{top} & Task Manager, Resource Monitor, Performance Monitor \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{สรุปความต่างที่สำคัญที่สุด} ทั้งสองระบบใช้ hardware และหลักการเดียวกันคือ paging กับ demand paging แต่ต่างกันที่ \textit{มุมมองในการจัดการ} คือ Linux มองหน่วยความจำเป็น pool กลางของทั้งเครื่องแล้วเรียกคืนตามอายุการใช้งานของ page ส่วน Windows มองเป็นโควตารายบ้านของแต่ละ process แล้วค่อยรวบ page ที่ตัดออกมาไว้ในรายการกลาง และต่างกันที่ \textit{นโยบายการจอง} คือ Linux ยอมให้จองเกินแล้วไปเสี่ยงเอาตอนใช้งานจริง ส่วน Windows กันโควตาไว้ตั้งแต่ตอนจองจึงไม่จำเป็นต้องฆ่า process ทิ้งภายหลัง
+
+% ---------------------------------------------------------------------
+\subsection{ขั้นตอนการเพิ่มและลด swap space บน Linux}
+% ---------------------------------------------------------------------
+
+หัวข้อนี้สาธิตการเพิ่มและลด swap space จริงบน Ubuntu 24.04.1 ที่ทำงานบน WSL2 โดยเลือกใช้วิธี \textbf{swap file} แทนการแบ่ง swap partition ใหม่ ด้วยเหตุผลสองข้อคือ swap file สร้างและลบได้ทันทีโดยไม่ต้องยุ่งกับตาราง partition ของ disk และบน file system สมัยใหม่ประสิทธิภาพต่างจาก swap partition น้อยมาก ทุกขั้นตอนถ่ายภาพหน้าจอไว้เป็นหลักฐานตามลำดับการทำงานจริง
+
+\subsubsection{ขั้นที่ 1: ตรวจสอบสถานะ swap เดิมก่อนแก้ไข}
+
+ก่อนแก้ไขสิ่งใดต้องรู้สถานะตั้งต้นเสมอ คำสั่งที่ใช้คือ \code{free -h} เพื่อดูภาพรวม \code{swapon --show} เพื่อดูว่ามี swap area ใดเปิดใช้งานอยู่บ้าง และ \code{cat /proc/swaps} ซึ่งเป็นแหล่งข้อมูลดิบที่ kernel เปิดให้อ่าน
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s01_swap_baseline.png}
+\caption{สถานะตั้งต้น: swap เดิมมีเพียง partition \code{/dev/sdc} ขนาด 4 GiB}
+\end{figure}
+
+จากภาพ ระบบมีหน่วยความจำหลัก 15 GiB ใช้ไป 585 MiB และมี swap ทั้งหมด 4.0 GiB ที่ยังไม่ถูกใช้เลย (\code{used} เท่ากับ \code{0B}) โดย swap นี้เป็นชนิด partition ชื่อ \code{/dev/sdc} มีค่า priority เท่ากับ \code{-2} ส่วน \code{/proc/swaps} รายงานขนาดเป็นหน่วย KiB คือ 4194304 KiB ซึ่งเท่ากับ 4 GiB พอดี จุดที่ควรสังเกตคือ swap ก้อนนี้ไม่ได้เกิดจากการติดตั้ง Ubuntu เอง แต่เป็น virtual disk ที่ WSL2 สร้างให้อัตโนมัติ (ขนาดเริ่มต้นเท่ากับ 25\% ของ RAM ที่ virtual machine มองเห็น)
+
+\subsubsection{ขั้นที่ 2: สร้าง file สำหรับใช้เป็น swap}
+
+\begin{lstlisting}[style=terminal,caption={สร้าง file ขนาด 2 GiB ด้วย fallocate}]
+sudo fallocate -l 2G /swapfile
+ls -lh /swapfile
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s02_fallocate.png}
+\caption{\code{fallocate -l 2G} จองพื้นที่บน disk ให้ครบ 2 GiB ในคำสั่งเดียว}
+\end{figure}
+
+\code{fallocate} จองพื้นที่บน file system ให้ครบตามขนาดที่ระบุทันทีโดยไม่ต้องเขียนข้อมูลลงไปจริง จึงเร็วกว่าการใช้ \code{dd} มาก ผลที่ได้คือ file \code{/swapfile} ขนาด 2.0G เจ้าของเป็น \code{root} เพราะสร้างผ่าน \code{sudo} แต่สิทธิ์ที่ได้คือ \code{-rw-r--r--} (644) ซึ่งหมายความว่าผู้ใช้ทั่วไปอ่าน file นี้ได้ ถือเป็นช่องโหว่ร้ายแรงเพราะ swap เก็บข้อมูลที่ถูกย้ายออกจากหน่วยความจำของทุก process รวมถึงข้อมูลที่เป็นความลับ จึงต้องแก้สิทธิ์ในขั้นถัดไปก่อนนำไปใช้งาน
+
+\textbf{ทางเลือก:} หาก file system ไม่รองรับ \code{fallocate} หรือ \code{swapon} ปฏิเสธ file ที่มีช่องว่าง (ข้อความ \code{it appears to have holes}) ให้สร้างด้วยการเขียนข้อมูลจริงแทน คือ \code{sudo dd if=/dev/zero of=/swapfile bs=1M count=2048}
+
+\subsubsection{ขั้นที่ 3: ตั้งสิทธิ์และ format พื้นที่ให้เป็น swap area}
+
+\begin{lstlisting}[style=terminal,caption={ปิดสิทธิ์ให้เหลือเฉพาะ root แล้วเขียน header ของ swap}]
+sudo chmod 600 /swapfile
+ls -lh /swapfile
+sudo mkswap /swapfile
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s03_mkswap.png}
+\caption{หลัง \code{chmod 600} สิทธิ์เหลือเฉพาะ root และ \code{mkswap} เขียน header พร้อม UUID}
+\end{figure}
+
+สิทธิ์เปลี่ยนเป็น \code{-rw-------} คือมีเพียง \code{root} เท่านั้นที่อ่านหรือเขียนได้ จากนั้น \code{mkswap} จะเขียนโครงสร้าง header ของ swap area ลงไปที่ต้นของ file แล้วรายงานว่า \code{Setting up swapspace version 1, size = 2 GiB (2147479552 bytes)} พร้อมกำหนด UUID ให้หนึ่งค่า
+
+ตัวเลขที่น่าสนใจคือ 2147479552 bytes ซึ่งน้อยกว่า 2 GiB (2147483648 bytes) อยู่ 4096 bytes พอดี ส่วนที่หายไปคือ page แรกของ file ที่ถูกกันไว้เก็บ header ของ swap area จึงเหลือพื้นที่ใช้งานจริง 2097148 KiB ตามที่จะเห็นใน \code{/proc/swaps} ในขั้นถัดไป
+
+\subsubsection{ขั้นที่ 4: เปิดใช้งาน swap file}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s04_swapon.png}
+\caption{หลัง \code{swapon} ระบบมี swap area สองก้อนทำงานพร้อมกัน}
+\end{figure}
+
+หลังสั่ง \code{sudo swapon /swapfile} ระบบมี swap area สองก้อนคือ partition \code{/dev/sdc} ขนาด 4G และ file \code{/swapfile} ขนาด 2G ทั้งสองก้อนยังมี \code{USED} เป็น \code{0B} เพราะหน่วยความจำยังเหลือเฟือ
+
+ค่า \code{PRIO} เป็นจุดที่ควรอธิบายเพิ่ม เมื่อไม่ได้ระบุ priority เอง kernel จะไล่ค่าติดลบลงเรื่อย ๆ ตามลำดับการเปิดใช้งาน swap ก้อนแรกจึงได้ \code{-2} และก้อนที่เปิดทีหลังได้ \code{-3} kernel จะใช้ swap ที่มี priority สูงกว่าก่อนเสมอ ในที่นี้คือใช้ partition จนเต็มแล้วจึงลงมาใช้ swap file หากต้องการให้ใช้พร้อมกันแบบกระจายโหลด ต้องกำหนด priority ให้เท่ากันด้วย \code{swapon -p} หรือใส่ option \code{pri=} ใน \code{/etc/fstab}
+
+\subsubsection{ขั้นที่ 5: ยืนยันว่า swap เพิ่มขึ้นจริง}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s05_free_after_add.png}
+\caption{\code{Swap} total เพิ่มจาก 4.0Gi เป็น 6.0Gi และการเทียบหน่วยฐาน 1024 กับฐาน 1000}
+\end{figure}
+
+บรรทัด \code{Swap} แสดง total เท่ากับ 6.0Gi ซึ่งคือ 4 GiB ของ partition เดิมบวกกับ 2 GiB ของ swap file ที่เพิ่งเพิ่มเข้าไป เท่ากับว่าการเพิ่ม swap สำเร็จตามเป้าหมาย
+
+คำสั่งที่สองในภาพคือ \code{free -h --si} ซึ่งให้ผลเป็น 6.4G และ 16G เพราะ \code{--si} เปลี่ยนไปใช้หน่วยฐาน 1000 (GB) แทนฐาน 1024 (GiB) ตัวเลขที่ต่างกันนี้ไม่ได้แปลว่าหน่วยความจำเปลี่ยน เป็นเพียงการเลือกฐานของหน่วยที่ต่างกันเท่านั้น
+
+\subsubsection{ขั้นที่ 6: ทำให้ถาวร และข้อจำกัดที่พบบน WSL2}
+
+บน Linux ทั่วไป การทำให้ swap file กลับมาเองหลัง reboot ทำได้ด้วยการเพิ่มบรรทัดต่อไปนี้ลงใน \code{/etc/fstab}
+
+\begin{lstlisting}[style=terminal,caption={รูปแบบของบรรทัด swap ใน /etc/fstab}]
+/swapfile none swap sw 0 0
+\end{lstlisting}
+
+ทั้งหกช่องมีความหมายตามลำดับคือ อุปกรณ์หรือ file ที่จะใช้, จุด mount (swap ไม่มีจุด mount จึงใส่ \code{none}), ชนิดของ file system (\code{swap}), option (\code{sw} คือค่าเริ่มต้นสำหรับ swap), ค่าสำหรับ \code{dump} และลำดับการตรวจ file system ด้วย \code{fsck} ซึ่ง swap ไม่ต้องตรวจจึงเป็น \code{0} ทั้งสองช่อง
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s06_fstab.png}
+\caption{บรรทัดเข้า \code{/etc/fstab} สำเร็จ แต่ systemd ตอบว่าไม่มี swap unit ที่ load อยู่เลย}
+\end{figure}
+
+ผลที่ได้กลับไม่เป็นไปตามตำราคือ หลังสั่ง \code{systemctl daemon-reload} แล้วตรวจด้วย \code{systemctl list-units --type=swap} ระบบตอบว่า \code{0 loaded units listed} แสดงว่า systemd ไม่ได้สร้าง unit ชื่อ \code{swapfile.swap} ให้ตามที่ควรจะเป็น เมื่อไล่หาสาเหตุจาก journal ของระบบพบข้อความที่ชี้สาเหตุโดยตรง
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s06b_container_ignored.png}
+\caption{สาเหตุที่แท้จริง: systemd มองว่า WSL2 เป็น container จึงข้าม swap entry ใน \code{/etc/fstab}}
+\end{figure}
+
+ภาพนี้อธิบายเรื่องทั้งหมดได้ในภาพเดียว เริ่มจาก \code{systemd-detect-virt --container} ตอบว่า \code{wsl} คือ systemd รู้ตัวว่ากำลังทำงานอยู่ภายใน container จากนั้นบรรทัดที่ดึงมาจาก journal ระบุชัดว่า \code{systemd-fstab-generator: Running in a container, ignoring swap entry for /swapfile.} กล่าวคือ ตัว generator ที่ทำหน้าที่แปลง \code{/etc/fstab} เป็น systemd unit จะ \textbf{ข้ามบรรทัด swap ทุกบรรทัดทิ้งเมื่อทำงานอยู่ใน container} เพราะตามหลักการแล้ว container ไม่ควรจัดการ swap ของเครื่องเอง
+
+เพื่อพิสูจน์ว่าบรรทัดใน \code{/etc/fstab} นั้นถูกต้อง ภาพเดียวกันจึงทดสอบต่อด้วยการสั่ง \code{swapoff} ให้เหลือ swap ก้อนเดียวก่อน แล้วสั่ง \code{sudo swapon -a} ซึ่งเป็นคำสั่งที่อ่าน \code{/etc/fstab} โดยตรงไม่ผ่าน systemd ผลคือ \code{/swapfile} กลับมาทำงานอีกครั้งพร้อม priority \code{-3} เหมือนเดิม สรุปได้ว่าปัญหาไม่ได้อยู่ที่บรรทัดใน \code{/etc/fstab} แต่อยู่ที่ systemd บน WSL2 ต่างหากที่เลือกจะไม่อ่านมัน
+
+\textbf{วิธีทำให้ swap ถาวรบน WSL2} มีสองทางที่ใช้ได้จริง
+
+\begin{enumerate}[leftmargin=*]
+  \item สั่ง \code{swapon -a} ตอน WSL2 เริ่มทำงาน โดยเพิ่มค่าต่อไปนี้ใน \code{/etc/wsl.conf} ฝั่ง Linux
+  \begin{lstlisting}[style=terminal]
+[boot]
+command = swapon -a
+  \end{lstlisting}
+  \item ปรับขนาด swap ที่ WSL2 สร้างให้เองแทนการเพิ่ม swap file ใหม่ โดยสร้าง file \code{C:\textbackslash Users\textbackslash <user>\textbackslash .wslconfig} ฝั่ง Windows แล้วกำหนด
+  \begin{lstlisting}[style=terminal]
+[wsl2]
+swap = 8GB
+  \end{lstlisting}
+  จากนั้นสั่ง \code{wsl --shutdown} ให้ virtual machine ปิดแล้วเปิดใหม่ ขนาดของ partition \code{/dev/sdc} จะเปลี่ยนตามค่าที่ตั้งไว้ วิธีนี้เป็นวิธีที่ตรงกับสถาปัตยกรรมของ WSL2 มากที่สุด เพราะ swap ของ WSL2 ถูกจัดการจากฝั่ง Windows ไม่ใช่จากฝั่ง Linux
+\end{enumerate}
+
+\subsubsection{ขั้นที่ 7: ลด swap space}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s07_swapoff.png}
+\caption{\code{swapoff} ปิดการใช้งาน swap file ทำให้ swap รวมลดจาก 6.0Gi กลับเป็น 4.0Gi}
+\end{figure}
+
+การลด swap ทำได้ด้วยคำสั่ง \code{sudo swapoff /swapfile} ซึ่งจะย้าย page ทั้งหมดที่ค้างอยู่ใน swap area ก้อนนั้นกลับเข้าหน่วยความจำหลักหรือย้ายไป swap ก้อนอื่นก่อน แล้วจึงถอด swap area ออกจากระบบ ข้อควรระวังคือ \textbf{ต้องมีหน่วยความจำว่างพอจะรับ page เหล่านั้นกลับ} มิฉะนั้นคำสั่งจะล้มเหลวด้วยข้อความ \code{Cannot allocate memory} ในการทดลองนี้ swap ยังไม่ถูกใช้งานเลย คำสั่งจึงจบทันที ผลลัพธ์คือเหลือ swap เพียง \code{/dev/sdc} และ \code{Swap} total กลับเป็น 4.0Gi
+
+อีกจุดที่สังเกตได้คือ \code{buff/cache} ลดจาก 618 MiB เหลือ 178 MiB เพราะ page cache ที่ระบบใช้กับ file \code{/swapfile} ถูกปล่อยคืนไปพร้อมกัน
+
+\subsubsection{ขั้นที่ 8: ลบ file และคืนค่าระบบให้เหมือนเดิม}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s08_cleanup.png}
+\caption{ลบบรรทัดใน \code{/etc/fstab} และลบ file ทิ้ง ระบบกลับสู่สภาพก่อนการทดลอง}
+\end{figure}
+
+เมื่อ swap file ถูกปิดการใช้งานแล้วจึงลบ file ทิ้งได้อย่างปลอดภัยด้วย \code{sudo rm /swapfile} พร้อมกับลบบรรทัดที่เพิ่มไว้ใน \code{/etc/fstab} ออก ภาพแสดงว่า \code{/etc/fstab} เหลือเพียงบรรทัดคอมเมนต์เดิม และ \code{ls} รายงาน \code{No such file or directory} ซึ่งยืนยันว่า file ถูกลบจริง ส่วน \code{Swap} total คือ 4.0Gi เท่ากับตอนเริ่มต้นการทดลองทุกประการ
+
+\textbf{ลำดับที่ห้ามสลับ:} ต้องสั่ง \code{swapoff} ก่อนลบ file เสมอ หากลบ file ทิ้งขณะที่ swap ยังเปิดใช้งานอยู่ kernel จะยังอ้างถึงพื้นที่นั้นต่อไปจนกว่าจะ reboot และอาจทำให้ระบบไม่เสถียร
+
+\subsubsection{การปรับพฤติกรรมการใช้ swap ด้วย vm.swappiness}
+
+การเพิ่มหรือลดขนาด swap เป็นการเปลี่ยน \textit{ปริมาณ} ที่มีให้ใช้ ส่วนการปรับ \code{vm.swappiness} เป็นการเปลี่ยน \textit{ความเต็มใจ} ของ kernel ที่จะใช้ swap ซึ่งมักต้องทำควบคู่กัน
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s09_swappiness.png}
+\caption{ปรับ \code{vm.swappiness} จาก 60 เป็น 10 แล้วตั้งกลับเป็น 60}
+\end{figure}
+
+ค่าเริ่มต้นของระบบคือ 60 เมื่อสั่ง \code{sudo sysctl vm.swappiness=10} ค่าใน \code{/proc/sys/vm/swappiness} เปลี่ยนเป็น 10 ทันทีโดยไม่ต้อง reboot ค่าที่ต่ำลงหมายความว่า kernel จะพยายามเรียกคืน page cache ก่อนและหลีกเลี่ยงการย้าย anonymous page ลง swap ส่วนค่าที่สูงขึ้นหมายถึงยอมใช้ swap ได้ง่ายขึ้น การทดลองจบลงด้วยการตั้งค่ากลับเป็น 60 เพื่อคืนสภาพระบบ
+
+ค่าที่ตั้งด้วย \code{sysctl} จะหายไปเมื่อ reboot หากต้องการให้ถาวรต้องเพิ่มบรรทัด \code{vm.swappiness=10} ลงใน \code{/etc/sysctl.conf} หรือสร้าง file ใหม่ใน \code{/etc/sysctl.d/}
+
+\subsubsection{สรุปคำสั่งทั้งหมดของข้อ 1.2}
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปคำสั่งสำหรับเพิ่มและลด swap space บน Linux}
+\begin{tabular}{@{}p{2.2cm}p{6.6cm}p{6.8cm}@{}}
+\toprule
+\textbf{เป้าหมาย} & \textbf{คำสั่ง} & \textbf{หน้าที่} \\
+\midrule
+เพิ่ม swap & \code{sudo fallocate -l 2G /swapfile} & จองพื้นที่บน disk ขนาด 2 GiB \\
+ & \code{sudo chmod 600 /swapfile} & ปิดสิทธิ์ให้เหลือเฉพาะ root \\
+ & \code{sudo mkswap /swapfile} & เขียน header ของ swap area และกำหนด UUID \\
+ & \code{sudo swapon /swapfile} & สั่งให้ kernel เริ่มใช้งาน swap area นี้ \\
+ & \code{echo ... | sudo tee -a /etc/fstab} & ทำให้กลับมาเองหลัง reboot (ดูข้อจำกัดบน WSL2) \\
+\midrule
+ลด swap & \code{sudo swapoff /swapfile} & ย้าย page กลับเข้า RAM แล้วถอด swap area ออก \\
+ & \code{sudo rm /swapfile} & ลบ file ทิ้งหลังปิดการใช้งานแล้วเท่านั้น \\
+ & แก้ \code{/etc/fstab} & ลบบรรทัดที่เพิ่มไว้ออก \\
+\midrule
+ตรวจสอบ & \code{free -h}, \code{swapon --show}, \code{cat /proc/swaps} & ดูขนาดและสถานะการใช้งานของ swap \\
+\midrule
+ปรับพฤติกรรม & \code{sudo sysctl vm.swappiness=10} & เปลี่ยนแนวโน้มที่ kernel จะใช้ swap \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{ข้อ 2: การเฝ้าดู Virtual Memory บน Linux}
+% =====================================================================
+
+ข้อนี้ใช้เครื่องมือสองตัวจาก package \code{procps-ng} คือ \code{free} ซึ่งรายงาน \textit{สถานะ ณ ขณะนั้น} ของหน่วยความจำ และ \code{vmstat} ซึ่งรายงาน \textit{อัตราการเคลื่อนไหว} ของระบบ ทั้งสองคำสั่งอ่านข้อมูลมาจาก \code{/proc} ที่ kernel เปิดให้เหมือนกัน แต่จัดรูปแบบและตีความต่างกัน
+
+\subsection{การรัน \code{free} และผลลัพธ์ที่ได้}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s10_free_plain.png}
+\caption{\code{free} แบบไม่ใส่ argument ใด ๆ ค่าทั้งหมดมีหน่วยเป็น KiB}
+\end{figure}
+
+เมื่อรัน \code{free} เปล่า ๆ ผลลัพธ์เป็นตัวเลขดิบที่มีหน่วยเป็น KiB (1024 bytes) ซึ่งอ่านยากเมื่อค่ามีหลักมาก จึงนิยมเติม \code{-h} เพื่อให้แปลงหน่วยให้อัตโนมัติ
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s11_free_h.png}
+\caption{\code{free -h} แสดงข้อมูลชุดเดียวกันในหน่วยที่อ่านง่าย}
+\end{figure}
+
+\subsubsection{ความหมายของทุกฟิลด์ที่คำสั่งนี้แสดง}
+
+ผลลัพธ์ประกอบด้วยสองแถวคือ \code{Mem:} สำหรับหน่วยความจำหลัก และ \code{Swap:} สำหรับพื้นที่ swap โดยมีคอลัมน์ดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของทุกคอลัมน์ในผลลัพธ์ของคำสั่ง \code{free}}
+\begin{tabular}{@{}p{2.3cm}p{13.8cm}@{}}
+\toprule
+\textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{total} & ขนาดทั้งหมดที่ระบบปฏิบัติการมองเห็นและใช้งานได้ อ่านมาจาก \code{MemTotal} และ \code{SwapTotal} ใน \code{/proc/meminfo} ค่านี้น้อยกว่า RAM ที่ติดตั้งจริงเล็กน้อยเพราะ firmware และ kernel กันบางส่วนไว้ตั้งแต่ตอนบูต \\
+\code{used} & หน่วยความจำที่ถูกใช้งานจริงโดย process ต่าง ๆ คำนวณจาก \code{total} ลบด้วย \code{free} และ \code{buff/cache} จึงเป็นตัวเลขที่บอกภาระจริงของระบบ \\
+\code{free} & หน่วยความจำที่ยังไม่ถูกแตะต้องเลย ไม่ได้แปลว่าเป็นหน่วยความจำที่เหลือให้ใช้ทั้งหมด เพราะส่วนที่เป็น cache ก็ขอคืนได้เช่นกัน \\
+\code{shared} & หน่วยความจำที่ถูกแบ่งใช้ร่วมกันระหว่าง process ส่วนใหญ่คือ \code{tmpfs} และ shared memory segment \\
+\code{buff/cache} & ผลรวมของ buffer (ข้อมูล metadata ของ block device) กับ page cache (เนื้อหาของ file ที่เคยอ่านเขียน) หน่วยความจำส่วนนี้ kernel ยืมไปใช้เร่งความเร็ว และคืนให้ process ได้ทันทีที่ต้องการ \\
+\code{available} & ค่าประมาณของหน่วยความจำที่ process ใหม่ขอใช้ได้จริงโดยระบบไม่ต้องเริ่ม swap เท่ากับ \code{free} บวกกับส่วนของ \code{buff/cache} ที่เรียกคืนได้ ค่านี้คือค่าที่ควรดูเวลาประเมินว่าเครื่องยังมีหน่วยความจำเหลือหรือไม่ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+สำหรับแถว \code{Swap:} มีเพียงสามคอลัมน์แรกที่มีความหมาย คือขนาดรวม ส่วนที่ถูกใช้ไป และส่วนที่ยังว่าง ส่วนคอลัมน์ที่เหลือเว้นว่างไว้เพราะไม่มีแนวคิดเรื่อง cache หรือ available สำหรับ swap
+
+\textbf{ข้อสังเกตเพิ่มเติม} \code{free} รุ่นเก่า (procps ก่อนรุ่น 3.3.10) เคยมีบรรทัด \code{-/+ buffers/cache} เพิ่มมาอีกหนึ่งบรรทัดเพื่อบอกว่าถ้าไม่นับ cache แล้วจะเหลือหน่วยความจำเท่าไร ปัจจุบันบรรทัดนั้นถูกตัดออกและแทนที่ด้วยคอลัมน์ \code{available} ซึ่งแม่นยำกว่า เพราะ kernel เป็นผู้คำนวณให้เองว่าส่วนใดของ cache เรียกคืนได้จริง
+
+\subsubsection{สรุปตัวเลขทั้งหมดที่คำสั่ง \code{free} รายงาน}
+
+จากภาพผลการรัน ระบบรายงานว่าหน่วยความจำหลักมีทั้งหมด 16{,}093{,}844 KiB ซึ่งเท่ากับ 15 GiB เมื่อแสดงด้วย \code{-h} ในจำนวนนี้ถูกใช้งานจริงโดย process ต่าง ๆ 625{,}124 KiB หรือประมาณ 610 MiB ยังไม่ถูกแตะต้องเลย 15{,}483{,}812 KiB หรือประมาณ 14 GiB เป็นหน่วยความจำที่แบ่งใช้ร่วมกัน 3{,}652 KiB หรือ 3.6 MiB และถูก kernel ยืมไปทำ buffer กับ page cache อีก 192{,}696 KiB หรือ 188 MiB ส่วนค่า \code{available} ซึ่งเป็นตัวเลขที่สำคัญที่สุดในการประเมินสภาพเครื่องอยู่ที่ 15{,}468{,}720 KiB หรือประมาณ 14 GiB กล่าวคือระบบยังมีหน่วยความจำให้ใช้อีกราว 96\% ของทั้งหมด สำหรับ swap มีขนาดรวม 4{,}194{,}304 KiB หรือ 4.0 GiB ถูกใช้ไป 0 KiB และว่างทั้งหมด 4{,}194{,}304 KiB การที่ \code{used} ของ swap เป็นศูนย์ในขณะที่หน่วยความจำหลักเหลือถึง 14 GiB เป็นภาพของระบบที่ยังไม่มีแรงกดดันด้านหน่วยความจำเลยแม้แต่น้อย kernel จึงไม่จำเป็นต้องย้าย page ใดลง swap
+
+\subsection{argument ที่น่าสนใจของ \code{free}}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s12_free_help.png}
+\caption{\code{free --help} แสดง option ทั้งหมดที่มีให้เลือกใช้}
+\end{figure}
+
+จากรายการทั้งหมด รายงานนี้เลือกมาสองชุดที่ใช้งานได้จริงในสถานการณ์ต่างกัน
+
+\subsubsection{argument ที่ 1: \code{-w} ร่วมกับ \code{-t}}
+
+\textbf{หน้าที่} \code{-w} (wide) สั่งให้แยกคอลัมน์ \code{buff/cache} ที่ปกติรวมกันออกเป็นสองคอลัมน์คือ \code{buffers} กับ \code{cache} ส่วน \code{-t} (total) เพิ่มแถว \code{Total:} ที่รวมหน่วยความจำหลักกับ swap เข้าด้วยกัน การใช้สองตัวนี้พร้อมกันทำให้เห็นทั้งรายละเอียดที่ละเอียดขึ้นและภาพรวมในคำสั่งเดียว
+
+\begin{lstlisting}[style=terminal,caption={เปรียบเทียบผลของ free แบบปกติกับแบบ -w -t}]
+free -h
+free -h -w -t
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s13_free_wide_total.png}
+\caption{\code{-w} แยก \code{buffers} ออกจาก \code{cache} และ \code{-t} เพิ่มแถวผลรวม}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} สองแถวบนคือผลของ \code{free -h} ตามปกติ ซึ่งรายงาน \code{buff/cache} รวมกันเป็น 188 MiB ส่วนสามแถวล่างคือผลของ \code{free -h -w -t} ที่แยกให้เห็นว่าในจำนวนนั้นเป็น \code{buffers} เพียง 4.7 MiB และเป็น \code{cache} ถึง 183 MiB ซึ่งบอกได้ว่าหน่วยความจำที่ kernel ยืมไปเกือบทั้งหมดเป็น page cache ของ file ไม่ใช่ metadata ของ block device แถวสุดท้าย \code{Total:} แสดงผลรวมของหน่วยความจำหลักกับ swap คือ 19 GiB โดยใช้ไป 610 MiB และเหลือ 18 GiB ซึ่งเป็นมุมมองที่มีประโยชน์เมื่อต้องการรู้ว่าระบบมีพื้นที่เก็บ page ได้ทั้งหมดเท่าไรเมื่อนับ swap ด้วย
+
+\subsubsection{argument ที่ 2: \code{-s} ร่วมกับ \code{-c}}
+
+\textbf{หน้าที่} \code{-s N} สั่งให้พิมพ์ผลซ้ำทุก N วินาที และ \code{-c N} กำหนดจำนวนรอบแล้วหยุดเอง เมื่อใช้คู่กันจะได้เครื่องมือเฝ้าดูหน่วยความจำแบบสั้น ๆ โดยไม่ต้องเปิด \code{top} หรือกด \code{Ctrl+C} เอง เหมาะกับการดูว่าหน่วยความจำเปลี่ยนแปลงอย่างไรระหว่างที่ program กำลังทำงาน
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s14_free_seconds_count.png}
+\caption{\code{free -h -s 2 -c 3} พิมพ์ผลสามรอบ ห่างกันรอบละ 2 วินาที แล้วจบการทำงาน}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} ตารางถูกพิมพ์ซ้ำสามครั้งตามที่กำหนดด้วย \code{-c 3} โดยเว้นระยะครั้งละ 2 วินาทีตาม \code{-s 2} แล้วคำสั่งจบเอง เมื่อเทียบตัวเลขระหว่างรอบจะเห็นว่า \code{used} ขยับจาก 609 MiB เป็น 609 MiB และ 610 MiB ตามลำดับ ส่วนค่าอื่นแทบไม่เปลี่ยน ซึ่งสะท้อนว่าเครื่องอยู่ในสภาวะว่างงาน หากนำคำสั่งนี้ไปรันระหว่างที่ program ใช้หน่วยความจำหนัก จะเห็น \code{used} ไต่ขึ้นและ \code{available} ลดลงอย่างชัดเจนในแต่ละรอบ
+
+\subsection{การติดตั้งและรัน \code{vmstat}}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s15_vmstat_installed.png}
+\caption{ตรวจสอบว่ามี \code{vmstat} อยู่แล้ว โดยมาจาก package \code{procps}}
+\end{figure}
+
+ใบงานระบุว่าหากไม่มี \code{vmstat} ให้ติดตั้งก่อน จึงตรวจสอบด้วย \code{which vmstat} ซึ่งตอบว่าอยู่ที่ \code{/usr/bin/vmstat} และ \code{dpkg -l procps} ยืนยันว่า package \code{procps} version \code{2:4.0.4-4ubuntu3.2} ถูกติดตั้งสมบูรณ์แล้ว (สถานะ \code{ii}) ส่วนตัวโปรแกรมรายงานตัวเองว่าเป็น \code{vmstat from procps-ng 4.0.4} หากเป็นเครื่องที่ยังไม่มี ติดตั้งได้ด้วยคำสั่ง
+
+\begin{lstlisting}[style=terminal,caption={คำสั่งติดตั้ง vmstat บน Ubuntu หรือ Debian}]
+sudo apt update
+sudo apt install -y procps
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s16_vmstat_plain.png}
+\caption{\code{vmstat} แบบไม่ใส่ argument ให้ข้อมูลหนึ่งแถวซึ่งเป็นค่าเฉลี่ยตั้งแต่บูตเครื่อง}
+\end{figure}
+
+\subsubsection{ความหมายของทุกคอลัมน์ที่คำสั่งนี้แสดง}
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของทุกคอลัมน์ในผลลัพธ์ของคำสั่ง \code{vmstat}}
+\begin{tabular}{@{}p{1.5cm}p{2.0cm}p{12.1cm}@{}}
+\toprule
+\textbf{กลุ่ม} & \textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{procs} & \code{r} & จำนวน process ที่พร้อมทำงานและกำลังรอคิว CPU ถ้าค่านี้สูงกว่าจำนวน core เป็นเวลานานแปลว่า CPU เป็นคอขวด \\
+ & \code{b} & จำนวน process ที่ติดอยู่ในสถานะ uninterruptible sleep ซึ่งเกือบทั้งหมดคือการรอ disk \\
+\midrule
+\code{memory} & \code{swpd} & ปริมาณหน่วยความจำที่ถูกย้ายไปอยู่บน swap แล้ว \\
+ & \code{free} & หน่วยความจำที่ยังว่างอยู่ \\
+ & \code{buff} & หน่วยความจำที่ใช้เป็น buffer สำหรับ metadata ของ block device \\
+ & \code{cache} & หน่วยความจำที่ใช้เป็น page cache ของ file \\
+\midrule
+\code{swap} & \code{si} & อัตราการอ่าน page กลับจาก swap เข้าหน่วยความจำ (swap in) หน่วยเป็น KiB ต่อวินาที \\
+ & \code{so} & อัตราการเขียน page จากหน่วยความจำลง swap (swap out) ถ้าสองค่านี้สูงต่อเนื่องคืออาการ thrashing \\
+\midrule
+\code{io} & \code{bi} & จำนวน block ที่อ่านเข้ามาจาก block device ต่อวินาที \\
+ & \code{bo} & จำนวน block ที่เขียนออกไปยัง block device ต่อวินาที \\
+\midrule
+\code{system} & \code{in} & จำนวน interrupt ต่อวินาที รวม interrupt ของ timer ด้วย \\
+ & \code{cs} & จำนวนครั้งของการสลับ context ต่อวินาที \\
+\midrule
+\code{cpu} & \code{us} & เปอร์เซ็นต์เวลาที่ CPU ใช้กับ code ใน user space \\
+ & \code{sy} & เปอร์เซ็นต์เวลาที่ CPU ใช้กับ code ของ kernel \\
+ & \code{id} & เปอร์เซ็นต์เวลาที่ CPU ว่าง \\
+ & \code{wa} & เปอร์เซ็นต์เวลาที่ CPU ว่างเพราะติดรอ I/O ค่านี้สูงแปลว่า disk เป็นคอขวด \\
+ & \code{st} & เปอร์เซ็นต์เวลาที่ถูก hypervisor ยืมไปให้ virtual machine อื่น \\
+ & \code{gu} & เปอร์เซ็นต์เวลาที่ใช้รัน guest virtual machine (มีใน procps-ng รุ่นใหม่) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ข้อควรระวังที่สำคัญที่สุดของ \code{vmstat}} แถวแรกที่พิมพ์ออกมาเสมอ \textbf{ไม่ใช่ค่าขณะนั้น} แต่เป็นค่าเฉลี่ยสะสมตั้งแต่บูตเครื่อง หากต้องการค่าที่เป็นปัจจุบันจริงต้องสั่งให้เก็บตัวอย่างเป็นช่วง เช่น \code{vmstat 1 5} แล้วดูตั้งแต่แถวที่สองเป็นต้นไป
+
+\subsubsection{สรุปตัวเลขทั้งหมดที่คำสั่ง \code{vmstat} รายงาน}
+
+จากภาพผลการรัน กลุ่ม \code{procs} รายงานว่ามี process ที่พร้อมทำงาน 1 ตัว ซึ่งก็คือตัว \code{vmstat} เอง และไม่มี process ใดติดรอ disk เลย (\code{b} เท่ากับ 0) กลุ่ม \code{memory} แสดงว่ายังไม่มีข้อมูลใดถูกย้ายลง swap (\code{swpd} เท่ากับ 0) มีหน่วยความจำว่าง 15{,}071{,}048 KiB ใช้เป็น buffer 8{,}524 KiB และใช้เป็น page cache 591{,}736 KiB กลุ่ม \code{swap} เป็นศูนย์ทั้ง \code{si} และ \code{so} ยืนยันอีกครั้งว่าไม่มีการสลับ page กับ disk เกิดขึ้นเลยนับตั้งแต่บูต กลุ่ม \code{io} รายงานค่าเฉลี่ยการอ่าน 419 block ต่อวินาทีและการเขียน 271 block ต่อวินาที ซึ่งเป็นภาระ I/O ของช่วงที่ระบบบูตและเปิด program เป็นหลัก กลุ่ม \code{system} รายงาน interrupt เฉลี่ย 206 ครั้งต่อวินาที ส่วนกลุ่ม \code{cpu} ชี้ว่าเครื่องแทบไม่ได้ทำงานเลย คือ \code{us}, \code{sy}, \code{wa}, \code{st} และ \code{gu} เป็นศูนย์ทั้งหมด ขณะที่ \code{id} เท่ากับ 100 เปอร์เซ็นต์ ภาพรวมทั้งหมดคือระบบที่มีหน่วยความจำเหลือเฟือ ไม่มีแรงกดดันให้ต้องใช้ swap และ CPU อยู่ในสภาวะว่าง
+
+\textbf{สิ่งที่สังเกตพบระหว่างการทดลอง} คอลัมน์ \code{cs} ในแถวแรกรายงานค่าเป็น 0 ทั้งที่ระบบต้องมีการสลับ context เกิดขึ้นแน่นอน เมื่อตรวจสอบเพิ่มเติมพบว่าคำสั่ง \code{vmstat -s} รายงานตัวนับสะสมว่ามีการสลับ context ไปแล้ว 261{,}886 ครั้ง และเมื่อสั่ง \code{vmstat -S M 1 5} เพื่อเก็บตัวอย่างเป็นช่วง แถวที่สองเป็นต้นไปก็รายงาน \code{cs} เป็น 100, 26, 90 และ 51 ตามปกติ สรุปได้ว่าค่า 0 นี้เกิดขึ้นเฉพาะกับแถวค่าเฉลี่ยตั้งแต่บูตบนสภาพแวดล้อม WSL2 เท่านั้น ส่วนคอลัมน์ \code{in} ในแถวเดียวกันกลับคำนวณได้ถูกต้อง (206 ครั้งต่อวินาที ซึ่งสอดคล้องกับตัวนับ \code{interrupts} ที่ 367{,}047 ครั้ง) ดังนั้นเมื่อต้องอ่านค่า \code{cs} จริง ควรใช้ค่าจากแถวที่เก็บตัวอย่างเป็นช่วงเสมอ
+
+\subsection{argument ที่น่าสนใจของ \code{vmstat}}
+
+\subsubsection{argument ที่ 1: \code{-S M} ร่วมกับการระบุ interval และ count}
+
+\textbf{หน้าที่} \code{-S} ใช้เปลี่ยนหน่วยของคอลัมน์ในกลุ่ม \code{memory} และ \code{swap} โดย \code{M} หมายถึงเมกะไบต์ (ยังเลือก \code{k}, \code{K}, \code{m} ได้ด้วย) ส่วนตัวเลขสองตัวที่ตามหลังคำสั่งคือ interval และ count ตามลำดับ เมื่อรวมกันจึงได้คำสั่งที่เก็บตัวอย่างสภาพระบบเป็นช่วงเวลาในหน่วยที่อ่านง่าย
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s17_vmstat_mb_interval.png}
+\caption{\code{vmstat -S M 1 5} เก็บตัวอย่างทุก 1 วินาที จำนวน 5 รอบ ในหน่วย MB}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} ตัวเลขในกลุ่ม \code{memory} เปลี่ยนจากหลักล้าน KiB มาเป็น 15{,}170 MB สำหรับ \code{free}, 1 MB สำหรับ \code{buff} และ 132 MB สำหรับ \code{cache} ซึ่งอ่านเทียบกับขนาดหน่วยความจำจริงได้ง่ายกว่ามาก แถวแรกยังคงเป็นค่าเฉลี่ยตั้งแต่บูต (\code{bi} 369, \code{bo} 239, \code{in} 190) ส่วนแถวที่สองถึงแถวที่ห้าคือค่าจริงของแต่ละวินาที ซึ่งเห็นชัดว่า \code{bi} และ \code{bo} กลายเป็น 0 เกือบทั้งหมดเพราะไม่มีการอ่านเขียน disk จริงในช่วงนั้น ขณะที่ \code{in} และ \code{cs} แกว่งอยู่ในช่วง 36--101 และ 26--100 ตามจังหวะการทำงานเบื้องหลังของระบบ นี่คือรูปแบบการใช้งานที่ถูกต้องของ \code{vmstat} คือดูแนวโน้มจากหลายแถว ไม่ใช่ตัดสินจากแถวเดียว
+
+\subsubsection{argument ที่ 2: \code{-s} ร่วมกับ \code{-S M}}
+
+\textbf{หน้าที่} \code{-s} (stats) เปลี่ยนรูปแบบการแสดงผลจากตารางเป็นรายการตัวนับสะสมตั้งแต่บูตเครื่องประมาณ 28 บรรทัด ครอบคลุมทั้งข้อมูลหน่วยความจำ ข้อมูล CPU ticks และเหตุการณ์ของ virtual memory ที่ตารางปกติไม่ได้แสดง เหมาะกับการตรวจย้อนหลังว่าตั้งแต่เปิดเครื่องมาระบบเคยเจอแรงกดดันด้านหน่วยความจำหรือไม่
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{../result/screenshots/s18_vmstat_stats.png}
+\caption{\code{vmstat -s -S M} แสดงตัวนับสะสมทั้งหมดตั้งแต่บูตเครื่อง}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} กลุ่มแรกเป็นข้อมูลหน่วยความจำ ได้แก่ total memory 15{,}716 MB, used memory 599 MB, active memory 45 MB, inactive memory 112 MB, free memory 15{,}173 MB, buffer memory 1 MB และ swap cache 132 MB ตามด้วยข้อมูล swap คือ total swap 4{,}096 MB โดย used swap เป็น 0 และ free swap เต็มจำนวน
+
+กลุ่มที่สองเป็น CPU ticks สะสม ได้แก่ non-nice user 2{,}277, nice user 1{,}226, system 1{,}877, idle 4{,}371{,}529, IO-wait 554, IRQ 0, softirq 196, stolen 0 และ guest 0 ทั้งสองแบบ สัดส่วนของ idle ที่มากกว่าค่าอื่นหลายพันเท่ายืนยันว่าเครื่องอยู่ในสภาวะว่างมาตลอด
+
+กลุ่มสุดท้ายเป็นเหตุการณ์ของ virtual memory ซึ่งเป็นส่วนที่ตรงกับหัวข้อของปฏิบัติการนี้มากที่สุด ได้แก่ paged in 701{,}163 KiB และ paged out 454{,}116 KiB ซึ่งคือปริมาณข้อมูลที่ระบบอ่านเข้าและเขียนออกกับ disk ผ่านกลไก paging ตั้งแต่บูต ส่วน pages swapped in และ pages swapped out เป็น \textbf{0 ทั้งคู่} ซึ่งเป็นหลักฐานยืนยันว่าตั้งแต่เปิดเครื่องมาไม่เคยมี page ใดถูกย้ายลง swap เลยแม้แต่หน้าเดียว ปิดท้ายด้วย interrupts 367{,}047 ครั้ง, CPU context switches 261{,}886 ครั้ง, boot time 1{,}789{,}916{,}206 (เวลาที่บูตในรูปแบบ Unix timestamp) และ forks 3{,}279 ครั้ง
+
+\textbf{ความแตกต่างระหว่าง paging กับ swapping ที่เห็นได้จากตัวเลขชุดนี้} ตัวเลข paged in และ paged out ที่สูงในขณะที่ pages swapped in และ out เป็นศูนย์ อธิบายได้ว่าการย้ายข้อมูลเกือบทั้งหมดเป็นการอ่าน file เข้ามาใน page cache และเขียนกลับลง file system ตามปกติ ไม่ใช่การนำ anonymous page ไปพักไว้บน swap เพราะหน่วยความจำยังเหลือเฟือ ซึ่งสอดคล้องกับค่าของ \code{free} และ \code{vmstat} ทุกภาพก่อนหน้านี้
+
+\subsection{ความสอดคล้องระหว่างตัวเลขของ \code{free} และ \code{vmstat}}
+
+เนื่องจากทั้งสองคำสั่งอ่านข้อมูลมาจากแหล่งเดียวกัน ตัวเลขจึงต้องสอดคล้องกันเสมอเมื่อปรับหน่วยให้ตรงกัน ตัวอย่างเช่น \code{free} รายงาน \code{total} เท่ากับ 16{,}093{,}844 KiB เมื่อหารด้วย 1024 จะได้ 15{,}716 MB ซึ่งตรงกับบรรทัด total memory ของ \code{vmstat -s -S M} พอดี และ \code{Swap} total 4{,}194{,}304 KiB ก็เท่ากับ 4{,}096 MB ตามที่ \code{vmstat -s} รายงานเช่นกัน ความต่างของตัวเลขในกลุ่ม \code{free} และ \code{cache} ระหว่างภาพแต่ละภาพเกิดจากการรันคนละช่วงเวลาเท่านั้น เพราะ page cache เปลี่ยนแปลงตลอดเวลาตามการอ่านเขียน file ของระบบ
+
+สรุปคือ \code{free} เหมาะกับการตอบคำถามว่า \textit{ตอนนี้หน่วยความจำเหลือเท่าไร} ส่วน \code{vmstat} เหมาะกับการตอบคำถามว่า \textit{ระบบกำลังทำงานหนักแค่ไหนและมีการสลับ page เกิดขึ้นหรือไม่} การใช้งานจริงจึงมักใช้ทั้งสองคำสั่งควบคู่กัน
+
+% =====================================================================
+\section{ข้อ 3: การเฝ้าดู Virtual Memory บน MS Windows}
+% =====================================================================
+
+ฝั่ง Windows ใช้เครื่องมือชื่อ Resource Monitor ซึ่งติดมากับระบบปฏิบัติการอยู่แล้ว เครื่องมือนี้แสดงข้อมูลหน่วยความจำได้ละเอียดกว่า Task Manager มาก โดยเฉพาะการแยกให้เห็นว่าหน่วยความจำที่ใช้ไปนั้นอยู่ในสถานะใดของระบบ
+
+\subsection{การเปิด Resource Monitor}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s19_resmon_command.png}
+\caption{เปิด Resource Monitor ด้วยคำสั่ง \code{resmon} ใน PowerShell}
+\end{figure}
+
+พิมพ์คำสั่ง \code{resmon} ใน PowerShell แล้วกด Enter ระบบจะเปิดหน้าต่าง Resource Monitor ขึ้นมา (เปิดผ่าน \code{perfmon /res} หรือกดปุ่ม Open Resource Monitor ที่แท็บ Performance ของ Task Manager ก็ได้ผลเหมือนกัน) จากนั้นเลือกแท็บ \textbf{Memory} ซึ่งเป็นแท็บที่รวมข้อมูลด้าน virtual memory ไว้ทั้งหมด
+
+\subsection{ข้อมูลที่แสดงในแท็บ Memory}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s20_resmon_memory_tab.png}
+\caption{แท็บ Memory ของ Resource Monitor ประกอบด้วยตาราง Processes แถบ Physical Memory และกราฟด้านขวา}
+\end{figure}
+
+หน้าจอนี้แบ่งออกเป็นสามส่วนที่ทำงานเสริมกัน
+
+\subsubsection{ส่วนที่ 1: ตาราง Processes}
+
+ตารางด้านบนไล่เรียง process ทุกตัวในระบบ เรียงจากตัวที่ใช้หน่วยความจำมากที่สุดลงมา แต่ละคอลัมน์มีความหมายดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของคอลัมน์ในตาราง Processes ของแท็บ Memory}
+\begin{tabular}{@{}p{3.4cm}p{12.6cm}@{}}
+\toprule
+\textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{Image} & ชื่อ file ที่ทำงานเป็น process นั้น \\
+\code{PID} & หมายเลขประจำตัวของ process \\
+\code{Hard Faults/sec} & จำนวน hard fault ต่อวินาที คือจำนวนครั้งที่ต้องไปอ่านข้อมูลกลับจาก disk เพราะ page ที่ต้องการไม่อยู่ใน RAM \textbf{ค่านี้คือตัวชี้วัดที่สำคัญที่สุดของหน้าจอนี้} ถ้าสูงต่อเนื่องแปลว่าหน่วยความจำไม่พอจริง \\
+\code{Commit (KB)} & ปริมาณ virtual memory ที่ระบบจองโควตาไว้ให้ process นี้ในบัญชี commit charge ไม่ว่าจะอยู่ใน RAM หรือถูกย้ายลง \code{pagefile.sys} แล้วก็ตาม \\
+\code{Working Set (KB)} & ปริมาณหน่วยความจำที่ process นี้ถือครองอยู่ใน RAM จริง ณ ขณะนั้น เทียบได้กับค่า RSS ของ Linux \\
+\code{Shareable (KB)} & ส่วนของ working set ที่แบ่งใช้ร่วมกับ process อื่นได้ เช่น code ของ DLL ที่หลาย program ใช้ร่วมกัน \\
+\code{Private (KB)} & ส่วนของ working set ที่เป็นของ process นี้เท่านั้น ใครมาใช้ร่วมไม่ได้ ค่านี้คือหน่วยความจำที่จะได้คืนจริงถ้าปิด process นั้น \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ความสัมพันธ์ที่ตรวจสอบได้จากตัวเลขในภาพคือ \code{Working Set} เท่ากับ \code{Shareable} บวก \code{Private} เสมอ เช่น \code{claude.exe} (PID 37740) มี working set 617{,}240 KB ซึ่งเท่ากับ shareable 94{,}400 KB บวก private 522{,}840 KB พอดี
+
+อีกแถวที่น่าสนใจเป็นพิเศษคือ \textbf{Memory Compression} (PID 5240) ซึ่งเป็น process ของระบบที่ทำหน้าที่เก็บ page ที่ถูกบีบอัดไว้ใน RAM ตามที่อธิบายไว้ในข้อ 1 จะเห็นว่ามี working set สูงถึง 1{,}058{,}116 KB (ราว 1 GB) และเป็น private ทั้งหมด แต่มี \code{Commit} เพียง 2{,}572 KB เพราะหน่วยความจำที่มันถือครองคือข้อมูลของ process อื่นที่ถูกบีบอัดเก็บไว้ ไม่ใช่หน่วยความจำที่ตัวมันเองขอจองมาใช้
+
+\subsubsection{ส่วนที่ 2: แถบ Physical Memory}
+
+แถบกราฟิกตรงกลางแบ่งหน่วยความจำจริงทั้งเครื่องออกเป็นห้าส่วนตามสถานะของ page ซึ่งตรงกับรายการ page ระดับระบบที่อธิบายไว้ในหัวข้อ 1.3
+
+\subsubsection{ส่วนที่ 3: กราฟด้านขวา}
+
+กราฟสามช่องทางขวาแสดงแนวโน้มย้อนหลัง 60 วินาที ได้แก่ \textbf{Used Physical Memory} (สัดส่วนหน่วยความจำจริงที่ถูกใช้ ซึ่งภาพนี้อยู่ที่ 44\%), \textbf{Commit Charge} (สัดส่วนของ commit charge เทียบกับ commit limit ซึ่งคือ RAM บวกขนาด \code{pagefile.sys}) และ \textbf{Hard Faults/sec} กราฟสองช่องแรกมีประโยชน์ต่างกันคือ ช่องแรกบอกว่า RAM เต็มหรือยัง ส่วนช่องที่สองบอกว่าระบบใกล้ชนเพดานการจองหรือยัง ซึ่งอาจชนได้แม้ RAM ยังเหลือ
+
+\subsection{สรุปตัวเลขทั้งหมดในส่วน Physical Memory}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s21_physical_memory.png}
+\caption{ส่วน Physical Memory ขยายให้เห็นตัวเลขทุกค่า}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของแต่ละส่วนในแถบ Physical Memory}
+\begin{tabular}{@{}p{3.4cm}p{2.0cm}p{10.3cm}@{}}
+\toprule
+\textbf{ส่วน} & \textbf{ค่าที่วัดได้} & \textbf{ความหมาย} \\
+\midrule
+Hardware Reserved & 556 MB & หน่วยความจำที่ firmware และ hardware กันไว้ใช้เอง ระบบปฏิบัติการนำไปใช้ไม่ได้ \\
+In Use & 14{,}386 MB & หน่วยความจำที่อยู่ใน working set ของ process, driver และ kernel จริง ณ ขณะนั้น \\
+Modified & 0 MB & page ที่ถูกแก้ไขแล้วและรอเขียนกลับลง disk ก่อนจึงจะนำไปใช้ใหม่ได้ \\
+Standby & 15{,}989 MB & page ที่ถูกตัดออกจาก working set แล้วแต่ยังเก็บเนื้อหาไว้ ทำหน้าที่เป็น cache ของทั้งระบบ ดึงกลับได้ด้วย soft fault \\
+Free & 1{,}837 MB & page ว่างที่พร้อมแจกจ่ายทันที \\
+\midrule
+Available & 17{,}826 MB & หน่วยความจำที่ process ใหม่ขอใช้ได้ทันที เท่ากับ Standby บวก Free \\
+Cached & 15{,}989 MB & หน่วยความจำที่ทำหน้าที่เป็น cache เท่ากับ Standby บวก Modified \\
+Total & 32{,}212 MB & หน่วยความจำที่ระบบปฏิบัติการใช้งานได้ คือ Installed ลบ Hardware Reserved \\
+Installed & 32{,}768 MB & ขนาด RAM ที่ติดตั้งจริงบนเครื่อง (32 GB) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ย่อหน้าสรุปตัวเลขทั้งหมด} เครื่องที่ใช้ทดลองติดตั้ง RAM ไว้ 32{,}768 MB หรือ 32 GB ในจำนวนนี้ถูก hardware กันไว้เป็น Hardware Reserved 556 MB เหลือให้ระบบปฏิบัติการใช้งานจริง 32{,}212 MB ตามที่บรรทัด Total รายงาน หน่วยความจำส่วนนี้ถูกแบ่งตามสถานะออกเป็นสี่ก้อน ได้แก่ In Use 14{,}386 MB ซึ่งเป็นส่วนที่ process และ kernel ถือครองอยู่จริง Modified 0 MB ซึ่งหมายความว่าไม่มี page ใดค้างรอเขียนกลับ disk เลยในขณะนั้น Standby 15{,}989 MB ซึ่งเป็นก้อนที่ใหญ่ที่สุดและทำหน้าที่เป็น cache ของทั้งระบบ และ Free 1{,}837 MB ที่ว่างพร้อมใช้งานทันที เมื่อรวมสี่ก้อนนี้เข้าด้วยกันจะได้ 32{,}212 MB เท่ากับค่า Total พอดี ส่วนค่าที่ระบบสรุปให้เพิ่มอีกสองค่าคือ Available 17{,}826 MB ซึ่งเท่ากับ Standby บวก Free และ Cached 15{,}989 MB ซึ่งเท่ากับ Standby บวก Modified ด้านบนของหน้าต่างยังรายงานสอดคล้องกันว่ามี 14{,}386 MB In Use และ 17{,}826 MB Available พร้อมกับตัวเลข 44\% Used Physical Memory ซึ่งตรวจสอบได้จาก 14{,}386 หารด้วย 32{,}212 เท่ากับ 44.7\% โดยประมาณ ภาพรวมทั้งหมดชี้ว่าเครื่องนี้ใช้หน่วยความจำไปไม่ถึงครึ่ง ยังมีหน่วยความจำพร้อมใช้อีกกว่า 17 GB และค่า Hard Faults/sec ของทุก process เป็นศูนย์ จึงไม่มีอาการขาดแคลนหน่วยความจำใด ๆ
+
+\textbf{จุดที่มักเข้าใจผิด} ค่า Free เพียง 1{,}837 MB อาจทำให้เข้าใจว่าเครื่องเหลือหน่วยความจำน้อย แต่ความจริงแล้วหน่วยความจำที่ขอใช้ได้คือ Available 17{,}826 MB เพราะ Standby ทั้งก้อนสามารถถูกยึดคืนไปให้ process ใหม่ได้ทันทีเมื่อจำเป็น แนวคิดนี้ตรงกับความสัมพันธ์ระหว่าง \code{free} กับ \code{available} ของคำสั่ง \code{free} บน Linux ที่อธิบายไว้ในข้อ 2 ทุกประการ
+
+\subsection{การเทียบศัพท์ระหว่าง Windows กับ Linux}
+
+เมื่อนำข้อมูลจากข้อ 2 และข้อ 3 มาวางเทียบกัน จะเห็นว่าทั้งสองระบบรายงานสิ่งเดียวกันด้วยชื่อที่ต่างกัน
+
+\begin{table}[H]
+\centering\small
+\caption{การเทียบศัพท์ของเครื่องมือ monitoring ระหว่าง Windows และ Linux}
+\begin{tabular}{@{}p{4.2cm}p{4.5cm}p{7.0cm}@{}}
+\toprule
+\textbf{Windows (Resource Monitor)} & \textbf{Linux (\code{free} / \code{vmstat})} & \textbf{สิ่งที่วัดเหมือนกัน} \\
+\midrule
+Working Set & RSS (\code{ps}), \code{used} & หน่วยความจำที่ถือครองอยู่ใน RAM จริง \\
+Private & \code{used} เฉพาะของ process & ส่วนที่ได้คืนแน่นอนเมื่อปิด process \\
+Shareable & shared library mapping & ส่วนที่ใช้ร่วมกับ process อื่น \\
+Standby + Modified (Cached) & \code{buff/cache} & หน่วยความจำที่ระบบยืมไปทำ cache \\
+Available & \code{available} & หน่วยความจำที่ขอใช้ได้จริงโดยไม่ต้อง swap \\
+Free & \code{free} & page ที่ยังไม่ถูกแตะต้องเลย \\
+Commit Charge / Commit Limit & \code{Committed\_AS} ใน \code{/proc/meminfo} & ปริมาณ virtual memory ที่ถูกจองไว้ \\
+Hard Faults/sec & \code{si} และ \code{so} ของ \code{vmstat} & การอ่านเขียน page กับ disk เพราะขาดหน่วยความจำ \\
+\code{pagefile.sys} & swap partition หรือ swap file & พื้นที่บน disk ที่ใช้พัก page \\
+Modified Page Writer & \code{kswapd} & ผู้ทำหน้าที่เขียน page กลับลง disk \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ข้อสังเกตที่เชื่อมสองฝั่งเข้าด้วยกัน} เครื่องที่ใช้ทดลองมี RAM 32 GB ตามที่ Resource Monitor รายงาน ขณะที่ Ubuntu บน WSL2 ในข้อ 2 มองเห็นหน่วยความจำเพียง 15 GiB (ราว 16 GB) เพราะ WSL2 ทำงานเป็น virtual machine ที่ได้รับส่วนแบ่งหน่วยความจำมาประมาณครึ่งหนึ่งของเครื่องตามค่าเริ่มต้น ตัวเลขทั้งสองฝั่งจึงไม่ขัดแย้งกัน แต่เป็นการมองหน่วยความจำคนละชั้นกัน คือฝั่ง Windows มองหน่วยความจำจริงของ hardware ส่วนฝั่ง Linux มองหน่วยความจำที่ virtual machine ได้รับมา
+
+% =====================================================================
+\section*{สรุปผลการทดลอง}
+\addcontentsline{toc}{section}{สรุปผลการทดลอง}
+% =====================================================================
+
+ปฏิบัติการนี้เริ่มจากการทำความเข้าใจว่า virtual memory คือกลไกที่ระบบปฏิบัติการใช้แยก address space ของแต่ละ process ออกจากกัน และใช้ paging ร่วมกับ backing store บน disk เพื่อให้ใช้หน่วยความจำได้มากกว่าขนาด RAM จริง แม้ Linux และ MS Windows จะตั้งอยู่บนหลักการและ hardware เดียวกัน แต่ต่างกันที่วิธีจัดการ คือ Linux มองหน่วยความจำเป็น pool กลางของทั้งระบบและเรียกคืนตาม LRU ขณะที่ Windows จัดสรรเป็น working set รายบ้านแล้วรวบ page ที่ตัดออกไว้ในรายการกลาง และต่างกันที่นโยบายการจองคือ Linux ยอมให้ overcommit แล้วใช้ OOM killer เป็นทางออกสุดท้าย ส่วน Windows กันโควตาด้วย commit charge ตั้งแต่ตอนจอง
+
+การทดลองเพิ่มและลด swap ด้วย swap file สำเร็จครบทุกขั้นตอน และยังทำให้พบข้อจำกัดที่ไม่ได้เขียนไว้ในคู่มือทั่วไป คือบน WSL2 ซึ่ง systemd ตรวจพบว่าตัวเองทำงานอยู่ใน container นั้น \code{systemd-fstab-generator} จะข้าม swap entry ใน \code{/etc/fstab} ทิ้งทั้งหมด การทำให้ swap ถาวรบน WSL2 จึงต้องใช้ \code{swapon -a} ผ่าน \code{/etc/wsl.conf} หรือกำหนดขนาด swap จากฝั่ง Windows ด้วย \code{.wslconfig} แทน
+
+ด้านเครื่องมือเฝ้าดู \code{free} ตอบคำถามว่าหน่วยความจำเหลือเท่าไรในขณะนั้น โดยมีค่า \code{available} เป็นตัวเลขที่ควรใช้ตัดสินใจมากกว่า \code{free} ส่วน \code{vmstat} ตอบคำถามว่าระบบกำลังเคลื่อนไหวอย่างไร โดยต้องระวังว่าแถวแรกเป็นค่าเฉลี่ยตั้งแต่บูต ไม่ใช่ค่าปัจจุบัน ฝั่ง Windows นั้น Resource Monitor ให้ข้อมูลระดับเดียวกันในรูปแบบกราฟิก และเมื่อเทียบศัพท์กันแล้วจะเห็นว่าทั้งสองระบบรายงานสิ่งเดียวกัน เช่น Standby ของ Windows ทำหน้าที่อย่างเดียวกับ \code{buff/cache} ของ Linux และค่า Available ของทั้งสองระบบมีความหมายตรงกันทุกประการ
+
+บทเรียนร่วมที่ได้จากทั้งสามข้อคือ \textbf{หน่วยความจำที่ดูเหมือนถูกใช้ไปไม่ได้หมายความว่าหายไป} ทั้ง Linux และ Windows ต่างยืมหน่วยความจำว่างไปทำ cache เพื่อเร่งความเร็วของระบบ และคืนให้ทันทีที่ process ต้องการ การอ่านค่าจากเครื่องมือ monitoring จึงต้องดูที่ค่า available หรือ Available เป็นหลัก ไม่ใช่ค่า free เพียงอย่างเดียว
+
+% =====================================================================
+\section*{เอกสารอ้างอิง}
+\addcontentsline{toc}{section}{เอกสารอ้างอิง}
+% =====================================================================
+
+\begin{enumerate}[leftmargin=*]
+  \item \code{man 1 free}, \code{man 8 vmstat}, \code{man 8 swapon}, \code{man 8 mkswap} และ \code{man 5 proc} จาก package \code{procps-ng 4.0.4} และ \code{util-linux} บน Ubuntu 24.04.1
+  \item The Linux Kernel Documentation, \textit{Memory Management} และ \textit{Documentation/admin-guide/sysctl/vm.rst} (คำอธิบาย \code{vm.swappiness} และ \code{vm.overcommit\_memory})
+  \item Russinovich, M., Solomon, D., Ionescu, A., Yosifovich, P., \textit{Windows Internals, Part 1}, 7th Edition, Microsoft Press (บท Memory Management: working set, VAD, PFN database, commit charge)
+  \item Microsoft Learn, \textit{Resource Monitor} และ \textit{Windows Subsystem for Linux: Advanced settings configuration} (\code{wsl.conf} และ \code{.wslconfig})
+  \item systemd documentation, \code{systemd-fstab-generator(8)} (เงื่อนไขการข้าม swap entry เมื่อทำงานใน container)
+\end{enumerate}
+
+\end{document}
