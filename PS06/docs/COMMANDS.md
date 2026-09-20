@@ -126,3 +126,104 @@ clear; cat /proc/sys/vm/swappiness; sudo sysctl vm.swappiness=10; cat /proc/sys/
 | s07 | `s07_swapoff.png` | ✔ |
 | s08 | `s08_cleanup.png` | ✔ |
 | s09 | `s09_swappiness.png` | ✔ |
+
+---
+
+## ข้อ 2 — Linux VM Monitoring ด้วย `free` และ `vmstat` (ภาพ s10–s18)
+
+### s10 — รัน `free` แบบไม่มี argument
+
+```bash
+clear; free
+```
+
+ต้องเห็น: ตารางสองแถว `Mem:` และ `Swap:` เป็นหน่วย KiB (ตัวเลขดิบ ไม่มีหน่วยกำกับ)
+
+### s11 — `free -h` เพื่อใช้อธิบายทุกฟิลด์
+
+```bash
+clear; free -h
+```
+
+ต้องเห็น: ตารางเดียวกันแต่อ่านง่าย มีหน่วย Gi / Mi กำกับ — ภาพนี้จะเป็นภาพอ้างอิงหลักของข้อ 2
+
+### s12 — ดู argument ทั้งหมดที่ `free` มี
+
+```bash
+clear; free --help
+```
+
+ต้องเห็น: รายการ option ทั้งหมด ถ้าล้นจอให้ย่อ font ด้วย `Ctrl` `-` ก่อนถ่าย แล้วค่อยขยายกลับ
+
+### s13 — argument ที่ 1 ของ `free`: `-w` กับ `-t`
+
+```bash
+clear; free -h; free -h -w -t
+```
+
+ต้องเห็น: ภาพเดียวเทียบกันให้ชัด แบบปกติมีคอลัมน์ `buff/cache` รวมกัน ส่วน `-w` แยกเป็น
+`buffers` กับ `cache` คนละคอลัมน์ และ `-t` เพิ่มแถว `Total:` ที่รวม Mem กับ Swap เข้าด้วยกัน
+
+### s14 — argument ที่ 2 ของ `free`: `-s` กับ `-c`
+
+```bash
+clear; free -h -s 2 -c 3
+```
+
+ต้องเห็น: ตารางพิมพ์ซ้ำ 3 รอบ ห่างกันรอบละ 2 วินาที (ใช้เฝ้าดูหน่วยความจำขณะรันงานหนัก)
+
+### s15 — ยืนยันว่ามี `vmstat` แล้วหรือต้องติดตั้ง
+
+```bash
+clear; which vmstat; dpkg -l procps | tail -3; vmstat --version
+```
+
+ต้องเห็น: path ของ `vmstat`, บรรทัด package `procps` สถานะ `ii` และเลข version
+(ถ้าเครื่องไหนไม่มี ให้ติดตั้งด้วย `sudo apt update && sudo apt install -y procps`)
+
+### s16 — รัน `vmstat` แบบไม่มี argument
+
+```bash
+clear; vmstat
+```
+
+ต้องเห็น: หัวตาราง 6 กลุ่ม (`procs`, `memory`, `swap`, `io`, `system`, `cpu`) กับข้อมูลหนึ่งแถว
+ซึ่งเป็นค่าเฉลี่ยสะสมตั้งแต่บูตเครื่อง — ภาพนี้ใช้อธิบายทุกคอลัมน์
+
+### s17 — argument ที่ 1 ของ `vmstat`: `-S M` กับการระบุ interval/count
+
+```bash
+clear; vmstat -S M 1 5
+```
+
+ต้องเห็น: 5 แถว เก็บตัวอย่างทุก 1 วินาที หน่วยเป็น MB แทน KB
+แถวแรกเป็นค่าเฉลี่ยตั้งแต่บูต แถวที่ 2 เป็นต้นไปคือค่าจริงของช่วงนั้น ๆ
+
+**ถ้าอยากให้คอลัมน์ `bi/bo` และ `cs` ขยับให้เห็นชัด (ไม่บังคับ):** เปิด terminal อีกหน้าต่าง
+พิมพ์ `dd if=/dev/zero of=~/bigfile bs=1M count=2048; sync` แล้วค่อยรันคำสั่ง s17 ในหน้าต่างเดิม
+เสร็จแล้วลบด้วย `rm ~/bigfile`
+
+### s18 — argument ที่ 2 ของ `vmstat`: `-s` ตารางสรุปตัวนับสะสม
+
+```bash
+clear; vmstat -s -S M
+```
+
+ต้องเห็น: รายการตัวนับประมาณ 30 บรรทัดตั้งแต่ total memory ถึง boot time
+**บรรทัดยาว ให้กด `Ctrl` `-` ย่อ font ก่อนถ่าย** เพื่อให้เห็นครบทุกบรรทัดในภาพเดียว
+
+---
+
+## ตารางเช็กลิสต์ภาพข้อ 2
+
+| ชื่อภาพ | ชื่อ file ที่จะเซฟ | สถานะ |
+|---|---|---|
+| s10 | `s10_free_plain.png` | ✔ |
+| s11 | `s11_free_h.png` | ✔ |
+| s12 | `s12_free_help.png` | ✔ |
+| s13 | `s13_free_wide_total.png` | ✔ |
+| s14 | `s14_free_seconds_count.png` | ✔ |
+| s15 | `s15_vmstat_installed.png` | ✔ |
+| s16 | `s16_vmstat_plain.png` | ✔ |
+| s17 | `s17_vmstat_mb_interval.png` | ✔ |
+| s18 | `s18_vmstat_stats.png` | ☐ |
