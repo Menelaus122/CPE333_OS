@@ -4,3 +4,8 @@ swap unit ให้ (systemctl list-units --type=swap ตอบ "0 loaded units 
 entry for /swapfile.  --> systemd มองว่า WSL2 เป็น container (systemd-detect-virt --container
 = wsl) จึงข้าม swap entry ทุกบรรทัดใน fstab ทางแก้บน WSL2 คือใช้ swapon -a เอง (อ่าน fstab
 ตรง ๆ ได้ปกติ) ผ่าน [boot] command ใน /etc/wsl.conf หรือกำหนด swap= ใน .wslconfig ฝั่ง Windows
+
+[2026-09-20 s16] vmstat แถวแรก (ค่าเฉลี่ยตั้งแต่บูต) รายงาน cs = 0 ทั้งที่ /proc/stat มี
+ctxt = 242592 และ uptime = 1703 s (ควรได้ราว 142 ครั้ง/วินาที) ส่วนคอลัมน์ in = 203 ตรงกับ
+intr = 346769 / 1703 พอดี ทดสอบ vmstat 1 3 แล้วแถวที่สองเป็นต้นไปรายงาน cs = 59, 85 ตามปกติ
+สรุป: ผิดเฉพาะแถวค่าเฉลี่ยตั้งแต่บูตบน WSL2 ให้ใช้ค่าจากแถวที่เก็บตัวอย่างเป็นช่วงแทน

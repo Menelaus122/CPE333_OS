@@ -419,3 +419,196 @@ swap = 8GB
 \bottomrule
 \end{tabular}
 \end{table}
+
+% =====================================================================
+\section{ข้อ 2: การเฝ้าดู Virtual Memory บน Linux}
+% =====================================================================
+
+ข้อนี้ใช้เครื่องมือสองตัวจาก package \code{procps-ng} คือ \code{free} ซึ่งรายงาน \textit{สถานะ ณ ขณะนั้น} ของหน่วยความจำ และ \code{vmstat} ซึ่งรายงาน \textit{อัตราการเคลื่อนไหว} ของระบบ ทั้งสองคำสั่งอ่านข้อมูลมาจาก \code{/proc} ที่ kernel เปิดให้เหมือนกัน แต่จัดรูปแบบและตีความต่างกัน
+
+\subsection{การรัน \code{free} และผลลัพธ์ที่ได้}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s10_free_plain.png}
+\caption{\code{free} แบบไม่ใส่ argument ใด ๆ ค่าทั้งหมดมีหน่วยเป็น KiB}
+\end{figure}
+
+เมื่อรัน \code{free} เปล่า ๆ ผลลัพธ์เป็นตัวเลขดิบที่มีหน่วยเป็น KiB (1024 bytes) ซึ่งอ่านยากเมื่อค่ามีหลักมาก จึงนิยมเติม \code{-h} เพื่อให้แปลงหน่วยให้อัตโนมัติ
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s11_free_h.png}
+\caption{\code{free -h} แสดงข้อมูลชุดเดียวกันในหน่วยที่อ่านง่าย}
+\end{figure}
+
+\subsubsection{ความหมายของทุกฟิลด์ที่คำสั่งนี้แสดง}
+
+ผลลัพธ์ประกอบด้วยสองแถวคือ \code{Mem:} สำหรับหน่วยความจำหลัก และ \code{Swap:} สำหรับพื้นที่ swap โดยมีคอลัมน์ดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของทุกคอลัมน์ในผลลัพธ์ของคำสั่ง \code{free}}
+\begin{tabular}{@{}p{2.3cm}p{13.8cm}@{}}
+\toprule
+\textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{total} & ขนาดทั้งหมดที่ระบบปฏิบัติการมองเห็นและใช้งานได้ อ่านมาจาก \code{MemTotal} และ \code{SwapTotal} ใน \code{/proc/meminfo} ค่านี้น้อยกว่า RAM ที่ติดตั้งจริงเล็กน้อยเพราะ firmware และ kernel กันบางส่วนไว้ตั้งแต่ตอนบูต \\
+\code{used} & หน่วยความจำที่ถูกใช้งานจริงโดย process ต่าง ๆ คำนวณจาก \code{total} ลบด้วย \code{free} และ \code{buff/cache} จึงเป็นตัวเลขที่บอกภาระจริงของระบบ \\
+\code{free} & หน่วยความจำที่ยังไม่ถูกแตะต้องเลย ไม่ได้แปลว่าเป็นหน่วยความจำที่เหลือให้ใช้ทั้งหมด เพราะส่วนที่เป็น cache ก็ขอคืนได้เช่นกัน \\
+\code{shared} & หน่วยความจำที่ถูกแบ่งใช้ร่วมกันระหว่าง process ส่วนใหญ่คือ \code{tmpfs} และ shared memory segment \\
+\code{buff/cache} & ผลรวมของ buffer (ข้อมูล metadata ของ block device) กับ page cache (เนื้อหาของ file ที่เคยอ่านเขียน) หน่วยความจำส่วนนี้ kernel ยืมไปใช้เร่งความเร็ว และคืนให้ process ได้ทันทีที่ต้องการ \\
+\code{available} & ค่าประมาณของหน่วยความจำที่ process ใหม่ขอใช้ได้จริงโดยระบบไม่ต้องเริ่ม swap เท่ากับ \code{free} บวกกับส่วนของ \code{buff/cache} ที่เรียกคืนได้ ค่านี้คือค่าที่ควรดูเวลาประเมินว่าเครื่องยังมีหน่วยความจำเหลือหรือไม่ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+สำหรับแถว \code{Swap:} มีเพียงสามคอลัมน์แรกที่มีความหมาย คือขนาดรวม ส่วนที่ถูกใช้ไป และส่วนที่ยังว่าง ส่วนคอลัมน์ที่เหลือเว้นว่างไว้เพราะไม่มีแนวคิดเรื่อง cache หรือ available สำหรับ swap
+
+\textbf{ข้อสังเกตเพิ่มเติม} \code{free} รุ่นเก่า (procps ก่อนรุ่น 3.3.10) เคยมีบรรทัด \code{-/+ buffers/cache} เพิ่มมาอีกหนึ่งบรรทัดเพื่อบอกว่าถ้าไม่นับ cache แล้วจะเหลือหน่วยความจำเท่าไร ปัจจุบันบรรทัดนั้นถูกตัดออกและแทนที่ด้วยคอลัมน์ \code{available} ซึ่งแม่นยำกว่า เพราะ kernel เป็นผู้คำนวณให้เองว่าส่วนใดของ cache เรียกคืนได้จริง
+
+\subsubsection{สรุปตัวเลขทั้งหมดที่คำสั่ง \code{free} รายงาน}
+
+จากภาพผลการรัน ระบบรายงานว่าหน่วยความจำหลักมีทั้งหมด 16{,}093{,}844 KiB ซึ่งเท่ากับ 15 GiB เมื่อแสดงด้วย \code{-h} ในจำนวนนี้ถูกใช้งานจริงโดย process ต่าง ๆ 625{,}124 KiB หรือประมาณ 610 MiB ยังไม่ถูกแตะต้องเลย 15{,}483{,}812 KiB หรือประมาณ 14 GiB เป็นหน่วยความจำที่แบ่งใช้ร่วมกัน 3{,}652 KiB หรือ 3.6 MiB และถูก kernel ยืมไปทำ buffer กับ page cache อีก 192{,}696 KiB หรือ 188 MiB ส่วนค่า \code{available} ซึ่งเป็นตัวเลขที่สำคัญที่สุดในการประเมินสภาพเครื่องอยู่ที่ 15{,}468{,}720 KiB หรือประมาณ 14 GiB กล่าวคือระบบยังมีหน่วยความจำให้ใช้อีกราว 96\% ของทั้งหมด สำหรับ swap มีขนาดรวม 4{,}194{,}304 KiB หรือ 4.0 GiB ถูกใช้ไป 0 KiB และว่างทั้งหมด 4{,}194{,}304 KiB การที่ \code{used} ของ swap เป็นศูนย์ในขณะที่หน่วยความจำหลักเหลือถึง 14 GiB เป็นภาพของระบบที่ยังไม่มีแรงกดดันด้านหน่วยความจำเลยแม้แต่น้อย kernel จึงไม่จำเป็นต้องย้าย page ใดลง swap
+
+\subsection{argument ที่น่าสนใจของ \code{free}}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s12_free_help.png}
+\caption{\code{free --help} แสดง option ทั้งหมดที่มีให้เลือกใช้}
+\end{figure}
+
+จากรายการทั้งหมด รายงานนี้เลือกมาสองชุดที่ใช้งานได้จริงในสถานการณ์ต่างกัน
+
+\subsubsection{argument ที่ 1: \code{-w} ร่วมกับ \code{-t}}
+
+\textbf{หน้าที่} \code{-w} (wide) สั่งให้แยกคอลัมน์ \code{buff/cache} ที่ปกติรวมกันออกเป็นสองคอลัมน์คือ \code{buffers} กับ \code{cache} ส่วน \code{-t} (total) เพิ่มแถว \code{Total:} ที่รวมหน่วยความจำหลักกับ swap เข้าด้วยกัน การใช้สองตัวนี้พร้อมกันทำให้เห็นทั้งรายละเอียดที่ละเอียดขึ้นและภาพรวมในคำสั่งเดียว
+
+\begin{lstlisting}[style=terminal,caption={เปรียบเทียบผลของ free แบบปกติกับแบบ -w -t}]
+free -h
+free -h -w -t
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s13_free_wide_total.png}
+\caption{\code{-w} แยก \code{buffers} ออกจาก \code{cache} และ \code{-t} เพิ่มแถวผลรวม}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} สองแถวบนคือผลของ \code{free -h} ตามปกติ ซึ่งรายงาน \code{buff/cache} รวมกันเป็น 188 MiB ส่วนสามแถวล่างคือผลของ \code{free -h -w -t} ที่แยกให้เห็นว่าในจำนวนนั้นเป็น \code{buffers} เพียง 4.7 MiB และเป็น \code{cache} ถึง 183 MiB ซึ่งบอกได้ว่าหน่วยความจำที่ kernel ยืมไปเกือบทั้งหมดเป็น page cache ของ file ไม่ใช่ metadata ของ block device แถวสุดท้าย \code{Total:} แสดงผลรวมของหน่วยความจำหลักกับ swap คือ 19 GiB โดยใช้ไป 610 MiB และเหลือ 18 GiB ซึ่งเป็นมุมมองที่มีประโยชน์เมื่อต้องการรู้ว่าระบบมีพื้นที่เก็บ page ได้ทั้งหมดเท่าไรเมื่อนับ swap ด้วย
+
+\subsubsection{argument ที่ 2: \code{-s} ร่วมกับ \code{-c}}
+
+\textbf{หน้าที่} \code{-s N} สั่งให้พิมพ์ผลซ้ำทุก N วินาที และ \code{-c N} กำหนดจำนวนรอบแล้วหยุดเอง เมื่อใช้คู่กันจะได้เครื่องมือเฝ้าดูหน่วยความจำแบบสั้น ๆ โดยไม่ต้องเปิด \code{top} หรือกด \code{Ctrl+C} เอง เหมาะกับการดูว่าหน่วยความจำเปลี่ยนแปลงอย่างไรระหว่างที่ program กำลังทำงาน
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s14_free_seconds_count.png}
+\caption{\code{free -h -s 2 -c 3} พิมพ์ผลสามรอบ ห่างกันรอบละ 2 วินาที แล้วจบการทำงาน}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} ตารางถูกพิมพ์ซ้ำสามครั้งตามที่กำหนดด้วย \code{-c 3} โดยเว้นระยะครั้งละ 2 วินาทีตาม \code{-s 2} แล้วคำสั่งจบเอง เมื่อเทียบตัวเลขระหว่างรอบจะเห็นว่า \code{used} ขยับจาก 609 MiB เป็น 609 MiB และ 610 MiB ตามลำดับ ส่วนค่าอื่นแทบไม่เปลี่ยน ซึ่งสะท้อนว่าเครื่องอยู่ในสภาวะว่างงาน หากนำคำสั่งนี้ไปรันระหว่างที่ program ใช้หน่วยความจำหนัก จะเห็น \code{used} ไต่ขึ้นและ \code{available} ลดลงอย่างชัดเจนในแต่ละรอบ
+
+\subsection{การติดตั้งและรัน \code{vmstat}}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s15_vmstat_installed.png}
+\caption{ตรวจสอบว่ามี \code{vmstat} อยู่แล้ว โดยมาจาก package \code{procps}}
+\end{figure}
+
+ใบงานระบุว่าหากไม่มี \code{vmstat} ให้ติดตั้งก่อน จึงตรวจสอบด้วย \code{which vmstat} ซึ่งตอบว่าอยู่ที่ \code{/usr/bin/vmstat} และ \code{dpkg -l procps} ยืนยันว่า package \code{procps} version \code{2:4.0.4-4ubuntu3.2} ถูกติดตั้งสมบูรณ์แล้ว (สถานะ \code{ii}) ส่วนตัวโปรแกรมรายงานตัวเองว่าเป็น \code{vmstat from procps-ng 4.0.4} หากเป็นเครื่องที่ยังไม่มี ติดตั้งได้ด้วยคำสั่ง
+
+\begin{lstlisting}[style=terminal,caption={คำสั่งติดตั้ง vmstat บน Ubuntu หรือ Debian}]
+sudo apt update
+sudo apt install -y procps
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s16_vmstat_plain.png}
+\caption{\code{vmstat} แบบไม่ใส่ argument ให้ข้อมูลหนึ่งแถวซึ่งเป็นค่าเฉลี่ยตั้งแต่บูตเครื่อง}
+\end{figure}
+
+\subsubsection{ความหมายของทุกคอลัมน์ที่คำสั่งนี้แสดง}
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของทุกคอลัมน์ในผลลัพธ์ของคำสั่ง \code{vmstat}}
+\begin{tabular}{@{}p{1.5cm}p{2.0cm}p{12.1cm}@{}}
+\toprule
+\textbf{กลุ่ม} & \textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{procs} & \code{r} & จำนวน process ที่พร้อมทำงานและกำลังรอคิว CPU ถ้าค่านี้สูงกว่าจำนวน core เป็นเวลานานแปลว่า CPU เป็นคอขวด \\
+ & \code{b} & จำนวน process ที่ติดอยู่ในสถานะ uninterruptible sleep ซึ่งเกือบทั้งหมดคือการรอ disk \\
+\midrule
+\code{memory} & \code{swpd} & ปริมาณหน่วยความจำที่ถูกย้ายไปอยู่บน swap แล้ว \\
+ & \code{free} & หน่วยความจำที่ยังว่างอยู่ \\
+ & \code{buff} & หน่วยความจำที่ใช้เป็น buffer สำหรับ metadata ของ block device \\
+ & \code{cache} & หน่วยความจำที่ใช้เป็น page cache ของ file \\
+\midrule
+\code{swap} & \code{si} & อัตราการอ่าน page กลับจาก swap เข้าหน่วยความจำ (swap in) หน่วยเป็น KiB ต่อวินาที \\
+ & \code{so} & อัตราการเขียน page จากหน่วยความจำลง swap (swap out) ถ้าสองค่านี้สูงต่อเนื่องคืออาการ thrashing \\
+\midrule
+\code{io} & \code{bi} & จำนวน block ที่อ่านเข้ามาจาก block device ต่อวินาที \\
+ & \code{bo} & จำนวน block ที่เขียนออกไปยัง block device ต่อวินาที \\
+\midrule
+\code{system} & \code{in} & จำนวน interrupt ต่อวินาที รวม interrupt ของ timer ด้วย \\
+ & \code{cs} & จำนวนครั้งของการสลับ context ต่อวินาที \\
+\midrule
+\code{cpu} & \code{us} & เปอร์เซ็นต์เวลาที่ CPU ใช้กับ code ใน user space \\
+ & \code{sy} & เปอร์เซ็นต์เวลาที่ CPU ใช้กับ code ของ kernel \\
+ & \code{id} & เปอร์เซ็นต์เวลาที่ CPU ว่าง \\
+ & \code{wa} & เปอร์เซ็นต์เวลาที่ CPU ว่างเพราะติดรอ I/O ค่านี้สูงแปลว่า disk เป็นคอขวด \\
+ & \code{st} & เปอร์เซ็นต์เวลาที่ถูก hypervisor ยืมไปให้ virtual machine อื่น \\
+ & \code{gu} & เปอร์เซ็นต์เวลาที่ใช้รัน guest virtual machine (มีใน procps-ng รุ่นใหม่) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ข้อควรระวังที่สำคัญที่สุดของ \code{vmstat}} แถวแรกที่พิมพ์ออกมาเสมอ \textbf{ไม่ใช่ค่าขณะนั้น} แต่เป็นค่าเฉลี่ยสะสมตั้งแต่บูตเครื่อง หากต้องการค่าที่เป็นปัจจุบันจริงต้องสั่งให้เก็บตัวอย่างเป็นช่วง เช่น \code{vmstat 1 5} แล้วดูตั้งแต่แถวที่สองเป็นต้นไป
+
+\subsubsection{สรุปตัวเลขทั้งหมดที่คำสั่ง \code{vmstat} รายงาน}
+
+จากภาพผลการรัน กลุ่ม \code{procs} รายงานว่ามี process ที่พร้อมทำงาน 1 ตัว ซึ่งก็คือตัว \code{vmstat} เอง และไม่มี process ใดติดรอ disk เลย (\code{b} เท่ากับ 0) กลุ่ม \code{memory} แสดงว่ายังไม่มีข้อมูลใดถูกย้ายลง swap (\code{swpd} เท่ากับ 0) มีหน่วยความจำว่าง 15{,}071{,}048 KiB ใช้เป็น buffer 8{,}524 KiB และใช้เป็น page cache 591{,}736 KiB กลุ่ม \code{swap} เป็นศูนย์ทั้ง \code{si} และ \code{so} ยืนยันอีกครั้งว่าไม่มีการสลับ page กับ disk เกิดขึ้นเลยนับตั้งแต่บูต กลุ่ม \code{io} รายงานค่าเฉลี่ยการอ่าน 419 block ต่อวินาทีและการเขียน 271 block ต่อวินาที ซึ่งเป็นภาระ I/O ของช่วงที่ระบบบูตและเปิด program เป็นหลัก กลุ่ม \code{system} รายงาน interrupt เฉลี่ย 206 ครั้งต่อวินาที ส่วนกลุ่ม \code{cpu} ชี้ว่าเครื่องแทบไม่ได้ทำงานเลย คือ \code{us}, \code{sy}, \code{wa}, \code{st} และ \code{gu} เป็นศูนย์ทั้งหมด ขณะที่ \code{id} เท่ากับ 100 เปอร์เซ็นต์ ภาพรวมทั้งหมดคือระบบที่มีหน่วยความจำเหลือเฟือ ไม่มีแรงกดดันให้ต้องใช้ swap และ CPU อยู่ในสภาวะว่าง
+
+\textbf{สิ่งที่สังเกตพบระหว่างการทดลอง} คอลัมน์ \code{cs} ในแถวแรกรายงานค่าเป็น 0 ทั้งที่ระบบต้องมีการสลับ context เกิดขึ้นแน่นอน เมื่อตรวจสอบเพิ่มเติมพบว่าคำสั่ง \code{vmstat -s} รายงานตัวนับสะสมว่ามีการสลับ context ไปแล้ว 261{,}886 ครั้ง และเมื่อสั่ง \code{vmstat -S M 1 5} เพื่อเก็บตัวอย่างเป็นช่วง แถวที่สองเป็นต้นไปก็รายงาน \code{cs} เป็น 100, 26, 90 และ 51 ตามปกติ สรุปได้ว่าค่า 0 นี้เกิดขึ้นเฉพาะกับแถวค่าเฉลี่ยตั้งแต่บูตบนสภาพแวดล้อม WSL2 เท่านั้น ส่วนคอลัมน์ \code{in} ในแถวเดียวกันกลับคำนวณได้ถูกต้อง (206 ครั้งต่อวินาที ซึ่งสอดคล้องกับตัวนับ \code{interrupts} ที่ 367{,}047 ครั้ง) ดังนั้นเมื่อต้องอ่านค่า \code{cs} จริง ควรใช้ค่าจากแถวที่เก็บตัวอย่างเป็นช่วงเสมอ
+
+\subsection{argument ที่น่าสนใจของ \code{vmstat}}
+
+\subsubsection{argument ที่ 1: \code{-S M} ร่วมกับการระบุ interval และ count}
+
+\textbf{หน้าที่} \code{-S} ใช้เปลี่ยนหน่วยของคอลัมน์ในกลุ่ม \code{memory} และ \code{swap} โดย \code{M} หมายถึงเมกะไบต์ (ยังเลือก \code{k}, \code{K}, \code{m} ได้ด้วย) ส่วนตัวเลขสองตัวที่ตามหลังคำสั่งคือ interval และ count ตามลำดับ เมื่อรวมกันจึงได้คำสั่งที่เก็บตัวอย่างสภาพระบบเป็นช่วงเวลาในหน่วยที่อ่านง่าย
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s17_vmstat_mb_interval.png}
+\caption{\code{vmstat -S M 1 5} เก็บตัวอย่างทุก 1 วินาที จำนวน 5 รอบ ในหน่วย MB}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} ตัวเลขในกลุ่ม \code{memory} เปลี่ยนจากหลักล้าน KiB มาเป็น 15{,}170 MB สำหรับ \code{free}, 1 MB สำหรับ \code{buff} และ 132 MB สำหรับ \code{cache} ซึ่งอ่านเทียบกับขนาดหน่วยความจำจริงได้ง่ายกว่ามาก แถวแรกยังคงเป็นค่าเฉลี่ยตั้งแต่บูต (\code{bi} 369, \code{bo} 239, \code{in} 190) ส่วนแถวที่สองถึงแถวที่ห้าคือค่าจริงของแต่ละวินาที ซึ่งเห็นชัดว่า \code{bi} และ \code{bo} กลายเป็น 0 เกือบทั้งหมดเพราะไม่มีการอ่านเขียน disk จริงในช่วงนั้น ขณะที่ \code{in} และ \code{cs} แกว่งอยู่ในช่วง 36--101 และ 26--100 ตามจังหวะการทำงานเบื้องหลังของระบบ นี่คือรูปแบบการใช้งานที่ถูกต้องของ \code{vmstat} คือดูแนวโน้มจากหลายแถว ไม่ใช่ตัดสินจากแถวเดียว
+
+\subsubsection{argument ที่ 2: \code{-s} ร่วมกับ \code{-S M}}
+
+\textbf{หน้าที่} \code{-s} (stats) เปลี่ยนรูปแบบการแสดงผลจากตารางเป็นรายการตัวนับสะสมตั้งแต่บูตเครื่องประมาณ 28 บรรทัด ครอบคลุมทั้งข้อมูลหน่วยความจำ ข้อมูล CPU ticks และเหตุการณ์ของ virtual memory ที่ตารางปกติไม่ได้แสดง เหมาะกับการตรวจย้อนหลังว่าตั้งแต่เปิดเครื่องมาระบบเคยเจอแรงกดดันด้านหน่วยความจำหรือไม่
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{../result/screenshots/s18_vmstat_stats.png}
+\caption{\code{vmstat -s -S M} แสดงตัวนับสะสมทั้งหมดตั้งแต่บูตเครื่อง}
+\end{figure}
+
+\textbf{อธิบายผลลัพธ์} กลุ่มแรกเป็นข้อมูลหน่วยความจำ ได้แก่ total memory 15{,}716 MB, used memory 599 MB, active memory 45 MB, inactive memory 112 MB, free memory 15{,}173 MB, buffer memory 1 MB และ swap cache 132 MB ตามด้วยข้อมูล swap คือ total swap 4{,}096 MB โดย used swap เป็น 0 และ free swap เต็มจำนวน
+
+กลุ่มที่สองเป็น CPU ticks สะสม ได้แก่ non-nice user 2{,}277, nice user 1{,}226, system 1{,}877, idle 4{,}371{,}529, IO-wait 554, IRQ 0, softirq 196, stolen 0 และ guest 0 ทั้งสองแบบ สัดส่วนของ idle ที่มากกว่าค่าอื่นหลายพันเท่ายืนยันว่าเครื่องอยู่ในสภาวะว่างมาตลอด
+
+กลุ่มสุดท้ายเป็นเหตุการณ์ของ virtual memory ซึ่งเป็นส่วนที่ตรงกับหัวข้อของปฏิบัติการนี้มากที่สุด ได้แก่ paged in 701{,}163 KiB และ paged out 454{,}116 KiB ซึ่งคือปริมาณข้อมูลที่ระบบอ่านเข้าและเขียนออกกับ disk ผ่านกลไก paging ตั้งแต่บูต ส่วน pages swapped in และ pages swapped out เป็น \textbf{0 ทั้งคู่} ซึ่งเป็นหลักฐานยืนยันว่าตั้งแต่เปิดเครื่องมาไม่เคยมี page ใดถูกย้ายลง swap เลยแม้แต่หน้าเดียว ปิดท้ายด้วย interrupts 367{,}047 ครั้ง, CPU context switches 261{,}886 ครั้ง, boot time 1{,}789{,}916{,}206 (เวลาที่บูตในรูปแบบ Unix timestamp) และ forks 3{,}279 ครั้ง
+
+\textbf{ความแตกต่างระหว่าง paging กับ swapping ที่เห็นได้จากตัวเลขชุดนี้} ตัวเลข paged in และ paged out ที่สูงในขณะที่ pages swapped in และ out เป็นศูนย์ อธิบายได้ว่าการย้ายข้อมูลเกือบทั้งหมดเป็นการอ่าน file เข้ามาใน page cache และเขียนกลับลง file system ตามปกติ ไม่ใช่การนำ anonymous page ไปพักไว้บน swap เพราะหน่วยความจำยังเหลือเฟือ ซึ่งสอดคล้องกับค่าของ \code{free} และ \code{vmstat} ทุกภาพก่อนหน้านี้
+
+\subsection{ความสอดคล้องระหว่างตัวเลขของ \code{free} และ \code{vmstat}}
+
+เนื่องจากทั้งสองคำสั่งอ่านข้อมูลมาจากแหล่งเดียวกัน ตัวเลขจึงต้องสอดคล้องกันเสมอเมื่อปรับหน่วยให้ตรงกัน ตัวอย่างเช่น \code{free} รายงาน \code{total} เท่ากับ 16{,}093{,}844 KiB เมื่อหารด้วย 1024 จะได้ 15{,}716 MB ซึ่งตรงกับบรรทัด total memory ของ \code{vmstat -s -S M} พอดี และ \code{Swap} total 4{,}194{,}304 KiB ก็เท่ากับ 4{,}096 MB ตามที่ \code{vmstat -s} รายงานเช่นกัน ความต่างของตัวเลขในกลุ่ม \code{free} และ \code{cache} ระหว่างภาพแต่ละภาพเกิดจากการรันคนละช่วงเวลาเท่านั้น เพราะ page cache เปลี่ยนแปลงตลอดเวลาตามการอ่านเขียน file ของระบบ
+
+สรุปคือ \code{free} เหมาะกับการตอบคำถามว่า \textit{ตอนนี้หน่วยความจำเหลือเท่าไร} ส่วน \code{vmstat} เหมาะกับการตอบคำถามว่า \textit{ระบบกำลังทำงานหนักแค่ไหนและมีการสลับ page เกิดขึ้นหรือไม่} การใช้งานจริงจึงมักใช้ทั้งสองคำสั่งควบคู่กัน
