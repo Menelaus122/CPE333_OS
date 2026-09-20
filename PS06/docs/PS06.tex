@@ -612,3 +612,151 @@ sudo apt install -y procps
 เนื่องจากทั้งสองคำสั่งอ่านข้อมูลมาจากแหล่งเดียวกัน ตัวเลขจึงต้องสอดคล้องกันเสมอเมื่อปรับหน่วยให้ตรงกัน ตัวอย่างเช่น \code{free} รายงาน \code{total} เท่ากับ 16{,}093{,}844 KiB เมื่อหารด้วย 1024 จะได้ 15{,}716 MB ซึ่งตรงกับบรรทัด total memory ของ \code{vmstat -s -S M} พอดี และ \code{Swap} total 4{,}194{,}304 KiB ก็เท่ากับ 4{,}096 MB ตามที่ \code{vmstat -s} รายงานเช่นกัน ความต่างของตัวเลขในกลุ่ม \code{free} และ \code{cache} ระหว่างภาพแต่ละภาพเกิดจากการรันคนละช่วงเวลาเท่านั้น เพราะ page cache เปลี่ยนแปลงตลอดเวลาตามการอ่านเขียน file ของระบบ
 
 สรุปคือ \code{free} เหมาะกับการตอบคำถามว่า \textit{ตอนนี้หน่วยความจำเหลือเท่าไร} ส่วน \code{vmstat} เหมาะกับการตอบคำถามว่า \textit{ระบบกำลังทำงานหนักแค่ไหนและมีการสลับ page เกิดขึ้นหรือไม่} การใช้งานจริงจึงมักใช้ทั้งสองคำสั่งควบคู่กัน
+
+% =====================================================================
+\section{ข้อ 3: การเฝ้าดู Virtual Memory บน MS Windows}
+% =====================================================================
+
+ฝั่ง Windows ใช้เครื่องมือชื่อ Resource Monitor ซึ่งติดมากับระบบปฏิบัติการอยู่แล้ว เครื่องมือนี้แสดงข้อมูลหน่วยความจำได้ละเอียดกว่า Task Manager มาก โดยเฉพาะการแยกให้เห็นว่าหน่วยความจำที่ใช้ไปนั้นอยู่ในสถานะใดของระบบ
+
+\subsection{การเปิด Resource Monitor}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s19_resmon_command.png}
+\caption{เปิด Resource Monitor ด้วยคำสั่ง \code{resmon} ใน PowerShell}
+\end{figure}
+
+พิมพ์คำสั่ง \code{resmon} ใน PowerShell แล้วกด Enter ระบบจะเปิดหน้าต่าง Resource Monitor ขึ้นมา (เปิดผ่าน \code{perfmon /res} หรือกดปุ่ม Open Resource Monitor ที่แท็บ Performance ของ Task Manager ก็ได้ผลเหมือนกัน) จากนั้นเลือกแท็บ \textbf{Memory} ซึ่งเป็นแท็บที่รวมข้อมูลด้าน virtual memory ไว้ทั้งหมด
+
+\subsection{ข้อมูลที่แสดงในแท็บ Memory}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s20_resmon_memory_tab.png}
+\caption{แท็บ Memory ของ Resource Monitor ประกอบด้วยตาราง Processes แถบ Physical Memory และกราฟด้านขวา}
+\end{figure}
+
+หน้าจอนี้แบ่งออกเป็นสามส่วนที่ทำงานเสริมกัน
+
+\subsubsection{ส่วนที่ 1: ตาราง Processes}
+
+ตารางด้านบนไล่เรียง process ทุกตัวในระบบ เรียงจากตัวที่ใช้หน่วยความจำมากที่สุดลงมา แต่ละคอลัมน์มีความหมายดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของคอลัมน์ในตาราง Processes ของแท็บ Memory}
+\begin{tabular}{@{}p{3.4cm}p{12.6cm}@{}}
+\toprule
+\textbf{คอลัมน์} & \textbf{ความหมาย} \\
+\midrule
+\code{Image} & ชื่อ file ที่ทำงานเป็น process นั้น \\
+\code{PID} & หมายเลขประจำตัวของ process \\
+\code{Hard Faults/sec} & จำนวน hard fault ต่อวินาที คือจำนวนครั้งที่ต้องไปอ่านข้อมูลกลับจาก disk เพราะ page ที่ต้องการไม่อยู่ใน RAM \textbf{ค่านี้คือตัวชี้วัดที่สำคัญที่สุดของหน้าจอนี้} ถ้าสูงต่อเนื่องแปลว่าหน่วยความจำไม่พอจริง \\
+\code{Commit (KB)} & ปริมาณ virtual memory ที่ระบบจองโควตาไว้ให้ process นี้ในบัญชี commit charge ไม่ว่าจะอยู่ใน RAM หรือถูกย้ายลง \code{pagefile.sys} แล้วก็ตาม \\
+\code{Working Set (KB)} & ปริมาณหน่วยความจำที่ process นี้ถือครองอยู่ใน RAM จริง ณ ขณะนั้น เทียบได้กับค่า RSS ของ Linux \\
+\code{Shareable (KB)} & ส่วนของ working set ที่แบ่งใช้ร่วมกับ process อื่นได้ เช่น code ของ DLL ที่หลาย program ใช้ร่วมกัน \\
+\code{Private (KB)} & ส่วนของ working set ที่เป็นของ process นี้เท่านั้น ใครมาใช้ร่วมไม่ได้ ค่านี้คือหน่วยความจำที่จะได้คืนจริงถ้าปิด process นั้น \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ความสัมพันธ์ที่ตรวจสอบได้จากตัวเลขในภาพคือ \code{Working Set} เท่ากับ \code{Shareable} บวก \code{Private} เสมอ เช่น \code{claude.exe} (PID 37740) มี working set 617{,}240 KB ซึ่งเท่ากับ shareable 94{,}400 KB บวก private 522{,}840 KB พอดี
+
+อีกแถวที่น่าสนใจเป็นพิเศษคือ \textbf{Memory Compression} (PID 5240) ซึ่งเป็น process ของระบบที่ทำหน้าที่เก็บ page ที่ถูกบีบอัดไว้ใน RAM ตามที่อธิบายไว้ในข้อ 1 จะเห็นว่ามี working set สูงถึง 1{,}058{,}116 KB (ราว 1 GB) และเป็น private ทั้งหมด แต่มี \code{Commit} เพียง 2{,}572 KB เพราะหน่วยความจำที่มันถือครองคือข้อมูลของ process อื่นที่ถูกบีบอัดเก็บไว้ ไม่ใช่หน่วยความจำที่ตัวมันเองขอจองมาใช้
+
+\subsubsection{ส่วนที่ 2: แถบ Physical Memory}
+
+แถบกราฟิกตรงกลางแบ่งหน่วยความจำจริงทั้งเครื่องออกเป็นห้าส่วนตามสถานะของ page ซึ่งตรงกับรายการ page ระดับระบบที่อธิบายไว้ในหัวข้อ 1.3
+
+\subsubsection{ส่วนที่ 3: กราฟด้านขวา}
+
+กราฟสามช่องทางขวาแสดงแนวโน้มย้อนหลัง 60 วินาที ได้แก่ \textbf{Used Physical Memory} (สัดส่วนหน่วยความจำจริงที่ถูกใช้ ซึ่งภาพนี้อยู่ที่ 44\%), \textbf{Commit Charge} (สัดส่วนของ commit charge เทียบกับ commit limit ซึ่งคือ RAM บวกขนาด \code{pagefile.sys}) และ \textbf{Hard Faults/sec} กราฟสองช่องแรกมีประโยชน์ต่างกันคือ ช่องแรกบอกว่า RAM เต็มหรือยัง ส่วนช่องที่สองบอกว่าระบบใกล้ชนเพดานการจองหรือยัง ซึ่งอาจชนได้แม้ RAM ยังเหลือ
+
+\subsection{สรุปตัวเลขทั้งหมดในส่วน Physical Memory}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/s21_physical_memory.png}
+\caption{ส่วน Physical Memory ขยายให้เห็นตัวเลขทุกค่า}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{ความหมายของแต่ละส่วนในแถบ Physical Memory}
+\begin{tabular}{@{}p{3.4cm}p{2.0cm}p{10.3cm}@{}}
+\toprule
+\textbf{ส่วน} & \textbf{ค่าที่วัดได้} & \textbf{ความหมาย} \\
+\midrule
+Hardware Reserved & 556 MB & หน่วยความจำที่ firmware และ hardware กันไว้ใช้เอง ระบบปฏิบัติการนำไปใช้ไม่ได้ \\
+In Use & 14{,}386 MB & หน่วยความจำที่อยู่ใน working set ของ process, driver และ kernel จริง ณ ขณะนั้น \\
+Modified & 0 MB & page ที่ถูกแก้ไขแล้วและรอเขียนกลับลง disk ก่อนจึงจะนำไปใช้ใหม่ได้ \\
+Standby & 15{,}989 MB & page ที่ถูกตัดออกจาก working set แล้วแต่ยังเก็บเนื้อหาไว้ ทำหน้าที่เป็น cache ของทั้งระบบ ดึงกลับได้ด้วย soft fault \\
+Free & 1{,}837 MB & page ว่างที่พร้อมแจกจ่ายทันที \\
+\midrule
+Available & 17{,}826 MB & หน่วยความจำที่ process ใหม่ขอใช้ได้ทันที เท่ากับ Standby บวก Free \\
+Cached & 15{,}989 MB & หน่วยความจำที่ทำหน้าที่เป็น cache เท่ากับ Standby บวก Modified \\
+Total & 32{,}212 MB & หน่วยความจำที่ระบบปฏิบัติการใช้งานได้ คือ Installed ลบ Hardware Reserved \\
+Installed & 32{,}768 MB & ขนาด RAM ที่ติดตั้งจริงบนเครื่อง (32 GB) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ย่อหน้าสรุปตัวเลขทั้งหมด} เครื่องที่ใช้ทดลองติดตั้ง RAM ไว้ 32{,}768 MB หรือ 32 GB ในจำนวนนี้ถูก hardware กันไว้เป็น Hardware Reserved 556 MB เหลือให้ระบบปฏิบัติการใช้งานจริง 32{,}212 MB ตามที่บรรทัด Total รายงาน หน่วยความจำส่วนนี้ถูกแบ่งตามสถานะออกเป็นสี่ก้อน ได้แก่ In Use 14{,}386 MB ซึ่งเป็นส่วนที่ process และ kernel ถือครองอยู่จริง Modified 0 MB ซึ่งหมายความว่าไม่มี page ใดค้างรอเขียนกลับ disk เลยในขณะนั้น Standby 15{,}989 MB ซึ่งเป็นก้อนที่ใหญ่ที่สุดและทำหน้าที่เป็น cache ของทั้งระบบ และ Free 1{,}837 MB ที่ว่างพร้อมใช้งานทันที เมื่อรวมสี่ก้อนนี้เข้าด้วยกันจะได้ 32{,}212 MB เท่ากับค่า Total พอดี ส่วนค่าที่ระบบสรุปให้เพิ่มอีกสองค่าคือ Available 17{,}826 MB ซึ่งเท่ากับ Standby บวก Free และ Cached 15{,}989 MB ซึ่งเท่ากับ Standby บวก Modified ด้านบนของหน้าต่างยังรายงานสอดคล้องกันว่ามี 14{,}386 MB In Use และ 17{,}826 MB Available พร้อมกับตัวเลข 44\% Used Physical Memory ซึ่งตรวจสอบได้จาก 14{,}386 หารด้วย 32{,}212 เท่ากับ 44.7\% โดยประมาณ ภาพรวมทั้งหมดชี้ว่าเครื่องนี้ใช้หน่วยความจำไปไม่ถึงครึ่ง ยังมีหน่วยความจำพร้อมใช้อีกกว่า 17 GB และค่า Hard Faults/sec ของทุก process เป็นศูนย์ จึงไม่มีอาการขาดแคลนหน่วยความจำใด ๆ
+
+\textbf{จุดที่มักเข้าใจผิด} ค่า Free เพียง 1{,}837 MB อาจทำให้เข้าใจว่าเครื่องเหลือหน่วยความจำน้อย แต่ความจริงแล้วหน่วยความจำที่ขอใช้ได้คือ Available 17{,}826 MB เพราะ Standby ทั้งก้อนสามารถถูกยึดคืนไปให้ process ใหม่ได้ทันทีเมื่อจำเป็น แนวคิดนี้ตรงกับความสัมพันธ์ระหว่าง \code{free} กับ \code{available} ของคำสั่ง \code{free} บน Linux ที่อธิบายไว้ในข้อ 2 ทุกประการ
+
+\subsection{การเทียบศัพท์ระหว่าง Windows กับ Linux}
+
+เมื่อนำข้อมูลจากข้อ 2 และข้อ 3 มาวางเทียบกัน จะเห็นว่าทั้งสองระบบรายงานสิ่งเดียวกันด้วยชื่อที่ต่างกัน
+
+\begin{table}[H]
+\centering\small
+\caption{การเทียบศัพท์ของเครื่องมือ monitoring ระหว่าง Windows และ Linux}
+\begin{tabular}{@{}p{4.2cm}p{4.5cm}p{7.0cm}@{}}
+\toprule
+\textbf{Windows (Resource Monitor)} & \textbf{Linux (\code{free} / \code{vmstat})} & \textbf{สิ่งที่วัดเหมือนกัน} \\
+\midrule
+Working Set & RSS (\code{ps}), \code{used} & หน่วยความจำที่ถือครองอยู่ใน RAM จริง \\
+Private & \code{used} เฉพาะของ process & ส่วนที่ได้คืนแน่นอนเมื่อปิด process \\
+Shareable & shared library mapping & ส่วนที่ใช้ร่วมกับ process อื่น \\
+Standby + Modified (Cached) & \code{buff/cache} & หน่วยความจำที่ระบบยืมไปทำ cache \\
+Available & \code{available} & หน่วยความจำที่ขอใช้ได้จริงโดยไม่ต้อง swap \\
+Free & \code{free} & page ที่ยังไม่ถูกแตะต้องเลย \\
+Commit Charge / Commit Limit & \code{Committed\_AS} ใน \code{/proc/meminfo} & ปริมาณ virtual memory ที่ถูกจองไว้ \\
+Hard Faults/sec & \code{si} และ \code{so} ของ \code{vmstat} & การอ่านเขียน page กับ disk เพราะขาดหน่วยความจำ \\
+\code{pagefile.sys} & swap partition หรือ swap file & พื้นที่บน disk ที่ใช้พัก page \\
+Modified Page Writer & \code{kswapd} & ผู้ทำหน้าที่เขียน page กลับลง disk \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{ข้อสังเกตที่เชื่อมสองฝั่งเข้าด้วยกัน} เครื่องที่ใช้ทดลองมี RAM 32 GB ตามที่ Resource Monitor รายงาน ขณะที่ Ubuntu บน WSL2 ในข้อ 2 มองเห็นหน่วยความจำเพียง 15 GiB (ราว 16 GB) เพราะ WSL2 ทำงานเป็น virtual machine ที่ได้รับส่วนแบ่งหน่วยความจำมาประมาณครึ่งหนึ่งของเครื่องตามค่าเริ่มต้น ตัวเลขทั้งสองฝั่งจึงไม่ขัดแย้งกัน แต่เป็นการมองหน่วยความจำคนละชั้นกัน คือฝั่ง Windows มองหน่วยความจำจริงของ hardware ส่วนฝั่ง Linux มองหน่วยความจำที่ virtual machine ได้รับมา
+
+% =====================================================================
+\section*{สรุปผลการทดลอง}
+\addcontentsline{toc}{section}{สรุปผลการทดลอง}
+% =====================================================================
+
+ปฏิบัติการนี้เริ่มจากการทำความเข้าใจว่า virtual memory คือกลไกที่ระบบปฏิบัติการใช้แยก address space ของแต่ละ process ออกจากกัน และใช้ paging ร่วมกับ backing store บน disk เพื่อให้ใช้หน่วยความจำได้มากกว่าขนาด RAM จริง แม้ Linux และ MS Windows จะตั้งอยู่บนหลักการและ hardware เดียวกัน แต่ต่างกันที่วิธีจัดการ คือ Linux มองหน่วยความจำเป็น pool กลางของทั้งระบบและเรียกคืนตาม LRU ขณะที่ Windows จัดสรรเป็น working set รายบ้านแล้วรวบ page ที่ตัดออกไว้ในรายการกลาง และต่างกันที่นโยบายการจองคือ Linux ยอมให้ overcommit แล้วใช้ OOM killer เป็นทางออกสุดท้าย ส่วน Windows กันโควตาด้วย commit charge ตั้งแต่ตอนจอง
+
+การทดลองเพิ่มและลด swap ด้วย swap file สำเร็จครบทุกขั้นตอน และยังทำให้พบข้อจำกัดที่ไม่ได้เขียนไว้ในคู่มือทั่วไป คือบน WSL2 ซึ่ง systemd ตรวจพบว่าตัวเองทำงานอยู่ใน container นั้น \code{systemd-fstab-generator} จะข้าม swap entry ใน \code{/etc/fstab} ทิ้งทั้งหมด การทำให้ swap ถาวรบน WSL2 จึงต้องใช้ \code{swapon -a} ผ่าน \code{/etc/wsl.conf} หรือกำหนดขนาด swap จากฝั่ง Windows ด้วย \code{.wslconfig} แทน
+
+ด้านเครื่องมือเฝ้าดู \code{free} ตอบคำถามว่าหน่วยความจำเหลือเท่าไรในขณะนั้น โดยมีค่า \code{available} เป็นตัวเลขที่ควรใช้ตัดสินใจมากกว่า \code{free} ส่วน \code{vmstat} ตอบคำถามว่าระบบกำลังเคลื่อนไหวอย่างไร โดยต้องระวังว่าแถวแรกเป็นค่าเฉลี่ยตั้งแต่บูต ไม่ใช่ค่าปัจจุบัน ฝั่ง Windows นั้น Resource Monitor ให้ข้อมูลระดับเดียวกันในรูปแบบกราฟิก และเมื่อเทียบศัพท์กันแล้วจะเห็นว่าทั้งสองระบบรายงานสิ่งเดียวกัน เช่น Standby ของ Windows ทำหน้าที่อย่างเดียวกับ \code{buff/cache} ของ Linux และค่า Available ของทั้งสองระบบมีความหมายตรงกันทุกประการ
+
+บทเรียนร่วมที่ได้จากทั้งสามข้อคือ \textbf{หน่วยความจำที่ดูเหมือนถูกใช้ไปไม่ได้หมายความว่าหายไป} ทั้ง Linux และ Windows ต่างยืมหน่วยความจำว่างไปทำ cache เพื่อเร่งความเร็วของระบบ และคืนให้ทันทีที่ process ต้องการ การอ่านค่าจากเครื่องมือ monitoring จึงต้องดูที่ค่า available หรือ Available เป็นหลัก ไม่ใช่ค่า free เพียงอย่างเดียว
+
+% =====================================================================
+\section*{เอกสารอ้างอิง}
+\addcontentsline{toc}{section}{เอกสารอ้างอิง}
+% =====================================================================
+
+\begin{enumerate}[leftmargin=*]
+  \item \code{man 1 free}, \code{man 8 vmstat}, \code{man 8 swapon}, \code{man 8 mkswap} และ \code{man 5 proc} จาก package \code{procps-ng 4.0.4} และ \code{util-linux} บน Ubuntu 24.04.1
+  \item The Linux Kernel Documentation, \textit{Memory Management} และ \textit{Documentation/admin-guide/sysctl/vm.rst} (คำอธิบาย \code{vm.swappiness} และ \code{vm.overcommit\_memory})
+  \item Russinovich, M., Solomon, D., Ionescu, A., Yosifovich, P., \textit{Windows Internals, Part 1}, 7th Edition, Microsoft Press (บท Memory Management: working set, VAD, PFN database, commit charge)
+  \item Microsoft Learn, \textit{Resource Monitor} และ \textit{Windows Subsystem for Linux: Advanced settings configuration} (\code{wsl.conf} และ \code{.wslconfig})
+  \item systemd documentation, \code{systemd-fstab-generator(8)} (เงื่อนไขการข้าม swap entry เมื่อทำงานใน container)
+\end{enumerate}
+
+\end{document}
