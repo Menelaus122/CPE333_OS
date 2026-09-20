@@ -7,6 +7,7 @@
 | **PS02** | Process Creation & Pipes | 1--5 | [`PS02/docs/PS02.pdf`](PS02/docs/PS02.pdf) |
 | **PS03** | Process Manipulation and Monitoring | 1, 2, 5 | [`PS03/docs/PS03.pdf`](PS03/docs/PS03.pdf) |
 | **PS04** | Memory class and API in C programming | 1--3 | [`PS04/docs/PS04.pdf`](PS04/docs/PS04.pdf) |
+| **Mini-Project 1** | Compile และติดตั้ง Ubuntu kernel ใหม่ | – | [`Miniproj1/docs/MiniProject1_Report.docx`](Miniproj1/docs/MiniProject1_Report.docx) |
 
 ---
 
@@ -67,30 +68,38 @@ CPE333_OS/
 │       ├── q1_verified.txt # ผลการทดลองข้อ 1
 │       ├── q2_verified.txt # ผลการทดลองข้อ 2 (transcript จาก terminal จริง)
 │       └── q5_verified.txt # ผลการทดลองข้อ 5
-└── PS04/                  # Problem Session 4: Memory class and API in C programming
-    ├── Makefile           # คำสั่งอัตโนมัติสำหรับคอมไพล์ C, LaTeX และเก็บผลการทดลองซ้ำ
-    ├── src/               # ซอร์สโค้ดและสคริปต์ของการทดลอง (ข้อ 1--3)
-    │   ├── q1_static.c        # ข้อ 1: โค้ดตามใบงาน มี static ในลูป while
-    │   ├── q1_auto.c          # ข้อ 1: โค้ดเดิมที่ลบคำว่า static ออก (Step 2)
-    │   ├── q2_extern.c        # ข้อ 2: โค้ดตามใบงาน มี extern ทั้งใน main() และ display()
-    │   ├── q2_noextern.c      # ข้อ 2: โค้ดเดิมที่ลบคำว่า extern ใน main() ออก (Step 2)
-    │   ├── q2_shared_main.c   # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่ประกาศตัวแปร
-    │   ├── q2_shared_def.c    # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่นิยามตัวแปร
-    │   ├── q3_alloc.c         # ข้อ 3: โค้ดตามใบงาน ยังคอมเมนต์ส่วนของ b ไว้
-    │   ├── q3_alloc_b.c       # ข้อ 3: โค้ดเดิมที่เปิดคอมเมนต์ malloc(b) และ free(b) (Step 4)
-    │   ├── q3_regions.c       # ข้อ 3: โปรแกรมตรวจสอบ อ่าน /proc/self/maps ของตัวเอง
-    │   ├── run_q1.sh          # สคริปต์เก็บผลข้อ 1 (คอมไพล์ทั้งแบบ PIE และ -no-pie)
-    │   ├── run_q2.sh          # สคริปต์เก็บผลข้อ 2 (รวม nm/readelf และการทดสอบ linker)
-    │   └── run_q3.sh          # สคริปต์เก็บผลข้อ 3 (malloc / realloc / free)
-    ├── docs/              # เอกสารและรายงาน LaTeX
-    │   ├── PS04.tex       # ไฟล์รายงานหลัก (LaTeX Source)
-    │   ├── PS04.pdf       # รายงานฉบับสมบูรณ์ (เนื้อหา 13 หน้า รวมปกและสารบัญ)
-    │   ├── PS4_2026_OS.md # โจทย์การทดลอง
+├── PS04/                  # Problem Session 4: Memory class and API in C programming
+│   ├── Makefile           # คำสั่งอัตโนมัติสำหรับคอมไพล์ C, LaTeX และเก็บผลการทดลองซ้ำ
+│   ├── src/               # ซอร์สโค้ดและสคริปต์ของการทดลอง (ข้อ 1--3)
+│   │   ├── q1_static.c        # ข้อ 1: โค้ดตามใบงาน มี static ในลูป while
+│   │   ├── q1_auto.c          # ข้อ 1: โค้ดเดิมที่ลบคำว่า static ออก (Step 2)
+│   │   ├── q2_extern.c        # ข้อ 2: โค้ดตามใบงาน มี extern ทั้งใน main() และ display()
+│   │   ├── q2_noextern.c      # ข้อ 2: โค้ดเดิมที่ลบคำว่า extern ใน main() ออก (Step 2)
+│   │   ├── q2_shared_main.c   # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่ประกาศตัวแปร
+│   │   ├── q2_shared_def.c    # ข้อ 2: ตัวอย่างการใช้ extern จริง ฝั่งที่นิยามตัวแปร
+│   │   ├── q3_alloc.c         # ข้อ 3: โค้ดตามใบงาน ยังคอมเมนต์ส่วนของ b ไว้
+│   │   ├── q3_alloc_b.c       # ข้อ 3: โค้ดเดิมที่เปิดคอมเมนต์ malloc(b) และ free(b) (Step 4)
+│   │   ├── q3_regions.c       # ข้อ 3: โปรแกรมตรวจสอบ อ่าน /proc/self/maps ของตัวเอง
+│   │   ├── run_q1.sh          # สคริปต์เก็บผลข้อ 1 (คอมไพล์ทั้งแบบ PIE และ -no-pie)
+│   │   ├── run_q2.sh          # สคริปต์เก็บผลข้อ 2 (รวม nm/readelf และการทดสอบ linker)
+│   │   └── run_q3.sh          # สคริปต์เก็บผลข้อ 3 (malloc / realloc / free)
+│   ├── docs/              # เอกสารและรายงาน LaTeX
+│   │   ├── PS04.tex       # ไฟล์รายงานหลัก (LaTeX Source)
+│   │   ├── PS04.pdf       # รายงานฉบับสมบูรณ์ (เนื้อหา 13 หน้า รวมปกและสารบัญ)
+│   │   ├── PS4_2026_OS.md # โจทย์การทดลอง
+│   │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
+│   └── result/            # ผลลัพธ์จากการทดลองจริง (ทุกบรรทัดที่อ้างในรายงานมาจากที่นี่)
+│       ├── q1_verified.txt # ผลการทดลองข้อ 1 (Static Storage Class)
+│       ├── q2_verified.txt # ผลการทดลองข้อ 2 (Extern Storage Class)
+│       └── q3_verified.txt # ผลการทดลองข้อ 3 (malloc / realloc / free)
+└── Miniproj1/             # Mini-Project 1: Compile และติดตั้ง Ubuntu kernel ใหม่ (ทำใน VMware Virtual Machine)
+    ├── docs/
+    │   ├── MiniProject1_Report.docx # รายงานฉบับสมบูรณ์ (Word) ผลลัพธ์ทุกขั้นเป็นภาพหน้าจอจริง
+    │   ├── COMMANDS.md              # คำสั่งที่ใช้ใน Virtual Machine ตามลำดับ และรายการภาพหลักฐาน
+    │   ├── MiniProject1_2026.md     # โจทย์ Mini-Project
     │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
-    └── result/            # ผลลัพธ์จากการทดลองจริง (ทุกบรรทัดที่อ้างในรายงานมาจากที่นี่)
-        ├── q1_verified.txt # ผลการทดลองข้อ 1 (Static Storage Class)
-        ├── q2_verified.txt # ผลการทดลองข้อ 2 (Extern Storage Class)
-        └── q3_verified.txt # ผลการทดลองข้อ 3 (malloc / realloc / free)
+    └── result/
+        └── screenshots/     # ภาพหน้าจอจาก Virtual Machine ที่ใช้ในรายงาน (s01–s19)
 ```
 
 ---
@@ -236,7 +245,7 @@ cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 
 ## 🧪 สภาพแวดล้อมที่ใช้ทดลอง
 
-การทดลองทั้งหมดรันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21`
+การทดลองของ PS02–PS04 รันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21`
 
 ข้อควรทราบสำหรับ PS03:
 
@@ -250,6 +259,13 @@ cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 - **ที่อยู่ที่พิมพ์ออกมาจะไม่ซ้ำเดิม** ในการรันแต่ละครั้ง เพราะ `gcc` ของ Ubuntu สร้างไบนารีแบบ PIE เป็นค่าเริ่มต้น (`--enable-default-pie`) ทำงานร่วมกับ ASLR ของเคอร์เนล (`/proc/sys/kernel/randomize_va_space` = 2) การรันซ้ำจึงได้ตัวเลขต่างจากที่บันทึกไว้ใน `result/` แต่ **ความสัมพันธ์ระหว่างตัวเลข** เช่น ระยะห่างระหว่างสมาชิกอาร์เรย์ หรือการที่ที่อยู่ใน `main()` กับ `display()` ตรงกัน จะเหมือนเดิมเสมอ
 - **ถ้าต้องการตัวเลขที่ซ้ำเดิมทุกครั้ง** ให้รันผ่าน `setarch -R <program>` ซึ่งปิด ASLR เฉพาะ process ลูก สคริปต์เก็บผลใช้วิธีนี้เป็นกรณีควบคุม และใช้ในข้อ 3 เพื่อให้เทียบที่อยู่ของสองโปรแกรมกันได้ตรง ๆ
 
+ข้อควรทราบสำหรับ Mini-Project 1:
+
+- **ทำใน Virtual Machine ไม่ใช่ WSL** เพราะต้องติดตั้งและบูต kernel ใหม่จริง ใช้ VMware Workstation 17 Player กับ Ubuntu 24.04.5 LTS (12 vCPU, RAM 12 GB, ดิสก์ 100 GB) ซึ่งบูตแบบ BIOS จึงไม่มี Secure Boot มาขวาง kernel แบบ `linux-image-unsigned`
+- **Ubuntu 24.04.5 ใช้ kernel HWE** (`7.0.0-31-generic`) source package จึงเป็น `linux-hwe-7.0` และต้องแก้ `debian.hwe-7.0/changelog` ไม่ใช่ `debian.master/changelog` ตามตัวอย่างในคู่มือ ดูชื่อ folder ที่ถูกต้องได้จาก `debian/debian.env`
+- เปลี่ยนเลข ABI เป็น 999 และเพิ่ม `pr_notice()` ใน `start_kernel()` ได้ kernel `7.0.0-999-generic` ใช้เวลา build 1 ชั่วโมง 46 นาทีบน 12 vCPU
+- **ไม่มี Makefile หรือสคริปต์เก็บผล** เหมือน PS อื่น เพราะต้องทำทีละขั้นใน Virtual Machine และ reboot ระหว่างทาง ขั้นตอนทั้งหมดอยู่ใน `Miniproj1/docs/COMMANDS.md` และหลักฐานทุกขั้นเป็นภาพหน้าจอใน `Miniproj1/result/screenshots/`
+
 ---
 
 ## 👥 ผู้จัดทำ (Group Members)
@@ -257,3 +273,5 @@ cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 - นายภูมิพัฒน์ อภิวาทธนะพงศ์ (67070501035)
 - นายวิรชัช ทองอุทัยศรี (67070501041)
 - นายเจษฎา เกียรติกมลวงศ์ (67070501080)
+
+Mini-Project 1 ทำร่วมกับสมาชิกจากอีกกลุ่มหนึ่ง รวมเป็น 7 คน รายชื่อทั้งหมดอยู่ในหน้าปกของรายงาน
