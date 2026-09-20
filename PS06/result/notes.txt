@@ -1,0 +1,6 @@
+[2026-09-20 s06] เพิ่มบรรทัด "/swapfile none swap sw 0 0" ใน /etc/fstab แล้ว systemd ไม่สร้าง
+swap unit ให้ (systemctl list-units --type=swap ตอบ "0 loaded units listed")
+สาเหตุจาก journalctl: systemd-fstab-generator[1652]: Running in a container, ignoring swap
+entry for /swapfile.  --> systemd มองว่า WSL2 เป็น container (systemd-detect-virt --container
+= wsl) จึงข้าม swap entry ทุกบรรทัดใน fstab ทางแก้บน WSL2 คือใช้ swapon -a เอง (อ่าน fstab
+ตรง ๆ ได้ปกติ) ผ่าน [boot] command ใน /etc/wsl.conf หรือกำหนด swap= ใน .wslconfig ฝั่ง Windows
