@@ -8,6 +8,7 @@
 | **PS03** | Process Manipulation and Monitoring | 1, 2, 5 | [`PS03/docs/PS03.pdf`](PS03/docs/PS03.pdf) |
 | **PS04** | Memory class and API in C programming | 1--3 | [`PS04/docs/PS04.pdf`](PS04/docs/PS04.pdf) |
 | **Mini-Project 1** | Compile และติดตั้ง Ubuntu kernel ใหม่ | – | [`Miniproj1/docs/MiniProject1_Report.docx`](Miniproj1/docs/MiniProject1_Report.docx) |
+| **PS06** | Virtual Memory | 1–3 | [`PS06/docs/PS06.pdf`](PS06/docs/PS06.pdf) · [`PS06_Report.docx`](PS06/docs/PS06_Report.docx) |
 
 ---
 
@@ -92,7 +93,7 @@ CPE333_OS/
 │       ├── q1_verified.txt # ผลการทดลองข้อ 1 (Static Storage Class)
 │       ├── q2_verified.txt # ผลการทดลองข้อ 2 (Extern Storage Class)
 │       └── q3_verified.txt # ผลการทดลองข้อ 3 (malloc / realloc / free)
-└── Miniproj1/             # Mini-Project 1: Compile และติดตั้ง Ubuntu kernel ใหม่ (ทำใน VMware Virtual Machine)
+├── Miniproj1/             # Mini-Project 1: Compile และติดตั้ง Ubuntu kernel ใหม่ (ทำใน VMware Virtual Machine)
     ├── docs/
     │   ├── MiniProject1_Report.docx # รายงานฉบับสมบูรณ์ (Word) ผลลัพธ์ทุกขั้นเป็นภาพหน้าจอจริง
     │   ├── COMMANDS.md              # คำสั่งที่ใช้ใน Virtual Machine ตามลำดับ และรายการภาพหลักฐาน
@@ -100,6 +101,22 @@ CPE333_OS/
     │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
     └── result/
         └── screenshots/     # ภาพหน้าจอจาก Virtual Machine ที่ใช้ในรายงาน (s01–s19)
+└── PS06/                  # Problem Session 6: Virtual Memory (หลักฐานเป็นภาพหน้าจอทั้งหมด)
+    ├── Makefile           # คำสั่งสร้างรายงาน PDF และ .docx
+    ├── docs/
+    │   ├── PS06.tex       # ไฟล์รายงานหลัก (LaTeX Source) เป็นต้นทางของทั้ง PDF และ .docx
+    │   ├── PS06.pdf       # รายงานฉบับสมบูรณ์ (PDF) 22 หน้า
+    │   ├── PS06_Report.docx # รายงานฉบับ Word สร้างจาก PS06.tex ไฟล์เดียวกัน
+    │   ├── COMMANDS.md    # คำสั่งที่พิมพ์ใน terminal ตามลำดับ และรายการภาพหลักฐาน s01–s21
+    │   ├── PS06_2026.md   # โจทย์การทดลอง
+    │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
+    ├── tools/             # เครื่องมือช่วยทำรายงาน (ไม่ใช่ส่วนหนึ่งของคำตอบ)
+    │   ├── build_report.js  # อ่าน PS06.tex แล้วสร้าง PS06_Report.docx
+    │   ├── crop_shot.ps1    # ตัดพื้นที่ว่างท้ายภาพหน้าจอ terminal ออกอัตโนมัติ
+    │   └── crop_region.ps1  # ตัดภาพตามพิกัด ใช้กับหน้าต่างที่ตัดอัตโนมัติไม่ได้
+    └── result/
+        ├── notes.txt      # ปัญหาและข้อสังเกตที่พบระหว่างทดลอง
+        └── screenshots/   # ภาพหน้าจอหลักฐานทั้งหมด (s01–s21)
 ```
 
 ---
@@ -236,8 +253,16 @@ gcc -Wall -Wextra -o q3_regions q3_regions.c
 cd PS02/docs && xelatex PS02.tex && xelatex PS02.tex
 cd PS03/docs && xelatex PS03.tex && xelatex PS03.tex
 cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
+cd PS06/docs && xelatex PS06.tex && xelatex PS06.tex
 ```
 *(รันคำสั่ง 2 รอบ เพื่อให้สารบัญและเลขหน้าอัปเดตอย่างถูกต้อง)*
+
+รายงานของ PS06 มีฉบับ Word ด้วย สร้างจากไฟล์ `.tex` ชุดเดียวกันเพื่อไม่ให้เนื้อหาสองฉบับหลุดกัน:
+
+```bash
+node PS06/tools/build_report.js     # อ่าน PS06/docs/PS06.tex -> PS06/docs/PS06_Report.docx
+```
+*(ต้องการ Node.js และ package `docx` เปิดไฟล์ใน Word ครั้งแรกให้กด `Ctrl` `A` แล้ว `F9` เพื่ออัปเดตสารบัญ)*
 
 ค่าตั้งต้นใช้ฟอนต์ **TH Sarabun New** ถ้าคอมไพล์บน Overleaf หรือเครื่องที่ไม่มีฟอนต์นี้ ให้สลับไปใช้ตัวเลือก (B) ที่คอมเมนต์ไว้ในส่วนหัวของไฟล์ `.tex` ซึ่งใช้ `Noto Serif Thai` แทน
 
@@ -245,7 +270,7 @@ cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 
 ## 🧪 สภาพแวดล้อมที่ใช้ทดลอง
 
-การทดลองของ PS02–PS04 รันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21`
+การทดลองของ PS02–PS04 และ PS06 รันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21` ส่วนข้อ 3 ของ PS06 ทำบน **Windows 11 Home Single Language (build 26200)** ซึ่งเป็นเครื่องเดียวกันกับที่ WSL2 ทำงานอยู่
 
 ข้อควรทราบสำหรับ PS03:
 
@@ -258,6 +283,14 @@ cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 - **ทั้งสามข้อ** ต้องรันบนเครื่องเดียวกันตามที่ใบงานกำหนด (*All steps must be executed on the same machine*) สคริปต์ `run_qN.sh` แต่ละไฟล์จึงคอมไพล์และรันทุกกรณีของข้อนั้นจบในการเรียกครั้งเดียว
 - **ที่อยู่ที่พิมพ์ออกมาจะไม่ซ้ำเดิม** ในการรันแต่ละครั้ง เพราะ `gcc` ของ Ubuntu สร้างไบนารีแบบ PIE เป็นค่าเริ่มต้น (`--enable-default-pie`) ทำงานร่วมกับ ASLR ของเคอร์เนล (`/proc/sys/kernel/randomize_va_space` = 2) การรันซ้ำจึงได้ตัวเลขต่างจากที่บันทึกไว้ใน `result/` แต่ **ความสัมพันธ์ระหว่างตัวเลข** เช่น ระยะห่างระหว่างสมาชิกอาร์เรย์ หรือการที่ที่อยู่ใน `main()` กับ `display()` ตรงกัน จะเหมือนเดิมเสมอ
 - **ถ้าต้องการตัวเลขที่ซ้ำเดิมทุกครั้ง** ให้รันผ่าน `setarch -R <program>` ซึ่งปิด ASLR เฉพาะ process ลูก สคริปต์เก็บผลใช้วิธีนี้เป็นกรณีควบคุม และใช้ในข้อ 3 เพื่อให้เทียบที่อยู่ของสองโปรแกรมกันได้ตรง ๆ
+
+ข้อควรทราบสำหรับ PS06:
+
+- **หลักฐานทุกขั้นเป็นภาพหน้าจอ ไม่ใช่ log ข้อความ** เพราะใบงานกำหนดให้แสดงภาพผลการรันคำสั่ง (ข้อ 1.2 ระบุ *with screenshots* และข้อ 2 ระบุ *Please capture the output image*) จึงไม่มีไฟล์ `result/*_verified.txt` เหมือน PS อื่น คำสั่งทั้งหมดอยู่ใน `PS06/docs/COMMANDS.md` และภาพอยู่ใน `PS06/result/screenshots/`
+- **swap ของ WSL2 เป็น partition ที่ Windows จัดการให้** (`/dev/sdc` ขนาด 4 GiB = 25% ของ RAM ที่ virtual machine มองเห็น) การทดลองข้อ 1 จึงเพิ่ม swap ด้วยวิธี swap file แทนการแก้ partition เดิม และคืนค่าระบบกลับหมดเมื่อจบการทดลอง
+- **systemd บน WSL2 ไม่รับ swap entry ใน `/etc/fstab`** เพราะ `systemd-detect-virt --container` ตอบ `wsl` ทำให้ `systemd-fstab-generator` ข้ามบรรทัด swap ทิ้ง (เห็นได้จาก journal) ถ้าต้องการให้ถาวรต้องใช้ `swapon -a` ผ่าน `[boot] command` ใน `/etc/wsl.conf` หรือกำหนด `swap=` ใน `.wslconfig` ฝั่ง Windows
+- **แถวแรกของ `vmstat` เป็นค่าเฉลี่ยตั้งแต่บูต ไม่ใช่ค่าปัจจุบัน** และบนเครื่องนี้คอลัมน์ `cs` ของแถวนั้นรายงานเป็น 0 ทั้งที่ `vmstat -s` นับได้ 261,886 ครั้ง ให้อ่านค่าจากแถวที่เก็บตัวอย่างเป็นช่วง เช่น `vmstat 1 5` แทน
+- **รายงานมีสองฉบับจากต้นฉบับเดียว** คือ `PS06.pdf` (XeLaTeX) และ `PS06_Report.docx` ที่ `tools/build_report.js` อ่าน `PS06.tex` ไปสร้างให้ ถ้าแก้เนื้อหาต้องแก้ที่ `.tex` แล้ว build ใหม่ทั้งสองฉบับ
 
 ข้อควรทราบสำหรับ Mini-Project 1:
 
