@@ -11,7 +11,8 @@ param(
   [int]$Pad = 20,          # pixels of breathing room kept after the last content row
   [int]$GapRows = 90,      # a run of this many blank rows counts as "end of output"
   [int]$Tolerance = 24,    # per-channel difference that still counts as background
-  [int]$MinPixels = 3      # non-background pixels needed for a row/column to count
+  [int]$MinPixels = 3,     # non-background pixels needed for a row/column to count
+  [int]$EdgeSkip = 10      # columns ignored at each side, so a window border is not "content"
 )
 
 Add-Type -AssemblyName System.Drawing
@@ -50,7 +51,7 @@ for ($y = 0; $y -lt $h; $y++) {
   $row = $y * $stride
   $count = 0
   $rowLast = 0
-  for ($x = 0; $x -lt $w; $x++) {
+  for ($x = $EdgeSkip; $x -lt ($w - $EdgeSkip); $x++) {
     $i = $row + $x * 4
     if ([math]::Abs($bytes[$i] - $bgB) -gt $Tolerance -or
         [math]::Abs($bytes[$i + 1] - $bgG) -gt $Tolerance -or

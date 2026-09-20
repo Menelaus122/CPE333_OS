@@ -227,3 +227,43 @@ clear; vmstat -s -S M
 | s16 | `s16_vmstat_plain.png` | ✔ |
 | s17 | `s17_vmstat_mb_interval.png` | ✔ |
 | s18 | `s18_vmstat_stats.png` | ☐ |
+
+---
+
+## ข้อ 3 — Windows VM Monitoring ด้วย Resource Monitor (ภาพ s19–s21)
+
+ขั้นนี้ทำฝั่ง Windows ไม่ใช่ใน Ubuntu
+
+### s19 — เปิด Resource Monitor จาก PowerShell
+
+1. เปิดหน้าต่าง **PowerShell** (tab ใหม่ใน Windows Terminal ก็ได้)
+2. พิมพ์คำสั่งด้านล่าง **แต่ยังไม่ต้องกด Enter** แล้วบอก `s19` เพื่อถ่ายภาพคำสั่งก่อน
+
+```powershell
+resmon
+```
+
+3. ถ่ายเสร็จแล้วค่อยกด Enter เพื่อเปิด Resource Monitor
+
+### s20 — แท็บ Memory ของ Resource Monitor
+
+1. ใน Resource Monitor คลิกแท็บ **Memory**
+2. ขยายหน้าต่างให้ใหญ่ที่สุด (กดปุ่ม maximize) เพื่อให้เห็นครบทั้งสามส่วน คือ
+   ตาราง process ด้านบน, แถบ **Physical Memory** ตรงกลาง และกราฟด้านขวา
+3. ถ้าส่วนใดถูกพับอยู่ ให้คลิกลูกศรบนหัวข้อนั้นเพื่อกางออก
+4. บอก `s20` เพื่อถ่ายภาพ
+
+### s21 — ส่วน Physical Memory (ตัดมาจาก s20)
+
+Claude จะตัดเฉพาะส่วนแถบ Physical Memory ออกมาจากภาพ s20 ให้เอง
+ใช้ตอบข้อ 3.3 ที่ให้สรุปตัวเลขในส่วนนี้เป็นย่อหน้า ไม่ต้องถ่ายเพิ่ม
+
+---
+
+## ตารางเช็กลิสต์ภาพข้อ 3
+
+| ชื่อภาพ | ชื่อ file ที่จะเซฟ | สถานะ |
+|---|---|---|
+| s19 | `s19_resmon_command.png` | ✔ |
+| s20 | `s20_resmon_memory_tab.png` | ✔ |
+| s21 | `s21_physical_memory.png` | ✔ |
