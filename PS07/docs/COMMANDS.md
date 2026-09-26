@@ -107,3 +107,39 @@ clear; objdump -d --no-show-raw-insn -M intel ps7 | awk '/<(deposit|withdraw)_pl
 | t03 | `t03_task2_multicore.png` | ✔ |
 | t04 | `t04_task2_one_core.png` | ✔ |
 | t05 | `t05_objdump.png` | ✔ |
+
+---
+
+## Task 3 — บังคับ context switch ระหว่าง load กับ store (ภาพ t06–t07)
+
+`ps7.c` มีโหมดใหม่คือ argument ตัวที่สาม `yield` ซึ่งเปลี่ยนการฝาก/ถอนเป็น
+load → modify → `sched_yield()` → store ตามตัวอย่างในใบงาน **ต้องคอมไพล์ใหม่ก่อน** (รวมไว้ใน t06 แล้ว)
+ใช้ 100,000 รายการต่อ thread เพราะ `sched_yield()` เป็น system call ทุกรอบ ทำให้ช้ากว่าโหมดปกติมาก
+
+### t06 — คอมไพล์ใหม่ แล้วรันโหมด yield บน CPU 22 ตัว 10 รอบ
+
+```bash
+clear; gcc -o ps7 ps7.c -lpthread; for i in $(seq 10); do ./ps7 4 100000 yield; done
+```
+
+ต้องเห็น: คอมไพล์ผ่านโดยไม่มีข้อความ แล้วตามด้วย 10 บรรทัดที่ขึ้นต้นด้วย `[yield]` ทุกบรรทัดเป็น `RACE`
+และ `diff` ไม่ซ้ำกัน (ใช้เวลาไม่ถึง 1 วินาที)
+
+### t07 — CPU ตัวเดียว เทียบโหมดปกติกับโหมด yield ที่จำนวนรายการเท่ากัน
+
+```bash
+clear; for i in $(seq 10); do taskset -c 0 ./ps7 4 100000; done; for i in $(seq 10); do taskset -c 0 ./ps7 4 100000 yield; done
+```
+
+ต้องเห็น: 20 บรรทัด 10 บรรทัดแรก `[plain]` เป็น `diff=+0 OK` ทั้งหมด ส่วน 10 บรรทัดหลัง `[yield]` เป็น
+`RACE` ทั้งหมด และ `diff` อยู่ใกล้ `+100000` หรือ `-100000` (รอประมาณ 4–5 วินาทีกว่าจะครบ)
+ภาพนี้คือการทดลองแบบควบคุม: โปรแกรม จำนวนรายการ และ CPU เหมือนกันทุกอย่าง ต่างกันแค่ `sched_yield()`
+
+---
+
+## ตารางเช็กลิสต์ภาพ Task 3
+
+| ชื่อภาพ | ชื่อ file ที่จะเซฟ | สถานะ |
+|---|---|---|
+| t06 | `t06_task3_yield_multicore.png` | ✔ |
+| t07 | `t07_task3_yield_one_core.png` | ✔ |
