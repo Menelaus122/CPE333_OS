@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <sched.h>
 
 #define INITIAL_BALANCE 1000L 
 #define AMOUNT          1L     
 #define MAX_THREADS     64
 
 long balance = INITIAL_BALANCE; 
+
+int use_yield = 0;              /* set once in main() before any thread starts */
 
 enum role { DEPOSITOR, WITHDRAWER, BOTH };
 
@@ -29,20 +32,38 @@ void withdraw_plain(void)
     balance = balance - AMOUNT;
 }
 
+void deposit_yield(void)
+{
+    long reg = balance;         /* load   */
+    reg = reg + AMOUNT;         /* modify */
+    sched_yield();              /* force a context switch */
+    balance = reg;              /* store  */
+}
+
+void withdraw_yield(void)
+{
+    long reg = balance;
+    reg = reg - AMOUNT;
+    sched_yield();
+    balance = reg;
+}
+
 void *atm_thread(void *arg)
 {
     struct atm *a = arg;
+    void (*deposit)(void)  = use_yield ? deposit_yield  : deposit_plain;
+    void (*withdraw)(void) = use_yield ? withdraw_yield : withdraw_plain;
     long done_dep = 0, done_wdr = 0;    
     long i;
 
     if (a->role == DEPOSITOR || a->role == BOTH)
         for (i = 0; i < a->tx; i++) {
-            deposit_plain();
+            deposit();
             done_dep++;
         }
     if (a->role == WITHDRAWER || a->role == BOTH)
         for (i = 0; i < a->tx; i++) {
-            withdraw_plain();
+            withdraw();
             done_wdr++;
         }
 
@@ -53,8 +74,9 @@ void *atm_thread(void *arg)
 
 static void usage(const char *prog)
 {
-    fprintf(stderr, "usage: %s [threads] [tx_per_thread]\n"
-                    "  threads = 1, or an even number from 2 to %d\n",
+    fprintf(stderr, "usage: %s [threads] [tx_per_thread] [yield]\n"
+                    "  threads = 1, or an even number from 2 to %d\n"
+                    "  yield   = call sched_yield() between load and store\n",
             prog, MAX_THREADS);
     exit(1);
 }
@@ -71,6 +93,11 @@ int main(int argc, char *argv[])
         nthreads = atoi(argv[1]);
     if (argc > 2)
         tx = atol(argv[2]);
+    if (argc > 3) {
+        if (strcmp(argv[3], "yield") != 0)
+            usage(argv[0]);
+        use_yield = 1;
+    }
     if (nthreads < 1 || nthreads > MAX_THREADS
         || (nthreads > 1 && nthreads % 2 != 0) || tx < 1)
         usage(argv[0]);
@@ -99,8 +126,8 @@ int main(int argc, char *argv[])
     }
     expected = INITIAL_BALANCE + deposits * AMOUNT - withdrawals * AMOUNT;
 
-    printf("[plain] threads=%d tx=%ld in=%ld out=%ld | expected=%ld actual=%ld diff=%+ld %s\n",
-           nthreads, tx, deposits, withdrawals, expected, balance,
+    printf("[%s] threads=%d tx=%ld in=%ld out=%ld | expected=%ld actual=%ld diff=%+ld %s\n",
+           use_yield ? "yield" : "plain", nthreads, tx, deposits, withdrawals, expected, balance,
            balance - expected, (balance == expected) ? "OK" : "RACE");
     return 0;
 }
