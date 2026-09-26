@@ -1,0 +1,316 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2569 - Problem Session 7
+%  Concurrency and Thread
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+\setmainfont{TH Sarabun New}[Scale=1.45]
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={pthread_t,pthread_create,pthread_join,sched_yield,taskset,objdump},
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2569}
+\rhead{\small Problem Session 7}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงานปฏิบัติการ}\\[0.4cm]
+{\Large\bfseries PS07: Concurrency and Thread}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+ทดลองบน Ubuntu 24.04.1 LTS ที่ทำงานบน WSL2 (kernel \code{6.6.87.2-microsoft-standard-WSL2}) CPU คือ Intel Core Ultra 9 185H ซึ่ง Linux มองเห็นเป็น 22 logical CPU คอมไพเลอร์คือ \code{gcc 13.3.0} และ thread library คือ POSIX threads ของ \code{glibc 2.39} ผลการรันทุกครั้งในรายงานเป็นภาพหน้าจอจริงจาก terminal และตัวเลขทุกตัวอ่านจากภาพเหล่านั้น
+
+% =====================================================================
+\section{โปรแกรมที่ใช้ทดลอง}
+% =====================================================================
+
+ตัวอย่างที่เลือกคือ\textbf{บัญชีเงินฝากร่วม}หนึ่งบัญชี ยอดเงินอยู่ในตัวแปร global \code{balance} (เริ่มต้น 1,000 บาท) ซึ่งตู้ ATM หลายตู้ใช้ร่วมกัน แต่ละตู้คือ thread หนึ่งตัว thread ครึ่งหนึ่งฝากเงินและอีกครึ่งหนึ่งถอนเงิน ครั้งละ 1 บาท จำนวนครั้งเท่ากัน \textbf{ยอดสุดท้ายที่ถูกต้องจึงต้องเป็น 1,000 บาทเสมอ} ต่างจากตัวอย่างในคาบเรียนที่เพิ่มค่าตัวนับทางเดียว ตัวอย่างนี้มีทั้งเพิ่มและลด ผลที่ผิดจึงเป็นได้ทั้งบวก (รายการถอนหาย) และลบ (รายการฝากหาย)
+
+การฝากและถอนแก้ค่า \code{balance} ตรง ๆ โดยไม่มี lock ป้องกัน ซึ่งเป็นจุดที่ทำให้เกิด race condition
+
+\begin{lstlisting}[caption={การฝากและถอนเงินที่ไม่มีการป้องกัน}]
+void deposit_plain(void)
+{
+    balance = balance + AMOUNT;
+}
+
+void withdraw_plain(void)
+{
+    balance = balance - AMOUNT;
+}
+\end{lstlisting}
+
+วิธีใช้คือ \code{./ps7 [threads] [tx\_per\_thread] [yield]} ถ้าระบุ 1 thread ตัวนั้นจะฝาก \code{tx} ครั้งแล้วจึงถอน \code{tx} ครั้ง ถ้าระบุเป็นเลขคู่ thread ครึ่งแรกฝาก ครึ่งหลังถอน ตัวละ \code{tx} ครั้ง \code{main()} สร้าง thread ทั้งหมดด้วย \code{pthread\_create()} ก่อนแล้วจึงรอด้วย \code{pthread\_join()} เพื่อให้ทุกตัวทำงานซ้อนกัน แต่ละ thread นับรายการที่ทำเสร็จไว้ในตัวแปร local ของตัวเอง ซึ่งไม่ได้ใช้ร่วมกันจึงถูกต้องเสมอ ใช้ยืนยันว่ารายการครบทุกรายการ
+
+แต่ละรอบพิมพ์ผลหนึ่งบรรทัด \code{in} และ \code{out} คือจำนวนรายการฝากและถอนที่ทำจริง \code{expected} คือยอดที่ควรเป็น (1,000) \code{actual} คือค่าใน \code{balance} และ \code{diff} คือ \code{actual - expected} ท้ายบรรทัดเป็น \code{OK} เมื่อยอดถูกต้อง และ \code{RACE} เมื่อยอดผิด
+
+คอมไพล์ด้วยคำสั่งตามใบงาน \code{gcc -o ps7 ps7.c -lpthread} โดยตั้งใจไม่ใส่ \code{-O} เพราะ \code{-O2} อาจรวบลูปทั้งลูปเหลือการบวกครั้งเดียว ทำให้ race condition แทบไม่ปรากฏ
+
+% =====================================================================
+\section{Task 1: รันด้วย thread เดียว}
+% =====================================================================
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t01_env_compile.png}
+\caption{จำนวน CPU รุ่นของ gcc และการคอมไพล์ด้วยคำสั่งตามใบงาน}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t02_task1_one_thread.png}
+\caption{Task 1: รันด้วย thread เดียว 5 รอบ ได้ยอดเงินถูกต้องทุกรอบ}
+\end{figure}
+
+คอมไพล์ผ่านโดยไม่มี warning และเมื่อรันด้วย thread เดียว ทั้ง 5 รอบได้ \code{actual=1000 diff=+0 OK} เหมือนกันทุกรอบ เพราะมี thread เพียงตัวเดียวที่แก้ \code{balance} การอ่าน--บวก--เขียนแต่ละครั้งจึงจบก่อนเริ่มครั้งถัดไปเสมอ ผลนี้ยืนยันว่าตรรกะของโปรแกรมถูกต้อง ถ้าใช้หลาย thread แล้วยอดผิด สาเหตุจึงมาจากการแก้ตัวแปรร่วมกันเท่านั้น
+
+% =====================================================================
+\section{Task 2: หลาย thread โดยไม่บังคับ context switch}
+% =====================================================================
+
+แก้ให้ใช้หลาย thread โดยสั่ง \code{./ps7 4 1000000} คือฝาก 2 ตัวและถอน 2 ตัว ตัวละ 1,000,000 รายการ ยอดที่ถูกต้องยังเป็น 1,000 บาท รันสองแบบ คือแบบปกติที่ thread กระจายอยู่บน CPU 22 ตัว และแบบที่ใช้ \code{taskset -c 0} บังคับให้ทุก thread อยู่บน CPU ตัวเดียว
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t03_task2_multicore.png}
+\caption{Task 2: 4 thread บน CPU 22 ตัว รัน 10 รอบ ผิดทุกรอบและไม่ซ้ำกันเลย}
+\end{figure}
+
+บน CPU 22 ตัว \textbf{ผิดทั้ง 10 รอบและไม่ซ้ำกันเลย} บวก 4 รอบ ลบ 6 รอบ ตั้งแต่ \mbox{-726,602} ถึง +379,062 ทั้งที่ \code{in=2000000 out=2000000} ครบทุกบรรทัด แปลว่ารายการถูกทำครบ แต่ผลของการเขียนลง \code{balance} หายไป สาเหตุคือ thread ได้ CPU คนละตัวและทำงานพร้อมกันจริง จึงชนกันได้ในทุกรอบของลูป
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t04_task2_one_core.png}
+\caption{Task 2: 4 thread บน CPU ตัวเดียว รัน 20 รอบ ถูก 13 รอบ ผิด 7 รอบ}
+\end{figure}
+
+บน CPU ตัวเดียว \textbf{ถูก 13 รอบ ผิด 7 รอบ} และค่าที่ผิดเป็นก้อนลงตัว คือ +1,000,000 (5 รอบ), +2,000,000 และ \mbox{-629,150} กรณีนี้ thread สลับกันได้เฉพาะเมื่อ kernel ขัดจังหวะ รอบส่วนใหญ่จึงถูก เพราะลูปจบก่อนโดนขัด หรือโดนขัดนอกช่วงอ่าน--เขียน แต่ถ้า thread ฝากเงินโดนขัดหลังอ่าน \code{balance} แล้วแต่ยังไม่ได้เขียนกลับ ระหว่างรอ thread ถอนเงินอาจถอนครบทั้ง 1,000,000 ครั้ง แล้ว thread ฝากก็กลับมาเขียนค่าเก่าทับ ได้ +1,000,000 พอดี นี่คือ untimely context switch ที่เกิดขึ้นเองแต่ไม่บ่อย จึงต้องรันหลายครั้งถึงจะเห็น
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{../result/screenshots/t05_objdump.png}
+\caption{คำสั่งเครื่องของ \code{deposit\_plain()} และ \code{withdraw\_plain()}}
+\end{figure}
+
+ภาพจาก \code{objdump} แสดงว่า \code{balance = balance + AMOUNT} ไม่ใช่คำสั่งเดียว แต่เป็นสามคำสั่ง คือ load (\code{mov rax,[balance]}) ที่ \code{1271}, add ที่ \code{1278} และ store (\code{mov [balance],rax}) ที่ \code{127c} ถ้า thread อื่นเขียน \code{balance} ในช่วงระหว่าง load กับ store ค่าที่ store ลงไปจะทับผลของ thread นั้น
+
+% =====================================================================
+\section{Task 3: บังคับ context switch}
+% =====================================================================
+
+เพิ่มโหมด \code{yield} ที่แยกการแก้ค่าเป็นสามขั้นตามตัวอย่างในใบงาน และเรียก \code{sched\_yield()} คั่นก่อนการเขียน (ไม่ใช้ \code{pthread\_yield()} เพราะ glibc 2.34 ขึ้นไปเลิกใช้แล้ว) จำนวนรายการลดเหลือ 100,000 ต่อ thread เพราะ \code{sched\_yield()} เป็น system call ทุกรอบ
+
+\begin{lstlisting}[caption={การฝากและถอนที่บังคับ context switch ระหว่าง load กับ store}]
+void deposit_yield(void)
+{
+    long reg = balance;         /* load   */
+    reg = reg + AMOUNT;         /* modify */
+    sched_yield();              /* force a context switch */
+    balance = reg;              /* store  */
+}
+
+void withdraw_yield(void)
+{
+    long reg = balance;
+    reg = reg - AMOUNT;
+    sched_yield();
+    balance = reg;
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t06_task3_yield_multicore.png}
+\caption{Task 3: คอมไพล์ใหม่แล้วรันโหมด yield บน CPU 22 ตัว 10 รอบ ผิดทุกรอบ}
+\end{figure}
+
+บน CPU 22 ตัว \textbf{ผิดทั้ง 10 รอบและไม่ซ้ำกัน} บวก 5 รอบ ลบ 5 รอบ ตั้งแต่ \mbox{-60,108} ถึง +30,997 บนเครื่องนี้ thread แต่ละตัวมักได้ CPU ของตัวเอง ถ้าไม่มี thread อื่นรออยู่ \code{sched\_yield()} จะไม่สลับจริง แต่ยังทำให้ช่วงระหว่าง load กับ store ยาวขึ้น thread บน CPU อื่นจึงเขียนแทรกได้ง่าย
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t07_task3_yield_one_core.png}
+\caption{Task 3: CPU ตัวเดียว 100,000 รายการต่อ thread โหมดปกติถูกทั้ง 10 รอบ โหมด yield ผิดทั้ง 10 รอบ}
+\end{figure}
+
+ภาพนี้เป็นการทดลองแบบควบคุมบน CPU ตัวเดียว ใช้จำนวน thread และจำนวนรายการเท่ากัน ต่างกันแค่การเรียก \code{sched\_yield()} ผลคือ\textbf{โหมดปกติถูกทั้ง 10 รอบ แต่โหมด yield ผิดทั้ง 10 รอบ} ยืนยันว่า context switch ที่เกิดระหว่าง load กับ store คือตัวที่ทำให้ค่าถูกเขียนทับ
+
+ค่าที่ผิดในโหมด yield คือ +100,000 พอดี 5 รอบ และใกล้ \mbox{-100,000} อีก 5 รอบ เพราะ thread ทั้ง 4 ตัวผลัดกันทำทีละรายการ และแต่ละตัวอ่านค่าที่ตัวเองเพิ่งเขียนกลับมาเสมอ thread ฝากสองตัวจึงรวมกันเป็นตัวนับตัวเดียวที่เพิ่มรอบละ 1 ส่วน thread ถอนสองตัวลดรอบละ 1 สองฝั่งเขียนทับกันตลอด ยอดสุดท้ายจึงเป็นค่าของฝั่งที่เขียนคนสุดท้าย คือ 101,000 หรือ \mbox{-99,000}
+
+% =====================================================================
+\section{อภิปรายผลและสาเหตุของ race condition}
+% =====================================================================
+
+race condition ในโปรแกรมนี้เกิดจากเงื่อนไขสามข้อพร้อมกัน ข้อแรก \code{balance} เป็นตัวแปร global ที่ทุก thread ใช้ร่วมกัน ข้อสอง \code{balance = balance + AMOUNT} ไม่เป็น atomic เพราะเป็นสามคำสั่ง load, add และ store (ภาพ t05) และข้อสาม ไม่มี lock กันไม่ให้หลาย thread เข้า critical section นี้พร้อมกัน ผลคือ \textbf{lost update} ดังตัวอย่างในตาราง
+
+\begin{table}[H]
+\centering\small
+\caption{ลำดับเหตุการณ์ที่ทำให้รายการถอนเงินหายไปหนึ่งรายการ}
+\begin{tabular}{@{}p{1.2cm}p{4.9cm}p{4.9cm}p{4.0cm}@{}}
+\toprule
+\textbf{ลำดับ} & \textbf{thread A (ฝาก)} & \textbf{thread B (ถอน)} & \textbf{balance ในหน่วยความจำ} \\
+\midrule
+1 & load: \code{rax = 1000} & & 1000 \\
+2 & add: \code{rax = 1001} & & 1000 \\
+3 & & load: \code{rax = 1000} & 1000 \\
+4 & & sub: \code{rax = 999} & 1000 \\
+5 & & store: \code{balance = 999} & 999 \\
+6 & store: \code{balance = 1001} & & 1001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ฝากหนึ่งครั้งและถอนหนึ่งครั้ง ยอดควรเป็น 1,000 แต่ได้ 1,001 เพราะ A เขียนค่าที่คำนวณจากข้อมูลเก่าทับผลของ B ถ้าขั้นที่ 5 กับ 6 สลับกัน ยอดจะเป็น 999 แทน ผลจึงขึ้นกับว่า thread ใด store คนสุดท้าย ขั้นที่ 3--5 เกิดได้ทั้งจาก B ทำงานพร้อมกันบน CPU อีกตัว (t03) และจาก A ถูกสลับออกหลังขั้นที่ 2 (t04 และ t07)
+
+ลำดับการสลับถูกกำหนดโดย scheduler และขึ้นกับสิ่งที่โปรแกรมควบคุมไม่ได้ เช่น จังหวะของ timer interrupt, CPU ที่แต่ละ thread ได้ และงานอื่นในเครื่อง ผลจึงเปลี่ยนไปทุกครั้งที่รัน (non-deterministic) ส่วน \code{sched\_yield()} ไม่ได้สร้าง bug ขึ้นมาใหม่ เพียงบังคับให้ช่วงระหว่าง load กับ store ถูกแทรกแน่นอนทุกครั้ง แทนที่จะรอให้เกิดเองโดยบังเอิญ
+
+\begin{table}[H]
+\centering\small
+\caption{สรุปผลการรันทุกชุด (ตัวเลขทั้งหมดอ่านจากภาพหน้าจอ)}
+\begin{tabular}{@{}p{1.0cm}p{1.1cm}p{2.3cm}p{1.9cm}p{0.9cm}p{1.5cm}p{4.9cm}@{}}
+\toprule
+\textbf{ภาพ} & \textbf{โหมด} & \textbf{thread/CPU} & \textbf{tx/thread} & \textbf{รอบ} & \textbf{รอบที่ผิด} & \textbf{diff ที่พบ} \\
+\midrule
+t02 & plain & 1 / 22 & 1,000,000 & 5 & 0 & +0 ทุกรอบ \\
+t03 & plain & 4 / 22 & 1,000,000 & 10 & 10 & \mbox{-726,602} ถึง +379,062 ไม่ซ้ำกัน \\
+t04 & plain & 4 / 1 & 1,000,000 & 20 & 7 & +1,000,000 (5 รอบ), +2,000,000 และ \mbox{-629,150} \\
+t06 & yield & 4 / 22 & 100,000 & 10 & 10 & \mbox{-60,108} ถึง +30,997 ไม่ซ้ำกัน \\
+t07 & plain & 4 / 1 & 100,000 & 10 & 0 & +0 ทุกรอบ \\
+t07 & yield & 4 / 1 & 100,000 & 10 & 10 & +100,000 (5 รอบ) และใกล้ \mbox{-100,000} (5 รอบ) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section*{สรุปผลการทดลอง}
+\addcontentsline{toc}{section}{สรุปผลการทดลอง}
+% =====================================================================
+
+โปรแกรมให้ผลถูกต้องเสมอเมื่อใช้ thread เดียว แต่เมื่อใช้หลาย thread ยอดเงินผิดและเปลี่ยนไปทุกครั้งที่รัน บน CPU หลายตัว race condition เกิดแทบทุกครั้งเพราะ thread ทำงานพร้อมกันจริง ส่วนบน CPU ตัวเดียวเกิดเฉพาะเมื่อ context switch ตกระหว่าง load กับ store ซึ่งไม่บ่อย และเมื่อบังคับ context switch ด้วย \code{sched\_yield()} ก็ผิดทุกครั้ง สาเหตุคือการอ่าน--แก้--เขียนตัวแปรที่ใช้ร่วมกันโดยไม่เป็น atomic และไม่มี mutual exclusion ข้อสังเกตสำคัญคือโปรแกรมที่มี race condition อาจรันผ่านได้หลายครั้ง (13 จาก 20 รอบใน t04) การรันแล้วได้ผลถูกจึงไม่ได้พิสูจน์ว่าโปรแกรมถูกต้อง ต้องป้องกัน critical section ด้วยกลไก synchronization เช่น mutex หรือคำสั่ง atomic
+
+% =====================================================================
+\section*{ภาคผนวก: ซอร์สโค้ดทั้งหมดของ ps7.c}
+\addcontentsline{toc}{section}{ภาคผนวก: ซอร์สโค้ดทั้งหมดของ ps7.c}
+% =====================================================================
+
+\lstinputlisting[caption={ซอร์สโค้ดฉบับสมบูรณ์ \code{PS07/src/ps7.c}}]{../src/ps7.c}
+
+\end{document}

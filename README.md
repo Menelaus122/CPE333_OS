@@ -9,6 +9,7 @@
 | **PS04** | Memory class and API in C programming | 1--3 | [`PS04/docs/PS04.pdf`](PS04/docs/PS04.pdf) |
 | **Mini-Project 1** | Compile และติดตั้ง Ubuntu kernel ใหม่ | – | [`Miniproj1/docs/MiniProject1_Report.docx`](Miniproj1/docs/MiniProject1_Report.docx) |
 | **PS06** | Virtual Memory | 1–3 | [`PS06/docs/PS06.pdf`](PS06/docs/PS06.pdf) · [`PS06_Report.docx`](PS06/docs/PS06_Report.docx) |
+| **PS07** | Concurrency and Thread (race condition) | Task 1–3 | [`PS07/docs/PS07.pdf`](PS07/docs/PS07.pdf) · [`PS07_Report.docx`](PS07/docs/PS07_Report.docx) |
 
 ---
 
@@ -101,7 +102,7 @@ CPE333_OS/
     │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
     └── result/
         └── screenshots/     # ภาพหน้าจอจาก Virtual Machine ที่ใช้ในรายงาน (s01–s19)
-└── PS06/                  # Problem Session 6: Virtual Memory (หลักฐานเป็นภาพหน้าจอทั้งหมด)
+├── PS06/                  # Problem Session 6: Virtual Memory (หลักฐานเป็นภาพหน้าจอทั้งหมด)
     ├── Makefile           # คำสั่งสร้างรายงาน PDF และ .docx
     ├── docs/
     │   ├── PS06.tex       # ไฟล์รายงานหลัก (LaTeX Source) เป็นต้นทางของทั้ง PDF และ .docx
@@ -117,6 +118,22 @@ CPE333_OS/
     └── result/
         ├── notes.txt      # ปัญหาและข้อสังเกตที่พบระหว่างทดลอง
         └── screenshots/   # ภาพหน้าจอหลักฐานทั้งหมด (s01–s21)
+└── PS07/                  # Problem Session 7: Concurrency and Thread (race condition บนบัญชีเงินฝากร่วม)
+    ├── Makefile           # คอมไพล์ ps7 ตามคำสั่งในใบงาน และสร้างรายงาน PDF / .docx
+    ├── src/
+    │   └── ps7.c          # บัญชีเงินฝากร่วมที่ ATM หลาย thread ฝาก/ถอนพร้อมกันโดยไม่มี lock (มีโหมด yield สำหรับ Task 3)
+    ├── docs/
+    │   ├── PS07.tex       # ไฟล์รายงานหลัก (LaTeX Source) เป็นต้นทางของทั้ง PDF และ .docx
+    │   ├── PS07.pdf       # รายงานฉบับสมบูรณ์ (PDF) 9 หน้า รวมปก สารบัญ และภาคผนวกซอร์สโค้ด
+    │   ├── PS07_Report.docx # รายงานฉบับ Word สร้างจาก PS07.tex ไฟล์เดียวกัน
+    │   ├── COMMANDS.md    # คำสั่งที่พิมพ์ใน terminal ตามลำดับ และรายการภาพหลักฐาน t01–t07
+    │   ├── problem_session_7_concurrency_and_thread.md # โจทย์การทดลอง
+    │   └── KMUTT_CI_Primary_Logo-Full-1200x1200.png # โลโก้ มจธ.
+    ├── tools/
+    │   └── build_report.js  # อ่าน PS07.tex แล้วสร้าง PS07_Report.docx (ต่อยอดจากของ PS06)
+    └── result/
+        ├── notes.txt      # การเลือกจำนวนรายการต่อ thread และข้อสังเกตก่อนถ่ายภาพ
+        └── screenshots/   # ภาพหน้าจอหลักฐานทั้งหมด (t01–t07)
 ```
 
 ---
@@ -125,7 +142,7 @@ CPE333_OS/
 
 ### 1. การใช้ Makefile (แนะนำ)
 
-ทั้ง `PS02/`, `PS03/` และ `PS04/` มี `Makefile` ของตัวเอง ใช้คำสั่งเดียวกันได้:
+ทั้ง `PS02/`, `PS03/`, `PS04/` และ `PS07/` มี `Makefile` ของตัวเอง ใช้คำสั่งเดียวกันได้ (`PS07/` มี `make docx` เพิ่มสำหรับฉบับ Word):
 
 ```bash
 cd PS02        # หรือ cd PS03 / cd PS04
@@ -241,6 +258,21 @@ gcc -Wall -Wextra -o q3_alloc_b q3_alloc_b.c
 gcc -Wall -Wextra -o q3_regions q3_regions.c
 ```
 
+**PS07 (`PS07/src`)**
+
+คอมไพล์ตามคำสั่งในใบงานทุกตัวอักษร และตั้งใจไม่ใส่ `-O` เพราะ `-O2` อาจรวบลูปทั้งลูปเหลือการบวกครั้งเดียวจน race condition แทบไม่ปรากฏ
+
+```bash
+cd PS07/src
+gcc -o ps7 ps7.c -lpthread
+
+./ps7 1 1000000                    # Task 1: thread เดียว ต้องได้ diff=+0 OK ทุกครั้ง
+./ps7 4 1000000                    # Task 2: 4 thread (ฝาก 2 ถอน 2) ผลเปลี่ยนทุกครั้ง
+taskset -c 0 ./ps7 4 1000000       # Task 2: บังคับให้อยู่บน CPU ตัวเดียว ส่วนใหญ่ OK บางครั้งผิดเป็นก้อน
+./ps7 4 100000 yield               # Task 3: sched_yield() ระหว่าง load กับ store
+taskset -c 0 ./ps7 4 100000 yield  # Task 3: CPU ตัวเดียว ผิดทุกครั้ง ใกล้ +100000 หรือ -100000
+```
+
 > **หมายเหตุ:** โค้ดต้นฉบับจากใบงานประกาศ `void main()` ซึ่งไม่ตรงมาตรฐาน C การคอมไพล์ด้วย `-Wall -Wextra` จึงมี warning `[-Wmain]` ติดมาทุกไฟล์ และไฟล์ `q2_noextern.c` มี warning `[-Wuninitialized]` เพิ่มอีกหนึ่งข้อ ทั้งสองอย่างเป็นส่วนหนึ่งของผลการทดลองที่ต้องอธิบายในรายงาน จึงคงโค้ดไว้ตามใบงานทุกตัวอักษร ส่วน `q3_regions.c` ที่เขียนขึ้นเองคอมไพล์ผ่านโดยไม่มี warning
 
 ---
@@ -254,13 +286,15 @@ cd PS02/docs && xelatex PS02.tex && xelatex PS02.tex
 cd PS03/docs && xelatex PS03.tex && xelatex PS03.tex
 cd PS04/docs && xelatex PS04.tex && xelatex PS04.tex
 cd PS06/docs && xelatex PS06.tex && xelatex PS06.tex
+cd PS07/docs && xelatex PS07.tex && xelatex PS07.tex
 ```
 *(รันคำสั่ง 2 รอบ เพื่อให้สารบัญและเลขหน้าอัปเดตอย่างถูกต้อง)*
 
-รายงานของ PS06 มีฉบับ Word ด้วย สร้างจากไฟล์ `.tex` ชุดเดียวกันเพื่อไม่ให้เนื้อหาสองฉบับหลุดกัน:
+รายงานของ PS06 และ PS07 มีฉบับ Word ด้วย สร้างจากไฟล์ `.tex` ชุดเดียวกันเพื่อไม่ให้เนื้อหาสองฉบับหลุดกัน:
 
 ```bash
 node PS06/tools/build_report.js     # อ่าน PS06/docs/PS06.tex -> PS06/docs/PS06_Report.docx
+node PS07/tools/build_report.js     # อ่าน PS07/docs/PS07.tex -> PS07/docs/PS07_Report.docx
 ```
 *(ต้องการ Node.js และ package `docx` เปิดไฟล์ใน Word ครั้งแรกให้กด `Ctrl` `A` แล้ว `F9` เพื่ออัปเดตสารบัญ)*
 
@@ -270,7 +304,7 @@ node PS06/tools/build_report.js     # อ่าน PS06/docs/PS06.tex -> PS06/do
 
 ## 🧪 สภาพแวดล้อมที่ใช้ทดลอง
 
-การทดลองของ PS02–PS04 และ PS06 รันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21` ส่วนข้อ 3 ของ PS06 ทำบน **Windows 11 Home Single Language (build 26200)** ซึ่งเป็นเครื่องเดียวกันกับที่ WSL2 ทำงานอยู่
+การทดลองของ PS02–PS04, PS06 และ PS07 รันบน **Ubuntu 24.04.1 LTS (WSL2 บน Windows 11)** kernel `6.6.87.2-microsoft-standard-WSL2` คอมไพเลอร์ `gcc 13.3.0` และ shell `GNU bash 5.2.21` ส่วนข้อ 3 ของ PS06 ทำบน **Windows 11 Home Single Language (build 26200)** ซึ่งเป็นเครื่องเดียวกันกับที่ WSL2 ทำงานอยู่
 
 ข้อควรทราบสำหรับ PS03:
 
@@ -291,6 +325,14 @@ node PS06/tools/build_report.js     # อ่าน PS06/docs/PS06.tex -> PS06/do
 - **systemd บน WSL2 ไม่รับ swap entry ใน `/etc/fstab`** เพราะ `systemd-detect-virt --container` ตอบ `wsl` ทำให้ `systemd-fstab-generator` ข้ามบรรทัด swap ทิ้ง (เห็นได้จาก journal) ถ้าต้องการให้ถาวรต้องใช้ `swapon -a` ผ่าน `[boot] command` ใน `/etc/wsl.conf` หรือกำหนด `swap=` ใน `.wslconfig` ฝั่ง Windows
 - **แถวแรกของ `vmstat` เป็นค่าเฉลี่ยตั้งแต่บูต ไม่ใช่ค่าปัจจุบัน** และบนเครื่องนี้คอลัมน์ `cs` ของแถวนั้นรายงานเป็น 0 ทั้งที่ `vmstat -s` นับได้ 261,886 ครั้ง ให้อ่านค่าจากแถวที่เก็บตัวอย่างเป็นช่วง เช่น `vmstat 1 5` แทน
 - **รายงานมีสองฉบับจากต้นฉบับเดียว** คือ `PS06.pdf` (XeLaTeX) และ `PS06_Report.docx` ที่ `tools/build_report.js` อ่าน `PS06.tex` ไปสร้างให้ ถ้าแก้เนื้อหาต้องแก้ที่ `.tex` แล้ว build ใหม่ทั้งสองฉบับ
+
+ข้อควรทราบสำหรับ PS07:
+
+- **ผลของ Task 2 และ Task 3 ไม่มีวันซ้ำกับที่บันทึกไว้** เพราะนั่นคือพฤติกรรม non-deterministic ที่การทดลองต้องการแสดง ตัวเลขในรายงานอ่านจากภาพหน้าจอใน `PS07/result/screenshots/` ส่วนคำสั่งที่ใช้ถ่ายแต่ละภาพอยู่ใน `PS07/docs/COMMANDS.md`
+- **เครื่องที่ใช้มี 22 CPU** thread ทั้ง 4 ตัวจึงทำงานพร้อมกันจริง race condition ปรากฏแทบทุกครั้งแม้ไม่บังคับ context switch การทดลองจึงรันซ้ำอีกชุดด้วย `taskset -c 0` เพื่อให้ทุก thread อยู่บน CPU ตัวเดียว ซึ่งจะสลับกันได้เฉพาะเมื่อ kernel ขัดจังหวะ (หลักการเดียวกับการทดลอง `nice` ของ PS03)
+- **โหมด `yield` ใช้ `sched_yield()`** ไม่ใช่ `pthread_yield()` เพราะ glibc 2.34 ขึ้นไปประกาศเลิกใช้ฟังก์ชันหลังแล้ว และจำนวนรายการต่อ thread ลดเหลือ 100,000 เพราะทุกรอบต้องเข้า kernel หนึ่งครั้ง
+- **รายงานมีสองฉบับจากต้นฉบับเดียว** เหมือน PS06 `PS07/tools/build_report.js` ต่อยอดจากของ PS06 ให้รองรับ `\mbox{}` และ `\lstinputlisting` และให้รายการลำดับเลขแต่ละชุดเริ่มนับใหม่
+- **รายงานเขียนแบบสั้นตามที่ใบงานขอ** (*a short report*) มีเฉพาะคำอธิบายโค้ดส่วนสำคัญ ผลการรัน Task 1–3 การอภิปรายสาเหตุ และภาคผนวกซอร์สโค้ดฉบับเต็มที่ดึงจาก `src/ps7.c` โดยตรงด้วย `\lstinputlisting`
 
 ข้อควรทราบสำหรับ Mini-Project 1:
 
