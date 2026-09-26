@@ -58,3 +58,52 @@ clear; for i in $(seq 5); do ./ps7 1 1000000; done
 |---|---|---|
 | t01 | `t01_env_compile.png` | ✔ |
 | t02 | `t02_task1_one_thread.png` | ✔ |
+
+---
+
+## Task 2 — หลาย thread โดยไม่บังคับ context switch (ภาพ t03–t05)
+
+ใช้ 4 thread (ฝาก 2 ตัว ถอน 2 ตัว) ตัวละ 1,000,000 รายการ ใช้ไฟล์ `ps7` ตัวเดิมจาก t01 ไม่ต้องคอมไพล์ใหม่
+ถ้าเปิด terminal ใหม่ ให้ `cd /mnt/c/Users/Oping/CPE333_OS/PS07/src` ก่อน
+
+### t03 — 4 thread บน CPU 22 ตัว รัน 10 รอบ
+
+```bash
+clear; for i in $(seq 10); do ./ps7 4 1000000; done
+```
+
+ต้องเห็น: 10 บรรทัด `in=2000000 out=2000000` เท่ากันทุกบรรทัด แต่ `actual` และ `diff` **ไม่ซ้ำกันเลย**
+มีทั้งบวกและลบ และลงท้ายด้วย `RACE` (ถ้ามีบางบรรทัดเป็น `OK` ก็ไม่ผิด ถ่ายได้เลย)
+
+### t04 — 4 thread เหมือนเดิม แต่บังคับให้อยู่บน CPU ตัวเดียว รัน 20 รอบ
+
+```bash
+clear; for i in $(seq 20); do taskset -c 0 ./ps7 4 1000000; done
+```
+
+`taskset -c 0` บังคับให้ทุก thread ของโปรแกรมทำงานบน CPU หมายเลข 0 เท่านั้น thread จึงสลับกันได้
+เฉพาะเมื่อ kernel ขัดจังหวะ (timer interrupt) เท่านั้น ไม่ได้ทำงานพร้อมกันจริงเหมือน t03
+
+ต้องเห็น: ส่วนใหญ่เป็น `diff=+0 OK` และมีบางรอบเป็น `RACE` ที่ผิดทีละมาก ๆ (หลักแสนถึงหนึ่งล้าน)
+ถ้าบังเอิญ `OK` ครบ 20 รอบ ให้กดลูกศรขึ้นแล้ว Enter รันซ้ำอีกครั้งก่อนถ่าย เพราะใบงานบอกว่า
+อาจต้องรันหลายครั้งถึงจะเห็นผล (บอกมาในแชตด้วยว่ารันกี่ครั้ง จะบันทึกไว้ในรายงาน)
+
+### t05 — ดูว่า `balance = balance + AMOUNT` กลายเป็นคำสั่งเครื่องกี่คำสั่ง
+
+```bash
+clear; objdump -d --no-show-raw-insn -M intel ps7 | awk '/<(deposit|withdraw)_plain>:/,/ret/'
+```
+
+ต้องเห็น: ฟังก์ชัน `deposit_plain` และ `withdraw_plain` ฟังก์ชันละ 9 บรรทัด ตรงกลางมีสามคำสั่งที่เป็นหัวใจ
+ของ race condition คือ `mov rax,QWORD PTR [rip+...] # <balance>` (load) → `add rax,0x1` หรือ
+`sub rax,0x1` (modify) → `mov QWORD PTR [rip+...],rax # <balance>` (store)
+
+---
+
+## ตารางเช็กลิสต์ภาพ Task 2
+
+| ชื่อภาพ | ชื่อ file ที่จะเซฟ | สถานะ |
+|---|---|---|
+| t03 | `t03_task2_multicore.png` | ✔ |
+| t04 | `t04_task2_one_core.png` | ✔ |
+| t05 | `t05_objdump.png` | ✔ |
