@@ -4,7 +4,7 @@
 // reads that same file and renders the Word version from it, so the two deliverables cannot
 // drift apart. It understands only the constructs PS07.tex actually uses: section/subsection,
 // paragraphs with \code \textbf \textit \mbox, itemize/enumerate, table+tabular,
-// figure+includegraphics, lstlisting and \lstinputlisting (the source appendix). The title
+// figure+includegraphics, lstlisting and \lstinputlisting. The title
 // page is skipped and rebuilt here, since LaTeX and Word lay a cover page out very differently.
 //
 // Usage: node PS07/tools/build_report.js
@@ -250,7 +250,6 @@ const bodyTex = source.slice(afterCover + '\\setcounter{page}{1}'.length, docEnd
 
 const counters = { section: 0, sub: 0, subsub: 0, figure: 0, table: 0, code: 0 };
 const out = [];
-let firstSection = true;
 let buffer = [];
 let listCount = 0;
 
@@ -290,8 +289,8 @@ for (let i = 0; i < lines.length; i++) {
       else { counters.subsub++; text = `${counters.section}.${counters.sub}.${counters.subsub} ${body}`; }
     }
     const level = depth === 0 ? HeadingLevel.HEADING_1 : depth === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
-    out.push(heading(text, level, depth === 0 && !firstSection));
-    if (depth === 0) firstSection = false;
+    // the report is short, so sections run on without a forced page break (as in the PDF)
+    out.push(heading(text, level, false));
     continue;
   }
 
