@@ -1,0 +1,308 @@
+% =====================================================================
+%  CPE 333 Operating Systems 1/2569 - Problem Session 7
+%  Concurrency and Thread
+%  ---------------------------------------------------------------
+%  คอมไพล์ด้วย XeLaTeX
+% =====================================================================
+\documentclass[a4paper,11pt]{article}
+
+% ------------------------- Layout -------------------------
+\usepackage[margin=2.2cm,top=2.2cm,bottom=2.2cm]{geometry}
+\usepackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\usepackage{parskip}
+\setlength{\parskip}{4pt}
+\usepackage{enumitem}
+\setlist{topsep=3pt,itemsep=2pt,parsep=0pt}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,skip=3pt}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% ------------------------- ฟอนต์ภาษาไทย -------------------------
+\usepackage{fontspec}
+\usepackage{xltxtra}
+
+\setmainfont{TH Sarabun New}[Scale=1.45]
+\setmonofont{Consolas}[Scale=0.78]
+
+% การตัดคำภาษาไทย
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip = 0pt plus 0.3pt
+\emergencystretch=3em
+
+% ------------------------- สไตล์โค้ด -------------------------
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codeframe}{RGB}{221,221,221}
+\definecolor{kw}{RGB}{0,86,179}
+\definecolor{cmt}{RGB}{106,153,85}
+\definecolor{str}{RGB}{163,21,21}
+\definecolor{numgray}{RGB}{150,150,150}
+
+\lstdefinestyle{cstyle}{
+  language=C,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kw}\bfseries,
+  commentstyle=\color{cmt}\itshape,
+  stringstyle=\color{str},
+  numbers=left,
+  numberstyle=\tiny\color{numgray},
+  numbersep=6pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=12pt,
+  framexleftmargin=12pt,
+  morekeywords={pthread_t,pthread_create,pthread_join,sched_yield,taskset,objdump},
+}
+
+\lstdefinestyle{terminal}{
+  language={},
+  keywordstyle=\relax,
+  commentstyle=\relax,
+  stringstyle=\relax,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\scriptsize,
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  aboveskip=6pt,
+  belowskip=2pt,
+  xleftmargin=4pt,
+}
+
+\lstset{style=cstyle}
+\renewcommand{\lstlistingname}{Code}
+\newcommand{\code}[1]{\texttt{#1}}
+
+% ------------------------- Header / Footer -------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CPE 333 Operating Systems 1/2569}
+\rhead{\small Problem Session 7}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+
+% =====================================================================
+\begin{document}
+
+% ------------------------- หน้าปก -------------------------
+\begin{titlepage}
+\centering
+\vspace*{0.3cm}
+\includegraphics[width=3.2cm]{KMUTT_CI_Primary_Logo-Full-1200x1200.png}\\[0.8cm]
+{\Large\bfseries รายงานปฏิบัติการ}\\[0.4cm]
+{\Large\bfseries PS07: Concurrency and Thread}\\[0.4cm]
+\vfill
+{\large\bfseries เสนอ}\\[0.3cm]
+{\large อาจารย์ ราชวิชช์ สโรชวิกสิต}\\[1.2cm]
+{\large\bfseries จัดทำโดย}\\[0.4cm]
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{l@{\hspace{1.5cm}}l}
+นายภูมิพัฒน์ อภิวาทธนะพงศ์ & 67070501035 \\
+นายวิรชัช ทองอุทัยศรี & 67070501041 \\
+นายเจษฎา เกียรติกมลวงศ์ & 67070501080 \\
+\end{tabular}
+\renewcommand{\arraystretch}{1.0}
+\vfill
+{\large รายงานนี้เป็นส่วนหนึ่งของวิชา CPE 333 Operating Systems}\\[0.2cm]
+{\large ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์}\\[0.2cm]
+{\large ภาคการศึกษาที่ 1 ปีการศึกษา 2569}\\[0.2cm]
+{\large มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี}
+\end{titlepage}
+
+% หน้าปกและสารบัญไม่นับเลขหน้า เนื้อหาจริงเริ่มนับที่หน้า 1
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+\setcounter{page}{1}
+
+% =====================================================================
+\section*{สภาพแวดล้อมที่ใช้ในการทดลอง}
+\addcontentsline{toc}{section}{สภาพแวดล้อมที่ใช้ในการทดลอง}
+% =====================================================================
+
+การทดลองทั้งหมดทำบน Linux ที่ทำงานอยู่บน WSL2 ของเครื่องคอมพิวเตอร์เครื่องเดียว จุดที่มีผลต่อการทดลองนี้โดยตรงคือจำนวน CPU เพราะ thread ที่รันบน CPU คนละแกนทำงานพร้อมกันได้จริง ไม่ต้องรอให้ระบบปฏิบัติการสลับให้ รายละเอียดของสภาพแวดล้อมเป็นดังนี้
+
+\begin{table}[H]
+\centering\small
+\caption{ข้อมูลสภาพแวดล้อมของระบบที่ใช้ในการทดลอง}
+\begin{tabular}{@{}p{3.9cm}p{12.2cm}@{}}
+\toprule
+\textbf{รายการ} & \textbf{รายละเอียด} \\
+\midrule
+ระบบปฏิบัติการ & Ubuntu 24.04.1 LTS ทำงานบน WSL2 ของ Windows 11 Home Single Language (build 26200) \\
+Kernel & \code{6.6.87.2-microsoft-standard-WSL2} (x86-64, \code{SMP PREEMPT\_DYNAMIC}) \\
+CPU & Intel Core Ultra 9 185H ที่ Linux มองเห็นเป็น 22 logical CPU (11 core แกนละ 2 thread) \\
+คอมไพเลอร์ & \code{gcc 13.3.0} ไม่ระบุระดับ optimization จึงใช้ค่าเริ่มต้นคือ \code{-O0} \\
+Thread library & POSIX threads ของ \code{glibc 2.39} (ลิงก์ด้วย \code{-lpthread}) \\
+เครื่องมือเสริม & \code{taskset} (util-linux) สำหรับบังคับให้ process ทำงานบน CPU ที่กำหนด \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{หมายเหตุเรื่องหลักฐาน:} ผลการรันทุกครั้งที่แสดงในรายงานเป็นภาพหน้าจอจริงจาก terminal ตัวเลขทุกตัวที่อ้างถึงในคำอธิบายและในตารางสรุปอ่านมาจากภาพโดยตรง ภาพทั้งหมดเก็บไว้ที่ \code{PS07/result/screenshots/} และลำดับคำสั่งที่ใช้ถ่ายภาพอยู่ใน \code{PS07/docs/COMMANDS.md}
+
+% =====================================================================
+\section{ภาพรวมของโปรแกรม}
+% =====================================================================
+
+\subsection{สถานการณ์ที่เลือก: บัญชีเงินฝากร่วมที่ใช้ผ่านตู้ ATM หลายตู้พร้อมกัน}
+
+ตัวอย่างในคาบเรียนใช้ thread หลายตัวบวกค่าตัวนับ (counter) ตัวเดียวกันไปในทิศทางเดียว รายงานนี้เลือกสถานการณ์ที่ต่างออกไปคือ \textbf{บัญชีเงินฝากร่วมหนึ่งบัญชี} ที่มีตู้ ATM หลายตู้ทำรายการพร้อมกัน โดยแต่ละตู้คือ thread หนึ่งตัว และยอดเงินในบัญชีคือตัวแปรที่ทุก thread ใช้ร่วมกัน
+
+\begin{itemize}[leftmargin=*]
+  \item บัญชีเปิดด้วยยอดเงิน 1,000 บาท (\code{INITIAL\_BALANCE})
+  \item thread ครึ่งแรกเป็น \textbf{ตู้ฝากเงิน} ฝากครั้งละ 1 บาท ส่วน thread ครึ่งหลังเป็น \textbf{ตู้ถอนเงิน} ถอนครั้งละ 1 บาท ทุก thread ทำรายการเท่ากันคือ \code{tx} ครั้ง
+  \item เงินที่ไหลเข้าจึงเท่ากับเงินที่ไหลออกเสมอ \textbf{ยอดเงินสุดท้ายที่ถูกต้องต้องเท่ากับ 1,000 บาท} ไม่ว่าจะใช้กี่ thread และไม่ว่าจะทำรายการกี่ครั้ง
+\end{itemize}
+
+สถานการณ์นี้ต่างจากตัวอย่างในคาบเรียนสามข้อ ข้อแรกคือมีการเปลี่ยนค่า\textbf{สองทิศทาง} (ทั้งเพิ่มและลด) ตามที่ใบงานกำหนดให้มีทั้ง increase และ decrease ผลของ race condition จึงออกมาได้ทั้งเป็นบวกและเป็นลบ ข้อที่สองคือความผิดพลาดมีความหมายชัดเจน ถ้ายอดสุดท้ายสูงกว่า 1,000 บาทแปลว่ารายการถอนบางรายการหายไป (ธนาคารเสียเงิน) ถ้าต่ำกว่าแปลว่ารายการฝากบางรายการหายไป (ลูกค้าเสียเงิน) และข้อที่สามคือโปรแกรม\textbf{ตรวจสอบตัวเอง}ได้ เพราะแต่ละ thread นับจำนวนรายการที่ตัวเองทำเสร็จไว้ในตัวแปร local ที่ไม่มีใครใช้ร่วม จึงพิสูจน์ได้ว่ารายการทุกรายการถูกทำจริงครบถ้วน สิ่งที่ผิดมีแต่ยอดเงินในตัวแปรที่ใช้ร่วมกันเท่านั้น
+
+\subsection{โครงสร้างของโปรแกรม}
+
+ตัวแปรที่ทุก thread ใช้ร่วมกันมีเพียงตัวเดียวคือ \code{balance} ซึ่งเป็นตัวแปร global จึงอยู่ในส่วน data ของ process และทุก thread ใน process เดียวกันมองเห็นตำแหน่งหน่วยความจำเดียวกัน ส่วนข้อมูลของแต่ละตู้เก็บใน \code{struct atm} หนึ่งชุดต่อหนึ่ง thread
+
+\begin{lstlisting}[caption={ตัวแปรที่ใช้ร่วมกันและข้อมูลประจำตัวของแต่ละ thread}]
+#define INITIAL_BALANCE 1000L
+#define AMOUNT          1L
+#define MAX_THREADS     64
+
+long balance = INITIAL_BALANCE;
+
+enum role { DEPOSITOR, WITHDRAWER, BOTH };
+
+struct atm {
+    pthread_t tid;
+    enum role role;
+    long      tx;               /* transactions this thread must make     */
+    long      deposits;         /* written once by the thread when done:  */
+    long      withdrawals;      /* how many transactions it really made   */
+};
+\end{lstlisting}
+
+การฝากและถอนเขียนเป็นฟังก์ชันสั้น ๆ ที่แก้ค่า \code{balance} ตรง ๆ โดยไม่มี lock หรือกลไก synchronization ใด ๆ ป้องกันไว้ ซึ่งเป็นจุดที่ใบงานกำหนดให้มี (\textit{without proper synchronization})
+
+\begin{lstlisting}[caption={การฝากและถอนเงินที่ไม่มีการป้องกัน}]
+void deposit_plain(void)
+{
+    balance = balance + AMOUNT;
+}
+
+void withdraw_plain(void)
+{
+    balance = balance - AMOUNT;
+}
+\end{lstlisting}
+
+ฟังก์ชันที่ทุก thread รันคือ \code{atm\_thread()} ซึ่งวนทำรายการตามบทบาทของตัวเอง ตัวนับ \code{done\_dep} และ \code{done\_wdr} เป็นตัวแปร local ที่อยู่บน stack ของแต่ละ thread แยกกัน จึงไม่มีทางเกิด race condition และค่าที่นับได้ถูกต้องเสมอ thread เขียนค่าเหล่านี้กลับเข้า \code{struct atm} ของตัวเองเพียงครั้งเดียวตอนทำงานเสร็จ
+
+\begin{lstlisting}[caption={ฟังก์ชันที่แต่ละ thread รัน}]
+void *atm_thread(void *arg)
+{
+    struct atm *a = arg;
+    long done_dep = 0, done_wdr = 0;
+    long i;
+
+    if (a->role == DEPOSITOR || a->role == BOTH)
+        for (i = 0; i < a->tx; i++) {
+            deposit_plain();
+            done_dep++;
+        }
+    if (a->role == WITHDRAWER || a->role == BOTH)
+        for (i = 0; i < a->tx; i++) {
+            withdraw_plain();
+            done_wdr++;
+        }
+
+    a->deposits    = done_dep;
+    a->withdrawals = done_wdr;
+    return NULL;
+}
+\end{lstlisting}
+
+ฟังก์ชัน \code{main()} รับค่าจาก command line สองตัวคือจำนวน thread และจำนวนรายการต่อ thread (ค่าเริ่มต้นคือ 1 thread และ 1,000,000 รายการ คำสั่ง \code{./ps7} เฉย ๆ ตามใบงานจึงใช้ได้) จากนั้นกำหนดบทบาทของแต่ละ thread ตามตารางด้านล่าง สร้าง thread ทั้งหมดด้วย \code{pthread\_create()} ก่อนแล้วจึงรอทุกตัวด้วย \code{pthread\_join()} เพื่อให้ทุก thread ทำงานซ้อนกันได้ สุดท้ายรวมจำนวนรายการจากทุก thread มาคำนวณยอดที่ควรจะเป็น (\code{expected}) แล้วเทียบกับยอดจริง (\code{actual})
+
+\begin{table}[H]
+\centering\small
+\caption{บทบาทของ thread ตามจำนวน thread ที่ระบุ}
+\begin{tabular}{@{}p{3.2cm}p{12.9cm}@{}}
+\toprule
+\textbf{จำนวน thread} & \textbf{บทบาท} \\
+\midrule
+1 & thread เดียวฝากเงิน \code{tx} ครั้งแล้วจึงถอน \code{tx} ครั้ง ใช้เป็นผลอ้างอิงแบบทำทีละรายการตามลำดับ (Task 1) \\
+เลขคู่ตั้งแต่ 2 ถึง 64 & thread ครึ่งแรกฝากเงินอย่างเดียว ครึ่งหลังถอนเงินอย่างเดียว แต่ละตัวทำ \code{tx} รายการ (Task 2 และ Task 3) \\
+เลขคี่ที่มากกว่า 1 & ไม่รับ เพราะแบ่งฝากกับถอนให้เท่ากันไม่ได้ โปรแกรมพิมพ์วิธีใช้แล้วจบการทำงาน \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+แต่ละรอบการรันพิมพ์ผลเพียงบรรทัดเดียว เพื่อให้ภาพหน้าจอหนึ่งภาพแสดงผลของการรันซ้ำได้หลายรอบ ความหมายของแต่ละช่องเป็นดังนี้
+
+\begin{lstlisting}[style=terminal,caption={รูปแบบผลลัพธ์หนึ่งบรรทัดต่อการรันหนึ่งรอบ}]
+[plain] threads=4 tx=1000000 in=2000000 out=2000000 | expected=1000 actual=... diff=... RACE
+\end{lstlisting}
+
+\begin{itemize}[leftmargin=*]
+  \item \code{threads} และ \code{tx} คือจำนวน thread และจำนวนรายการต่อ thread ที่ระบุตอนรัน
+  \item \code{in} และ \code{out} คือจำนวนรายการฝากและถอนทั้งหมดที่ thread นับได้จริง (จากตัวนับ local)
+  \item \code{expected} คือยอดที่ควรเป็น คำนวณจาก \code{1000 + in - out} ซึ่งเท่ากับ 1,000 เสมอ
+  \item \code{actual} คือค่าใน \code{balance} หลังทุก thread ทำงานเสร็จ และ \code{diff} คือ \code{actual - expected}
+  \item คำสุดท้ายเป็น \code{OK} เมื่อ \code{diff} เท่ากับศูนย์ และเป็น \code{RACE} เมื่อยอดเงินผิด
+\end{itemize}
+
+\subsection{การคอมไพล์}
+
+คอมไพล์ด้วยคำสั่งตามใบงานทุกตัวอักษร คือ \code{gcc -o ps7 ps7.c -lpthread} ตัวเลือก \code{-lpthread} บอก linker ให้ลิงก์กับ POSIX thread library ส่วนการที่\textbf{ไม่ระบุระดับ optimization} (จึงเป็น \code{-O0}) เป็นความตั้งใจ เพราะถ้าใช้ \code{-O2} คอมไพเลอร์มีสิทธิ์มองว่าลูปที่บวก \code{balance} ทีละ 1 เป็นล้านครั้งมีผลเท่ากับการบวกครั้งเดียว และรวบทั้งลูปเหลือคำสั่งเดียว ช่วงเวลาที่ thread สองตัวจะชนกันจึงแทบหายไป ทั้งที่โค้ดยังผิดอยู่เหมือนเดิม
+
+% =====================================================================
+\section{Task 1: รันด้วย thread เดียว}
+% =====================================================================
+
+ใบงานข้อ 2 ให้รันโปรแกรมด้วย thread เดียวก่อน เพื่อยืนยันว่าตรรกะของโปรแกรมถูกต้อง ถ้าผลที่ได้ในขั้นนี้ผิด ความผิดพลาดในขั้นต่อไปก็จะแยกไม่ออกว่าเกิดจาก race condition หรือเกิดจาก bug ธรรมดาในโปรแกรม
+
+\subsection{การคอมไพล์และสภาพแวดล้อม}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t01_env_compile.png}
+\caption{จำนวน CPU รุ่นของ gcc และการคอมไพล์ด้วยคำสั่งตามใบงาน}
+\end{figure}
+
+จากภาพ คำสั่ง \code{nproc} ตอบ \code{22} คือ Linux มองเห็น CPU 22 ตัว ซึ่งหมายความว่า thread หลายตัวของโปรแกรมนี้ได้ CPU คนละตัวและทำงานพร้อมกันได้จริง ข้อนี้จะมีผลมากใน Task 2 คอมไพเลอร์คือ \code{gcc 13.3.0} ของ Ubuntu คำสั่ง \code{gcc -o ps7 ps7.c -lpthread} ไม่พิมพ์ข้อความใดออกมาเลย แปลว่าคอมไพล์ผ่านโดยไม่มีทั้ง error และ warning และ \code{ls -l} แสดงไฟล์ \code{ps7} ขนาด 16,568 byte ที่มีสิทธิ์ execute (สิทธิ์ขึ้นเป็น \code{rwxrwxrwx} ทุกช่อง เพราะไฟล์อยู่บน drive C ของ Windows ที่ WSL2 mount ไว้ที่ \code{/mnt/c})
+
+\subsection{ผลการรันด้วย thread เดียว}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{../result/screenshots/t02_task1_one_thread.png}
+\caption{Task 1: รันด้วย thread เดียว 5 รอบ ได้ยอดเงินถูกต้องทุกรอบ}
+\end{figure}
+
+คำสั่ง \code{./ps7 1 1000000} สร้าง thread ทำงานเพียงตัวเดียว (thread \code{main} มีหน้าที่แค่สร้างแล้วรอด้วย \code{pthread\_join()} และไม่แตะ \code{balance} จนกว่า thread ทำงานจะจบ) thread ตัวนี้ฝากเงิน 1,000,000 ครั้งจนยอดขึ้นไปเป็น 1,001,000 บาท แล้วจึงถอนอีก 1,000,000 ครั้งจนยอดกลับลงมา
+
+ผลทั้ง 5 รอบในภาพเหมือนกันทุกตัวอักษร คือ \code{in=1000000 out=1000000 | expected=1000 actual=1000 diff=+0 OK} แสดงว่า
+\begin{itemize}[leftmargin=*]
+  \item ตรรกะของโปรแกรมถูกต้อง ทั้งการกำหนดบทบาท การวนทำรายการ ตัวนับ local และการคำนวณยอดที่ควรเป็น
+  \item ผลลัพธ์ \textbf{deterministic} คือรันกี่ครั้งก็ได้ค่าเดิม เพราะมี thread เพียงตัวเดียวที่อ่านและเขียน \code{balance} การอ่าน--บวก--เขียนแต่ละครั้งจึงจบครบก่อนเริ่มครั้งถัดไปเสมอ
+  \item แม้ระบบปฏิบัติการจะขัดจังหวะ thread ตัวนี้กลางคันเพื่อไปรันงานอื่นได้ตลอดเวลา แต่ค่าที่ค้างอยู่ใน register ถูกเก็บไว้กับ context ของ thread และถูกคืนกลับมาครบเมื่อได้ทำงานต่อ และระหว่างนั้นไม่มี thread อื่นแก้ \code{balance} ค่าที่เขียนกลับจึงยังถูกต้อง
+\end{itemize}
+
+ผลนี้เป็นเส้นฐานสำหรับเทียบกับขั้นต่อไป ถ้าใช้หลาย thread แล้วยอดเงินผิดไปจาก 1,000 บาท สาเหตุจึงไม่ใช่ bug ในตรรกะของโปรแกรม แต่มาจากการที่หลาย thread แก้ตัวแปรเดียวกันพร้อมกันเท่านั้น
+
+\end{document}

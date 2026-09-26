@@ -57,3 +57,7 @@ Miniproj1/tools/
 # PS06 : เครื่องมือช่วยทำรายงาน (ตัว script commit ไว้ แต่ dependency ไม่นำเข้า Git)
 PS06/tools/node_modules/
 *.tmp.png
+
+# PS07 : ไฟล์ที่คอมไพล์ได้และ dependency ของเครื่องมือทำรายงาน
+ps7
+PS07/tools/node_modules/
